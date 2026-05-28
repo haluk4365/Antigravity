@@ -1,0 +1,321 @@
+@import "tailwindcss";
+@source "../";
+
+@theme {
+  /* ── [MARKA ADI] Brand System ── */
+  --color-night: #08090C;          /* primary background */
+  --color-night-soft: #0E0F14;     /* surface */
+  --color-night-elev: #14161D;     /* elevated surface */
+  --color-paper: #EDEAE3;          /* light alternative surface */
+  --color-paper-soft: #F4F2EC;     /* light alt soft */
+  --color-blue: #4F8BFF;           /* accent blue */
+  --color-blue-soft: #7AA8FF;      /* hover/lighter accent */
+  --color-blue-deep: #2F6BE6;      /* pressed/deeper accent */
+  --color-ash: #C9CCD4;            /* warm gray text */
+  --color-ash-mute: #8A8E99;       /* muted gray */
+
+  /* legacy aliases — kept so older tokens still resolve */
+  --color-dark-bg: #08090C;
+  --color-dark-surface: #0E0F14;
+  --color-glass-border: rgba(255, 255, 255, 0.08);
+  --color-glass-bg: rgba(255, 255, 255, 0.03);
+  --color-electric-blue: #4F8BFF;
+  --color-accent-purple: #4F8BFF;
+  --color-accent-violet: #7AA8FF;
+  --color-silver: #8A8E99;
+
+  --font-sans: 'Inter Tight', 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Inter Tight', var(--font-sans);
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    background-color: var(--color-night);
+    color: #F4F2EC;
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: rgba(79, 139, 255, 0.35);
+    color: #F4F2EC;
+  }
+
+  /* Editorial type rhythm */
+  h1, h2, h3, h4 { letter-spacing: -0.025em; font-weight: 600; }
+  h1 { letter-spacing: -0.035em; font-weight: 700; }
+}
+
+@layer utilities {
+  /* ── Mono label (JetBrains Mono uppercase tag) ── */
+  .mono-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-ash-mute);
+  }
+
+  /* ── Glass Surfaces ── */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.025);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow:
+      0 4px 30px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .glass-button {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-button::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(79, 139, 255, 0.18) 0%, rgba(79, 139, 255, 0.04) 100%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .glass-button:hover::before { opacity: 1; }
+
+  .glass-button:hover {
+    border-color: rgba(79, 139, 255, 0.45);
+    transform: translateY(-3px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45), 0 0 30px rgba(79, 139, 255, 0.18);
+  }
+
+  /* Primary CTA — solid blue */
+  .btn-primary {
+    background: var(--color-blue);
+    color: #08090C;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 8px 24px rgba(79, 139, 255, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.30);
+  }
+  .btn-primary:hover {
+    background: var(--color-blue-soft);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 36px rgba(79, 139, 255, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.40);
+  }
+
+  /* ── Bento Card ── */
+  .bento-card {
+    background: rgba(255, 255, 255, 0.022);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 24px;
+    padding: 2rem;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .bento-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(79, 139, 255, 0.10), transparent 40%);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+  }
+
+  .bento-card:hover::before { opacity: 1; }
+
+  .bento-card:hover {
+    border-color: rgba(79, 139, 255, 0.30);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  }
+
+  /* ── Text Gradients (monochrome editorial — no rainbow) ── */
+  .text-gradient {
+    background: linear-gradient(180deg, #F4F2EC 0%, #C9CCD4 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* legacy "accent" gradient → unified blue, no purple/cyan */
+  .text-gradient-accent {
+    background: linear-gradient(135deg, #4F8BFF 0%, #7AA8FF 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-warm {
+    background: linear-gradient(135deg, #EDEAE3 0%, #4F8BFF 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* solid accent text — replacement for rainbow gradients */
+  .text-blue { color: var(--color-blue); }
+  .text-paper { color: var(--color-paper); }
+  .text-ash { color: var(--color-ash); }
+  .text-ash-mute { color: var(--color-ash-mute); }
+
+  /* ── Section Dividers ── */
+  .section-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.10) 50%, transparent 100%);
+  }
+
+  /* ── Halftone divider — echoes D11 Ash mark (dots grow left→right) ── */
+  .halftone-divider {
+    height: 12px;
+    width: 100%;
+    background-image: url("/images/halftone-strip.svg"); /* TODO: kendi doku gorselinizi koyun */
+    background-repeat: repeat-x;
+    background-position: center;
+    background-size: 480px 12px;
+    opacity: 0.55;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  }
+
+  /* ── Halftone arc — minimal three-dot accent (echoes mark's lit-side gradient) ── */
+  .halftone-arc {
+    display: inline-block;
+    width: 1.6rem;
+    height: 0.55rem;
+    -webkit-mask: url("/images/halftone-arc-mini.svg") center/contain no-repeat; /* TODO: kendi doku gorseliniz */
+            mask: url("/images/halftone-arc-mini.svg") center/contain no-repeat;
+    background-color: currentColor;
+    vertical-align: middle;
+  }
+
+  /* ── Dotted halftone canvas — fine ambient texture (already exists, kept) ── */
+  .halftone-bg {
+    background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.04) 1px, transparent 0);
+    background-size: 28px 28px;
+  }
+
+  /* Coarser variant — bigger dots, used for bigger sections */
+  .halftone-bg-lg {
+    background-image:
+      radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.05) 1.4px, transparent 0),
+      radial-gradient(circle at 24px 24px, rgba(79, 139, 255, 0.05) 1.8px, transparent 0);
+    background-size: 48px 48px, 48px 48px;
+  }
+
+  /* ── Ash drift particle (single tiny dot, animates upward-left) ── */
+  .ash-drift {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(244, 242, 236, 0.6);
+    animation: drift-particles 8s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  /* ── Animated Gradient Background — quieter, blue-only ── */
+  .gradient-bg-animated {
+    background: linear-gradient(
+      135deg,
+      var(--color-night) 0%,
+      #0A0C13 25%,
+      #0B0E1A 50%,
+      #0A0C13 75%,
+      var(--color-night) 100%
+    );
+    background-size: 400% 400%;
+    animation: gradientShift 18s ease infinite;
+  }
+
+  /* ── Glow Effects (single blue tone) ── */
+  .glow-blue {
+    box-shadow: 0 0 40px rgba(79, 139, 255, 0.18), 0 0 80px rgba(79, 139, 255, 0.06);
+  }
+
+  .glow-purple { /* legacy alias — collapses to same blue glow */
+    box-shadow: 0 0 40px rgba(79, 139, 255, 0.18), 0 0 80px rgba(79, 139, 255, 0.06);
+  }
+
+  /* ── Floating ── */
+  .floating {
+    animation: floating 6s ease-in-out infinite;
+  }
+
+  .floating-slow {
+    animation: floating 10s ease-in-out infinite;
+  }
+
+  /* (kept above for organization) */
+
+  /* ── Blog Prose ── */
+  .prose-blog {
+    color: #C9CCD4;
+    line-height: 1.8;
+  }
+  .prose-blog h1 { font-size: 2.5rem; font-weight: 700; color: #F4F2EC; margin-bottom: 1rem; line-height: 1.2; letter-spacing: -0.03em; }
+  .prose-blog h2 { font-size: 1.75rem; font-weight: 600; color: #F4F2EC; margin-top: 2.5rem; margin-bottom: 0.75rem; letter-spacing: -0.02em; }
+  .prose-blog h3 { font-size: 1.25rem; font-weight: 600; color: #E2E2DC; margin-top: 2rem; margin-bottom: 0.5rem; }
+  .prose-blog p { margin-bottom: 1.25rem; }
+  .prose-blog ul, .prose-blog ol { margin-bottom: 1.25rem; padding-left: 1.5rem; }
+  .prose-blog li { margin-bottom: 0.5rem; }
+  .prose-blog li::marker { color: var(--color-blue); }
+  .prose-blog strong { color: #F4F2EC; font-weight: 600; }
+  .prose-blog a { color: var(--color-blue); text-decoration: underline; text-underline-offset: 2px; transition: color 0.2s; }
+  .prose-blog a:hover { color: var(--color-blue-soft); }
+  .prose-blog blockquote { border-left: 3px solid var(--color-blue); padding-left: 1rem; margin: 1.5rem 0; color: #8A8E99; font-style: italic; }
+  .prose-blog code { background: rgba(255,255,255,0.06); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; font-family: var(--font-mono); }
+  .prose-blog pre { background: #0E0F14; border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+  .prose-blog img { border-radius: 12px; margin: 1.5rem 0; }
+}
+
+/* ── Keyframes ── */
+@keyframes floating {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes reveal-line {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes drift-particles {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  20% { opacity: 0.6; }
+  100% { transform: translate(-40px, -60px) rotate(-12deg); opacity: 0; }
+}

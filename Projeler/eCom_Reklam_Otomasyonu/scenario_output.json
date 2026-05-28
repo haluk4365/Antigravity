@@ -1,0 +1,58 @@
+{
+  "narrative_hook": "Alpler buz gibi ama ben sıcacık kalıyorum",
+  "title": "Alplerde Sıcacık ve Şık: LARA ARI Furry Leg Warmers",
+  "summary": "Alplerin soğuk havasında LARA ARI'nın furry leg warmers'ı ile tarzımdan ödün vermeden sıcacık kaldım.",
+  "hook_pattern": "Problem-Solution",
+  "narrative_pattern": "linear",
+  "voice_name": "Sarah",
+  "character_gender": "kadın",
+  "scene_count": 3,
+  "total_duration_seconds": 15,
+  "character_visual_prompt": "Single early-20s Turkish woman, wearing winter streetwear coat and brown faux fur leg warmers with silver heart buckles, standing in snowy Alpine landscape, photorealistic, soft lighting, candid expression, 9:16 vertical",
+  "character_visual_prompt_before": "",
+  "character_visual_prompt_after": "",
+  "scenes": [
+    {
+      "scene_name": "Putting on Leg Warmers",
+      "video_prompt": "UGC creator footage, vertical 9:16, handheld iPhone camera, close-up of a woman pulling up brown faux fur leg warmers onto her legs, showing the black leather belt and silver heart buckle detail, soft indoor light, natural movement, phone sensor grain.",
+      "voiceover_segment": "[whispers] Alpler buz gibi ama ben sıcacık kalıyorum [pause] bu peluş LARA ARI leg warmers sayesinde.",
+      "duration_seconds": 5,
+      "character_state": "after"
+    },
+    {
+      "scene_name": "Walking Outside in Snow",
+      "video_prompt": "UGC creator footage, vertical 9:16, handheld iPhone camera, outdoor shot of the woman walking forward on a snowy path in the Alps, showing her legs with the brown faux fur leg warmers and boots, soft winter sunlight, slight camera movement, natural expression.",
+      "voiceover_segment": "[delighted] Soğuk havada bile stilimden ödün vermiyorum, [mischievously] çünkü bacaklarım sıcacık.",
+      "duration_seconds": 6,
+      "character_state": "after"
+    },
+    {
+      "scene_name": "Close-up on Leg Warmers",
+      "video_prompt": "UGC creator footage, vertical 9:16, close-up details of the brown faux fur leg warmers and silver heart buckle, soft natural winter light, high texture detail, phone camera movement, ambient snowy background.",
+      "voiceover_segment": "[in awe] LARA ARI ile kış stilim hem sıcak hem zarif, [pause] favorim oldu kesinlikle.",
+      "duration_seconds": 4,
+      "character_state": "after"
+    }
+  ],
+  "voiceover_text": "[whispers] Alpler buz gibi ama ben sıcacık kalıyorum [pause] bu peluş LARA ARI leg warmers sayesinde. [delighted] Soğuk havada bile stilimden ödün vermiyorum, [mischievously] çünkü bacaklarım sıcacık. [in awe] LARA ARI ile kış stilim hem sıcak hem zarif, [pause] favorim oldu kesinlikle.",
+  "technical_notes": "3 scene multi-scene UGC winter ad",
+  "duration": 15,
+  "scene_durations": [
+    5,
+    6,
+    4
+  ],
+  "aspect_ratio": "9:16",
+  "language": "Türkçe",
+  "has_reference_images": true,
+  "cost": {
+    "credits_per_second": 25,
+    "total_credits": 375,
+    "seedance_usd": 1.875,
+    "total_usd": 2.01,
+    "scene_count": 3,
+    "actual_duration": 15,
+    "resolution": "720p"
+  },
+  "is_multi_scene": true
+}
