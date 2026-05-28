@@ -8,7 +8,8 @@ Bu dosya, Railway'e deploy edilmiş projelerin kayıt defteridir.
 
 | Proje | Railway Proje ID | Service ID | Ortam | Tip | Durum |
 |-------|-----------------|------------|-------|-----|-------|
-| _(İlk deploy'unuzda buraya ekleyin)_ | | | production | | |
+| eCom_Reklam_Otomasyonu | `69be07e1-f26e-409f-9e03-bf0d2b8cc04d` | `dd5ffc56-7faf-4a60-abdb-5afb74944f4c` | production | Worker | ✅ Aktif |
+
 
 ---
 
