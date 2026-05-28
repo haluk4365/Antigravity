@@ -32,8 +32,11 @@ class Config:
         self.TELEGRAM_BOT_TOKEN = self._require_env("TELEGRAM_ECOM_BOT_TOKEN")
         self.ADMIN_CHAT_ID = int(self._require_env("TELEGRAM_ADMIN_CHAT_ID"))
         
-        allowed_users_raw = os.environ.get("TELEGRAM_ALLOWED_USERS", "")
-        if allowed_users_raw:
+        allowed_users_raw = os.environ.get("TELEGRAM_ALLOWED_USERS", "").strip()
+        self.ALLOW_ALL_USERS = allowed_users_raw == "*"
+        if self.ALLOW_ALL_USERS:
+            self.ALLOWED_USER_IDS = []
+        elif allowed_users_raw:
             try:
                 self.ALLOWED_USER_IDS = [int(x.strip()) for x in allowed_users_raw.split(",") if x.strip()]
             except ValueError:
@@ -41,8 +44,9 @@ class Config:
         else:
             self.ALLOWED_USER_IDS = [self.ADMIN_CHAT_ID]
             
-        if self.ADMIN_CHAT_ID not in self.ALLOWED_USER_IDS:
+        if not self.ALLOW_ALL_USERS and self.ADMIN_CHAT_ID not in self.ALLOWED_USER_IDS:
             self.ALLOWED_USER_IDS.append(self.ADMIN_CHAT_ID)
+
 
         # ── OpenAI (GPT-4.1 Mini — Chat + Vision) ──
         self.OPENAI_API_KEY = self._require_env("OPENAI_API_KEY")

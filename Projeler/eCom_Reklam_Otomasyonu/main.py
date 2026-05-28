@@ -263,7 +263,10 @@ async def _cleanup_idle_sessions(app=None):
 
 def is_authorized(user_id: int) -> bool:
     """Sadece izin verilen kullanıcıları kabul et."""
+    if getattr(settings, "ALLOW_ALL_USERS", False):
+        return True
     return user_id in settings.ALLOWED_USER_IDS
+
 
 
 async def unauthorized_reply(update: Update):
