@@ -683,13 +683,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             admin_sess.state = ConversationState.IDLE
             admin_sess.admin_targeting_client = None
             
-            # Dynamic A6 Proposal Card Generation
+            # Dynamic Telegram-Optimized Proposal Card Generation
             img_path = None
             try:
-                from utils.card_generator import generate_a6_proposal_card
-                img_path = generate_a6_proposal_card(client_sess.scenario, price)
+                from utils.card_generator import generate_telegram_proposal_card
+                img_path = generate_telegram_proposal_card(client_sess.scenario, price)
             except Exception as card_err:
                 log.error(f"Teklif kartı görseli oluşturulamadı (fallback metin kullanılacak): {card_err}")
+
 
             client_keyboard = InlineKeyboardMarkup([
                 [
