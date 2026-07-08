@@ -320,13 +320,13 @@ SCENE_REGISTRY: list[SceneDefinition] = [
         voice_enabled=False,
     ),
 
-    # SAHNE-12: Brief Onay — REFERANS_BRIEF_OZETI PNG render (MASTER-010)
+    # SAHNE-12: Brief Onay — REFERANS_Brief_Onay_Formu PNG render (MASTER-010)
     # PNG _deliver_brief_table() tarafından render edilip send_photo ile gönderilir.
     SceneDefinition(
         scene_id="SAHNE-12",
         scene_name="Brief Onay Ekranı",
         state=UserState.BRIEF_REVIEW,
-        text="📋 Brief Özeti — REFERANS_BRIEF_OZETI PNG olarak gönderilir.",
+        text="📋 Brief Onayı — REFERANS_Brief_Onay_Formu PNG olarak gönderilir.",
         next_state=UserState.BRIEF_COMPLETED,
         trigger_event=UserEvent.BRIEF_APPROVED,
         buttons=[],

@@ -18,7 +18,7 @@ from utils.state_engine import StateEngine, UserState, UserEvent
 from helpers.typewriter_animation import typewriter_animation
 from services.scene_delivery import scene_delivery
 from services.scene_engine import conversation_scene_engine
-from services.render_service import render_brief_ozeti
+from services.render_service import render_brief_onay
 from services.scene_registry import get_scene_for_state, SCENE_REGISTRY
 
 # CEE + EEC + Olay Kayıt Merkezi entegrasyonu
@@ -1213,7 +1213,7 @@ async def handle_emphasis_done(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# SAHNE-12: Brief Onay Tablosu — REFERANS_BRIEF_OZETI Referans Form uyumlu
+# SAHNE-12: Brief Onay Tablosu — REFERANS_Brief_Onay_Formu Referans Form uyumlu
 # (AR-002_64 + FD-008_1 + MASTER-010)
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1235,7 +1235,7 @@ BRIEF_FIELDS = [
     ("brief_emphasis",  "✨ Vurgulanacaklar",     "SAHNE-11",              True),
 ]
 
-# REFERANS_BRIEF_OZETI formuna göre kategorize edilmiş bölümler
+# REFERANS_Brief_Onay_Formu formuna göre kategorize edilmiş bölümler
 # Her bölüm: (başlık, [field_key'ler])
 BRIEF_SECTIONS = [
     ("🏷️ Ürün Bilgileri",  ["brief_link", "brief_material"]),
@@ -1333,9 +1333,9 @@ def _get_brief_checks(user_data: dict) -> dict:
 
 
 async def _deliver_brief_table(chat_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """SAHNE-12: REFERANS_BRIEF_OZETI → PNG + Aktif Onay Butonları (MASTER-010).
+    """SAHNE-12: REFERANS_Brief_Onay_Formu → PNG + Aktif Onay Butonları (MASTER-010).
 
-    MASTER-010 uyarınca REFERANS_BRIEF_OZETI Referans Formu PNG olarak render edilir.
+    MASTER-010 uyarınca REFERANS_Brief_Onay_Formu Referans Formu PNG olarak render edilir.
     PNG sonrası Telegram inline butonları ile kullanıcı onayı alınır:
     - ✅ ONAYLIYORUM → BRIEF_APPROVED → SAHNE-13 akışı
     - ✏️ DÜZELTMEK İSTİYORUM → SAHNE-12 düzeltme modu
@@ -1343,7 +1343,7 @@ async def _deliver_brief_table(chat_id: int, context: ContextTypes.DEFAULT_TYPE)
     checks = _get_brief_checks(context.user_data)
 
     from io import BytesIO
-    png_bytes = await render_brief_ozeti(context.user_data, checks)
+    png_bytes = await render_brief_onay(context.user_data, checks)
     if png_bytes is None:
         logger.error(f"❌ [SAHNE-12] PNG render başarısız.")
         raise RuntimeError("SAHNE-12 PNG render başarısız — Referans Form oluşturulamadı.")

@@ -112,57 +112,50 @@ async def render_scenario_approval(user_data: dict) -> bytes | None:
     return await render_form_png("REFERANS_SENARYO_ONAY_FORMU", data)
 
 
-async def render_brief_ozeti(user_data: dict, checks: dict) -> bytes | None:
-    """REFERANS_BRIEF_OZETI → PNG — sample-data.json şeması tek otorite."""
-    from handlers.website import _get_brief_value
+async def render_brief_onay(user_data: dict, checks: dict) -> bytes | None:
+    """REFERANS_Brief_Onay_Formu → PNG — SAHNE-12'nin tek resmi referans formu."""
+    from handlers.website import _get_brief_value, BRIEF_FIELDS
     from datetime import datetime
 
-    # Ürün Adı: URL'den veya araştırmadan
-    url = user_data.get("website_url", "")
-    if url:
-        product_name = url.rstrip("/").split("/")[-1].split("?")[0][:40] or "Ürün"
-    else:
-        product_name = user_data.get("product_name", "—")
+    # Maddeler: BRIEF_FIELDS sırasına göre, checks dict'ten onayli durumu
+    maddeler = []
+    aciklama_map = {
+        "brief_link":       "Analiz edilen ürün sayfası",
+        "brief_material":   "Kullanıcının yüklediği materyaller",
+        "brief_platform":   "Yayınlanacak platform",
+        "brief_format":     "Seçilen video formatı",
+        "brief_resolution": "Video çözünürlüğü",
+        "brief_duration":   "Tercih edilen video süresi",
+        "brief_style":      "Reklam tanıtım tarzı",
+        "brief_audience":   "Reklam hedef kitlesi",
+        "brief_audio":      "Ses tercihleri",
+        "brief_voicelang":  "Seçilen seslendirme dili",
+        "brief_voicechar":  "Seslendirme karakteri",
+        "brief_emphasis":   "Öne çıkarılacak detaylar",
+    }
 
-    # Marka
-    brand = user_data.get("brand", "—")
-
-    # Referans Görsel
-    img_count = user_data.get("material_count", 0)
-    ref_gorsel = f"{img_count} adet" if img_count > 0 else "Yok"
+    for field_key, label, scene_id, editable in BRIEF_FIELDS:
+        ikon = label.split(" ", 1)[0] if " " in label else ""
+        baslik = label.split(" ", 1)[1] if " " in label else label
+        maddeler.append({
+            "onayli": checks.get(field_key, True),
+            "ikon": ikon,
+            "baslik": baslik,
+            "aciklama": aciklama_map.get(field_key, "Brief bilgisi"),
+            "deger": _get_brief_value(user_data, field_key),
+        })
 
     data = {
         "adimlar": [
-            {"no": 1, "baslik": "Brief", "altbaslik": "Özet İncelemede", "durum": "active"},
+            {"no": 1, "baslik": "Brief", "altbaslik": "İncelemede", "durum": "active"},
             {"no": 2, "baslik": "Senaryo", "altbaslik": "Sıradaki Adım", "durum": "pending"},
+            {"no": 3, "baslik": "Fiyat Teklifi", "altbaslik": "Sıradaki Adım", "durum": "pending"},
         ],
-        "urun": [
-            {"ikon": "🏷️", "label": "Ürün Adı", "deger": product_name},
-            {"ikon": "⭐", "label": "Marka", "deger": brand},
-            {"ikon": "🔗", "label": "Ürün Linki", "deger": _get_brief_value(user_data, "brief_link")},
-            {"ikon": "🖼️", "label": "Referans Görsel", "deger": ref_gorsel},
-            {"ikon": "📦", "label": "Ek Materyal", "deger": _get_brief_value(user_data, "brief_material")},
-        ],
-        "video": [
-            {"ikon": "📱", "label": "Platform", "deger": _get_brief_value(user_data, "brief_platform")},
-            {"ikon": "🎬", "label": "Format", "deger": _get_brief_value(user_data, "brief_format")},
-            {"ikon": "📺", "label": "Çözünürlük", "deger": _get_brief_value(user_data, "brief_resolution")},
-            {"ikon": "⏱️", "label": "Video Süresi", "deger": _get_brief_value(user_data, "brief_duration")},
-            {"ikon": "🎨", "label": "Tanıtım Tarzı", "deger": _get_brief_value(user_data, "brief_style")},
-            {"ikon": "👥", "label": "Hedef Kitle", "deger": _get_brief_value(user_data, "brief_audience")},
-        ],
-        "ses": [
-            {"ikon": "🎙️", "label": "Ses Yapısı", "deger": _get_brief_value(user_data, "brief_audio")},
-            {"ikon": "🌍", "label": "Seslendirme Dili", "deger": _get_brief_value(user_data, "brief_voicelang")},
-            {"ikon": "🎭", "label": "Ses Karakteri", "deger": _get_brief_value(user_data, "brief_voicechar")},
-        ],
-        "tercihler": [
-            {"ikon": "✨", "label": "Vurgulanacaklar", "deger": _get_brief_value(user_data, "brief_emphasis")},
-        ],
+        "maddeler": maddeler,
         "footer": {
-            "kod": "UI_REF_007_BRIEF_OZETI_V1",
+            "kod": "UI_REF_002_BRIEF_ONAY_FORMU_V1",
             "versiyon": "V1.0",
             "tarih": datetime.now().strftime("%d.%m.%Y"),
         },
     }
-    return await render_form_png("REFERANS_BRIEF_OZETI", data)
+    return await render_form_png("REFERANS_Brief_Onay_Formu", data)

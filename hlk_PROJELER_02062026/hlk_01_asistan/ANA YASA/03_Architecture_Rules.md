@@ -4293,7 +4293,7 @@ Hiçbir modül, `sample-data.json` dışında yeni bir veri modeli oluşturamaz.
 
 Bu kural aşağıdaki tüm REFERANS FORM'lar için geçerlidir:
 
-* REFERANS_BRIEF_OZETI
+* REFERANS_Brief_Onay_Formu
 * REFERANS_SENARYO_ONAY_FORMU
 * REFERANS_KULLANICI_FIYAT_TEKLIF_FORMU
 * REFERANS_YONETICI_FIYATLANDIRMA_FORMU
@@ -4377,7 +4377,7 @@ Bu kural mevcut ve gelecekte oluşturulacak tüm REFERANS FORM bileşenleri içi
 
 Bu kural aşağıdaki tüm REFERANS FORM'lar için geçerlidir:
 
-* REFERANS_BRIEF_OZETI
+* REFERANS_Brief_Onay_Formu
 * REFERANS_SENARYO_ONAY_FORMU
 * REFERANS_KULLANICI_FIYAT_TEKLIF_FORMU
 * REFERANS_YONETICI_FIYATLANDIRMA_FORMU
@@ -4394,7 +4394,7 @@ Bu kuralın amacı;
 
 * Her REFERANS FORM'un kendi kendine yeterli, bağımsız bir bileşen olmasını sağlamak,
 * Bir REFERANS FORM'un tasarımının veya veri modelinin başka bir formdan kopyalanmasını veya ödünç alınmasını engellemek,
-* REFERANS_BRIEF_OZETI örneğinde olduğu gibi, bir formun kendi base.css standart tasarım sistemi yerine özel CSS ve DOM yapısı kullanarak referans PNG'den sapmasını anayasal olarak önlemek,
+* REFERANS_Brief_Onay_Formu örneğinde olduğu gibi, bir formun kendi base.css standart tasarım sistemi yerine özel CSS ve DOM yapısı kullanarak referans PNG'den sapmasını anayasal olarak önlemek,
 * Her formun kendi `template.html`, `render.js` ve `sample-data.json` dosyalarıyla tam ve bağımsız olarak çalışmasını garanti altına almak,
 * Formlar arası gizli bağımlılıkları (örneğin bir formun CSS'inin başka bir formun stillerine bağımlı olması) Constitution Violation olarak tanımlamak,
 * Runtime'da her formun yalnızca kendi referans bileşenlerini kullanarak doğru çıktıyı üretmesini sağlamaktır.
