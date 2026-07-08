@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Yönetici Fiyatlandırma Formu</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .service-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .service-table th { background: #f8fafc; padding: 10px 14px; text-align: left; font-weight: 700; font-size: 11px; color: var(--muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  .service-table td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+  .risk-card { border: 1px solid var(--red); background: var(--red-bg); border-radius: 12px; padding: 18px 22px; margin-bottom: 16px; }
+  .risk-card h3 { font-size: 14px; color: var(--red); margin: 0 0 8px; }
+  .risk-card p { font-size: 12.5px; margin: 0; line-height: 1.6; }
+  .price-input-row { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+  .price-input-row label { font-weight: 700; font-size: 14px; }
+  .price-input-row input { padding: 12px 16px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; font-weight: 700; width: 200px; }
+</style>
+</head>
+<body>
+<div class="sheet" id="sheet">
+  <div class="header">
+    <div class="logo"><span class="name">HLK</span><span class="tag">YAPAY ZEKA REKLAM ASİSTANI</span></div>
+    <div class="admin-badge">🔒 YALNIZCA YÖNETİCİ</div>
+    <div class="title">Fiyatlandırma Formu</div>
+    <div class="subtitle">Operasyon özeti ve fiyat teklifi belirleme ekranıdır.</div>
+  </div>
+  <div class="steps" id="steps"></div>
+  {{COMPONENT:product_summary}}
+  {{COMPONENT:service_table}}
+  {{COMPONENT:risk_analysis}}
+  {{COMPONENT:cost_summary}}
+  {{COMPONENT:pricing_panel}}
+  {{COMPONENT:action_buttons}}
+  <div class="footer" id="footer"></div>
+</div>
+<script>
+const DATA = {{DATA_JSON}};
+document.getElementById('steps').innerHTML = DATA.adimlar.map(a => `<div class="step ${a.durum}"><div class="circle">${a.durum==='done'?'✓':a.no}</div><div class="label"><b>${a.baslik}</b><span>${a.altbaslik}</span></div></div>`).join('');
+document.getElementById('urunOzet').innerHTML = DATA.urunOzet.map(u => `<div class="info-item"><span class="icon">${u.ikon}</span><div><b>${u.label}</b><span>${u.deger}</span></div></div>`).join('');
+document.getElementById('serviceTable').querySelector('tbody').innerHTML = DATA.servisler.map(s => `<tr><td><b>${s.ad}</b></td><td>${s.kullanim}</td><td><span class="badge ${s.apiDurumSinif}">${s.apiDurum}</span></td><td>${s.kredi}</td><td>${s.guvenSkoru}</td></tr>`).join('');
+document.getElementById('riskTitle').innerText = DATA.risk.baslik;
+document.getElementById('riskDesc').innerHTML = DATA.risk.aciklama;
+document.getElementById('maliyetGrid').innerHTML = DATA.maliyet.map(m => `<div class="info-item"><span class="icon">${m.ikon}</span><div><b>${m.label}</b><span>${m.deger}</span></div></div>`).join('');
+document.getElementById('footer').innerHTML = `<span>🔖 Bu ekran HLK'nın resmi referansıdır.</span><span>Kod: ${DATA.footer.kod}</span><span>Versiyon: ${DATA.footer.versiyon}</span><span>Tarih: ${DATA.footer.tarih}</span>`;
+</script>
+</body>
+</html>

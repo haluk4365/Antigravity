@@ -1,0 +1,34 @@
+{
+  "adimlar": [
+    { "no": 1, "baslik": "Brief", "altbaslik": "Özet İncelemede", "durum": "active" },
+    { "no": 2, "baslik": "Senaryo", "altbaslik": "Sıradaki Adım", "durum": "pending" }
+  ],
+  "urun": [
+    { "ikon": "🏷️", "label": "Ürün Adı", "deger": "HLK Vitamin C Serum" },
+    { "ikon": "⭐", "label": "Marka", "deger": "HLK Cosmetics" },
+    { "ikon": "🔗", "label": "Ürün Linki", "deger": "milagron.com/products/..." },
+    { "ikon": "🖼️", "label": "Referans Görsel", "deger": "Bulundu (1 adet)" },
+    { "ikon": "📦", "label": "Ek Materyal", "deger": "1 adet fotoğraf" }
+  ],
+  "video": [
+    { "ikon": "📱", "label": "Platform", "deger": "Instagram / Facebook" },
+    { "ikon": "🎬", "label": "Format", "deger": "Dikey (9:16)" },
+    { "ikon": "📺", "label": "Çözünürlük", "deger": "1080p Full HD" },
+    { "ikon": "⏱️", "label": "Video Süresi", "deger": "12 saniye" },
+    { "ikon": "🎨", "label": "Tanıtım Tarzı", "deger": "UGC Tarzı" },
+    { "ikon": "👥", "label": "Hedef Kitle", "deger": "18–34 Yaş Kadın" }
+  ],
+  "ses": [
+    { "ikon": "🎙️", "label": "Ses Yapısı", "deger": "Dış Seslendirme + Fon Müziği" },
+    { "ikon": "🌍", "label": "Seslendirme Dili", "deger": "Türkçe" },
+    { "ikon": "🎭", "label": "Ses Karakteri", "deger": "Kadın Ses" }
+  ],
+  "tercihler": [
+    { "ikon": "✨", "label": "Vurgulanacaklar", "deger": "Ücretsiz Kargo, Yerli Üretim" }
+  ],
+  "footer": {
+    "kod": "UI_REF_007_BRIEF_OZETI_V1",
+    "versiyon": "V1.0",
+    "tarih": "07.07.2026"
+  }
+}

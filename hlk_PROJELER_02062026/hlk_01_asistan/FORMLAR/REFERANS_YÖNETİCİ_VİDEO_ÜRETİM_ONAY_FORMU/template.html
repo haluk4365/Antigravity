@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Yönetici Video Üretim Onay Formu</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .production-summary { display: flex; gap: 16px; flex-wrap: wrap; }
+  .prod-card {
+    flex: 1; min-width: 150px; border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; text-align: center; display: flex; flex-direction: column; gap: 6px;
+  }
+  .prod-card .big { font-size: 32px; font-weight: 800; }
+  .prod-card .label { font-size: 12px; color: var(--muted); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="sheet" id="sheet">
+  <div class="header">
+    <div class="logo"><span class="name">HLK</span><span class="tag">YAPAY ZEKA REKLAM ASİSTANI</span></div>
+    <div class="admin-badge">🔒 YALNIZCA YÖNETİCİ</div>
+    <div class="title">Video Üretim Onayı</div>
+    <div class="subtitle">Üretim paketi doğrulaması — bu form onaylanmadan üretim başlatılamaz.</div>
+  </div>
+  <div class="pid-box" id="pidBox">PID: --</div>
+  <div class="section"><div class="section-title"><span class="num">1</span>ÜRETİM PAKETİ ÖZETİ</div>
+    <div class="card"><div class="info-grid" id="paketOzet"></div></div>
+  </div>
+  <div class="section"><div class="section-title"><span class="num">2</span>ÜRETİM DETAYLARI</div>
+    <div class="production-summary" id="prodSummary"></div>
+  </div>
+  <div class="section"><div class="section-title"><span class="num">3</span>SERVİS DURUMU</div>
+    <div class="card"><div class="info-grid" id="servisGrid"></div></div>
+  </div>
+  <div class="warning-box" id="warningBox"><h3 id="warningTitle"></h3><p id="warningDesc"></p></div>
+  <div class="actions">
+    <div class="btn approve"><div class="circle-ic">✓</div><div><b>ÜRETİMİ BAŞLAT</b><span>PID oluşturulur, üretim süreci başlatılır.</span></div></div>
+    <div class="btn reject"><div class="circle-ic">✕</div><div><b>İPTAL</b><span>Üretim iptal edilir, oturum sonlandırılır.</span></div></div>
+  </div>
+  <div class="footer" id="footer"></div>
+</div>
+<script>
+const DATA = {{DATA_JSON}};
+document.getElementById('pidBox').innerText = `PID: ${DATA.pid}`;
+document.getElementById('paketOzet').innerHTML = DATA.paketOzet.map(p => `<div class="info-item"><span class="icon">${p.ikon}</span><div><b>${p.label}</b><span>${p.deger}</span></div></div>`).join('');
+document.getElementById('prodSummary').innerHTML = DATA.uretimDetay.map(d => `<div class="prod-card"><span class="big">${d.ikon}</span><span class="label">${d.label}</span><b>${d.deger}</b></div>`).join('');
+document.getElementById('servisGrid').innerHTML = DATA.servisler.map(s => `<div class="info-item"><span class="icon">${s.ikon}</span><div><b>${s.ad}</b><span>${s.durum}</span></div></div>`).join('');
+document.getElementById('warningTitle').innerText = DATA.uyari.baslik;
+document.getElementById('warningDesc').innerHTML = DATA.uyari.aciklama;
+document.getElementById('footer').innerHTML = `<span>🔖 Bu ekran HLK'nın resmi referansıdır.</span><span>Kod: ${DATA.footer.kod}</span><span>Versiyon: ${DATA.footer.versiyon}</span><span>Tarih: ${DATA.footer.tarih}</span>`;
+</script>
+</body>
+</html>

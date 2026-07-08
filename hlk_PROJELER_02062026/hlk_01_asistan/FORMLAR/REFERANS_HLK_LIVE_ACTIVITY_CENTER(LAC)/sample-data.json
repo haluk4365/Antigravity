@@ -1,0 +1,51 @@
+{
+  "aktifPid": "PID-20260701-0001",
+  "navItems": [
+    { "ikon": "📊", "isim": "Dashboard", "active": true, "sayac": null },
+    { "ikon": "🔄", "isim": "Oturumlar", "active": false, "sayac": 3 },
+    { "ikon": "🎬", "isim": "Üretimler", "active": false, "sayac": 1 },
+    { "ikon": "⚙️", "isim": "Servisler", "active": false, "sayac": null },
+    { "ikon": "📋", "isim": "Event Log", "active": false, "sayac": 127 },
+    { "ikon": "📁", "isim": "Arşiv", "active": false, "sayac": null }
+  ],
+  "kpi": [
+    { "label": "Aktif Oturum", "deger": "3", "alt": "2 kullanıcı bekliyor" },
+    { "label": "Üretimde", "deger": "1", "alt": "PID-20260701-0001" },
+    { "label": "Tamamlanan", "deger": "47", "alt": "Bu ay" },
+    { "label": "Servis Sağlığı", "deger": "92%", "alt": "8/9 servis aktif" },
+    { "label": "Kredi Durumu", "deger": "₺1,247", "alt": "Tahmini 12 üretim" },
+    { "label": "Ort. Üretim Süresi", "deger": "8.4 dk", "alt": "Son 10 üretim" }
+  ],
+  "oturumlar": [
+    { "pid": "PID-20260701-0001", "kullanici": "user_8912", "dil": "TR", "state": "STATE_VIDEO_PRODUCTION", "baslangic": "14:32", "durum": "Üretimde", "durumSinif": "running" },
+    { "pid": "PID-20260701-0002", "kullanici": "user_4501", "dil": "EN", "state": "STATE_PRICING", "baslangic": "14:45", "durum": "Bekliyor", "durumSinif": "waiting" },
+    { "pid": "PID-20260701-0003", "kullanici": "user_6723", "dil": "DE", "state": "STATE_SCENARIO_APPROVAL", "baslangic": "14:58", "durum": "Aktif", "durumSinif": "active" }
+  ],
+  "katmanlar": [
+    { "isim": "1. Session", "durum": "✅ Aktif", "renk": "#16a34a" },
+    { "isim": "2. Workflow", "durum": "✅ Çalışıyor", "renk": "#16a34a" },
+    { "isim": "3. State", "durum": "✅ STATE_VIDEO_PRODUCTION", "renk": "#16a34a" },
+    { "isim": "4. Agent", "durum": "✅ 3/3 aktif", "renk": "#16a34a" },
+    { "isim": "5. Event", "durum": "✅ OLAY-023 tetiklendi", "renk": "#16a34a" },
+    { "isim": "6. Decision", "durum": "✅ Karar verildi", "renk": "#16a34a" },
+    { "isim": "7. Service", "durum": "⚠️ 1 servis yavaş", "renk": "#eab308" },
+    { "isim": "8. Digital Asset", "durum": "✅ 12 varlık", "renk": "#16a34a" },
+    { "isim": "9. Production Package", "durum": "✅ Paket oluşturuldu", "renk": "#16a34a" },
+    { "isim": "10. Video Production", "durum": "🔄 %45", "renk": "#2453e8" },
+    { "isim": "11. Quality Control", "durum": "⏳ Bekliyor", "renk": "#64748b" },
+    { "isim": "12. Delivery", "durum": "⏳ Bekliyor", "renk": "#64748b" },
+    { "isim": "13. Archive", "durum": "⏳ Bekliyor", "renk": "#64748b" }
+  ],
+  "eventler": [
+    { "zaman": "15:02:14", "pid": "PID-...0001", "event": "EVENT_VIDEO_PRODUCTION_STARTED", "aciklama": "Video üretimi başlatıldı", "durum": "OK", "durumSinif": "active" },
+    { "zaman": "15:01:58", "pid": "PID-...0001", "event": "EVENT_PAYMENT_APPROVED", "aciklama": "Ödeme onaylandı", "durum": "OK", "durumSinif": "active" },
+    { "zaman": "15:01:32", "pid": "PID-...0001", "event": "EVENT_PAYMENT_DECLARED", "aciklama": "Kullanıcı ödeme bildirimi", "durum": "OK", "durumSinif": "active" },
+    { "zaman": "15:01:05", "pid": "PID-...0001", "event": "EVENT_PRICE_APPROVED", "aciklama": "Fiyat teklifi onaylandı", "durum": "OK", "durumSinif": "active" },
+    { "zaman": "15:00:41", "pid": "PID-...0001", "event": "EVENT_SCENARIO_APPROVED", "aciklama": "Senaryo onaylandı", "durum": "OK", "durumSinif": "active" }
+  ],
+  "footer": {
+    "kod": "UI_REF_003_HLK_LAC_V1",
+    "versiyon": "V1.0",
+    "tarih": "01.07.2026"
+  }
+}

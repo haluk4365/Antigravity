@@ -1,0 +1,37 @@
+{
+  "pid": "PID-20260701-0001",
+  "paketOzet": [
+    { "ikon": "🏷️", "label": "Ürün", "deger": "HLK Vitamin C Serum" },
+    { "ikon": "⭐", "label": "Marka", "deger": "HLK Cosmetics" },
+    { "ikon": "📱", "label": "Hedef Platform", "deger": "Instagram / Facebook" },
+    { "ikon": "🎬", "label": "Format", "deger": "Dikey 9:16 • 1080p" },
+    { "ikon": "⏱️", "label": "Süre", "deger": "12 saniye • 5 sahne" },
+    { "ikon": "🎙️", "label": "Ses", "deger": "Dış Seslendirme (TR, Kadın) + Fon Müziği" },
+    { "ikon": "💰", "label": "Satış Fiyatı", "deger": "₺299 (KDV dahil)" },
+    { "ikon": "👤", "label": "Kullanıcı", "deger": "user_8912" }
+  ],
+  "uretimDetay": [
+    { "ikon": "🎬", "label": "Toplam Sahne", "deger": "5" },
+    { "ikon": "🖼️", "label": "Görsel", "deger": "5 adet" },
+    { "ikon": "🎵", "label": "Ses Dosyası", "deger": "1 adet" },
+    { "ikon": "📝", "label": "Senaryo", "deger": "HLK Onaylı" },
+    { "ikon": "⏱️", "label": "Tahmini Süre", "deger": "8–12 dk" },
+    { "ikon": "💳", "label": "Tahmini Kredi", "deger": "~120" }
+  ],
+  "servisler": [
+    { "ikon": "✅", "ad": "Higgsfield AI", "durum": "Aktif • 1,200 kredi" },
+    { "ikon": "✅", "ad": "ElevenLabs", "durum": "Aktif • 8,500 kredi" },
+    { "ikon": "✅", "ad": "Kie AI", "durum": "Aktif • 2,000 kredi" },
+    { "ikon": "⚠️", "ad": "Fal.ai", "durum": "Yavaş • Kullanılmayacak" },
+    { "ikon": "✅", "ad": "OpenAI (TTS Yedek)", "durum": "Hazır • 5,000 kredi" }
+  ],
+  "uyari": {
+    "baslik": "⚠️ Lütfen üretim onayı vermeden önce kontrol ediniz.",
+    "aciklama": "• Ürün bilgileri ve senaryo doğrulanmıştır.<br>• Kullanıcı ödemesi alınmıştır (EVENT_PAYMENT_APPROVED).<br>• Bu form onaylandığında PID oluşturulur ve üretim geri döndürülemez şekilde başlar.<br>• Yanlış üretimi önlemek için Package Engine çıktısını dikkatle inceleyiniz."
+  },
+  "footer": {
+    "kod": "UI_REF_005_YONETICI_VIDEO_URETIM_ONAY_FORMU_V1",
+    "versiyon": "V1.0",
+    "tarih": "01.07.2026"
+  }
+}

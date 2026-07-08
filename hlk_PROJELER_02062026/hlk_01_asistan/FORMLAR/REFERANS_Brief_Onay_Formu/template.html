@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Brief Onayı</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  :root { --check-bg: #f0f9f4; }
+  .section-title { font-size: 16px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+  .checklist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .check-item {
+    display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+    border: 1px solid var(--border); border-radius: 12px; background: var(--check-bg);
+    cursor: pointer; transition: all .15s;
+  }
+  .check-item.unchecked { background: var(--card-bg); opacity: .65; }
+  .check-icon { font-size: 20px; flex-shrink: 0; }
+  .check-item .info { flex: 1; }
+  .check-item .info b { display: block; font-size: 14px; }
+  .check-item .info span { font-size: 12.5px; color: var(--muted); }
+  .check-item .value { font-size: 14px; font-weight: 700; text-align: right; }
+  .note { font-size: 11px; color: var(--muted); display: flex; gap: 6px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <div class="sheet" id="sheet">
+    <div class="header">
+      <div class="logo"><span class="name">HLK</span><span class="tag">YAPAY ZEKA REKLAM ASİSTANI</span></div>
+      <div class="title">Brief Onayı</div>
+      <div class="subtitle">Şimdiye kadar verdiğiniz tüm bilgiler aşağıda özetlenmiştir. Değiştirmek istediğiniz bir şey varsa ilgili satıra tıklayın.</div>
+    </div>
+    <div class="steps" id="steps"></div>
+    <div class="section-title"><span class="num">📋</span>BRIEF ÖZETİ</div>
+    <div class="checklist" id="checklist"></div>
+    <div class="actions">
+      <div class="btn approve"><div class="circle-ic">✓</div><div><b>EVET — Onaylıyorum</b><span>Brief bilgilerimi onaylıyor, senaryo aşamasına geçiyorum.</span></div></div>
+    </div>
+    <div class="note">ⓘ Bir satıra tıklayarak ilgili ayarı değiştirebilirsiniz. Değişiklik sonrası bu ekrana geri dönersiniz.</div>
+    <div class="footer" id="footer"></div>
+  </div>
+<script>
+const DATA = {{DATA_JSON}};
+document.getElementById('steps').innerHTML = DATA.adimlar.map(a => `<div class="step ${a.durum}"><div class="circle">${a.durum==='done'?'✓':a.no}</div><div class="label"><b>${a.baslik}</b><span>${a.altbaslik}</span></div></div>`).join('');
+document.getElementById('checklist').innerHTML = DATA.maddeler.map((m,i) => `<div class="check-item ${m.onayli?'':'unchecked'}" data-index="${i}"><div class="check-icon">${m.onayli?'✅':'☐'}</div><div class="info"><b>${m.ikon} ${m.baslik}</b><span>${m.aciklama}</span></div><div class="value">${m.deger}</div></div>`).join('');
+document.getElementById('footer').innerHTML = `<span>🔖 Bu ekran HLK'nın resmi referansıdır.</span><span>Kod: ${DATA.footer.kod}</span><span>Versiyon: ${DATA.footer.versiyon}</span><span>Tarih: ${DATA.footer.tarih}</span>`;
+</script>
+</body>
+</html>

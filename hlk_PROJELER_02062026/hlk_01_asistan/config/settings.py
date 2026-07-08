@@ -1,0 +1,49 @@
+"""Proje konfigürasyonu ve ayarları."""
+
+import os
+
+# Environment Mode (test = local test bot, production = Railway bot)
+_ENV = os.getenv("ENV", "production")
+_TELEGRAM_TOKEN_TEST = os.getenv("TELEGRAM_TOKEN_TEST", "")
+_TELEGRAM_TOKEN_PROD = os.getenv("TELEGRAM_TOKEN", "")
+
+
+class Settings:
+    """Bot ayarlarını merkezi olarak yönet."""
+
+    # Telegram — ENV=test ise test token, yoksa production token
+    ENV: str = _ENV
+    TELEGRAM_TOKEN: str = _TELEGRAM_TOKEN_TEST if _ENV == "test" else _TELEGRAM_TOKEN_PROD
+    TELEGRAM_ALLOWED_USERS: str = os.getenv("TELEGRAM_ALLOWED_USERS", "*")
+
+    # Kie AI
+    KIE_AI_API_KEY: str = os.getenv("KIE_AI_API_KEY", "")
+
+    # Fal.ai (Seedance image-to-video)
+    FAL_KEY: str = os.getenv("FAL_KEY", "")
+
+    # ElevenLabs (Ses üretimi)
+    ELEVENLABS_API_KEY: str = os.getenv("ELEVENLABS_API_KEY", "")
+
+    # Descript API (Video/ses düzenleme ve sentetik ses üretimi)
+    DESCRIPT_API_KEY: str = os.getenv("DESCRIPT_API_KEY", "")
+
+    # Telegram file_id cache (ilk /start sonrası otomatik doldurulur)
+    INTRO_VIDEO_FILE_ID: str = os.getenv("INTRO_VIDEO_FILE_ID", "")
+
+    # Bot ayarları
+    BOT_DEBUG: bool = os.getenv("BOT_DEBUG", "False").lower() == "true"
+    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
+
+    # Database
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///data/bot.db")
+
+    def __init__(self):
+        """Ayarları valide et."""
+        if not self.TELEGRAM_TOKEN:
+            raise ValueError("❌ TELEGRAM_TOKEN env değişkeni gereklidir!")
+
+    @property
+    def is_user_allowed(self) -> bool:
+        """Tüm kullanıcılar izin verili mi?"""
+        return self.TELEGRAM_ALLOWED_USERS == "*"

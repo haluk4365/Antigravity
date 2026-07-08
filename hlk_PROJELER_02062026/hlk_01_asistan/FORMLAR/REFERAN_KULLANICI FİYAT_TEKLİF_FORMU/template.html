@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Fiyat Teklif Formu</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .price-highlight {
+    text-align: center; padding: 28px; background: var(--green-bg); border-radius: 14px;
+    border: 2px solid var(--green); margin-bottom: 16px;
+  }
+  .price-highlight .amount { font-size: 48px; font-weight: 800; color: var(--green); }
+  .price-highlight .currency { font-size: 20px; color: var(--muted); }
+  .hizmet-list { display: flex; flex-direction: column; gap: 8px; }
+  .hizmet-item { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  .hizmet-item .check { color: var(--green); font-weight: 700; }
+  .validity-box {
+    text-align: center; padding: 14px; background: var(--blue-light); border-radius: 10px;
+    font-size: 13px; font-weight: 600; color: var(--blue); margin-bottom: 16px;
+  }
+  .note-row { display: flex; gap: 16px; margin-top: 16px; }
+  .note { flex: 1; font-size: 11px; color: var(--muted); display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+<div class="sheet" id="sheet">
+  <div class="header">
+    <div class="logo"><span class="name">HLK</span><span class="tag">YAPAY ZEKA REKLAM ASİSTANI</span></div>
+    <div class="title">Fiyat Teklifi</div>
+    <div class="subtitle">Reklam videonuz için hazırlanan fiyat teklifiniz aşağıda sunulmuştur.</div>
+  </div>
+  <div class="steps" id="steps"></div>
+  <div class="section"><div class="section-title"><span class="num">1</span>ÜRÜN BİLGİLERİ</div>
+    <div class="card"><div class="info-grid" id="urunGrid"></div></div>
+  </div>
+  <div class="section"><div class="section-title"><span class="num">2</span>FİYAT TEKLİFİ</div>
+    <div class="price-highlight"><div class="amount" id="priceAmount"></div><div class="currency" id="priceCurrency"></div></div>
+  </div>
+  <div class="section"><div class="section-title"><span class="num">3</span>HİZMET KAPSAMI</div>
+    <div class="card"><div class="hizmet-list" id="hizmetList"></div></div>
+  </div>
+  <div class="section"><div class="section-title"><span class="num">4</span>TESLİM BİLGİLERİ</div>
+    <div class="card"><div class="info-grid" id="teslimGrid"></div></div>
+  </div>
+  <div class="validity-box" id="validityBox"></div>
+  <div class="actions">
+    <div class="btn approve"><div class="circle-ic">✓</div><div><b>Teklifi Onayla</b><span>Ödeme sürecine geçilir.</span></div></div>
+    <div class="btn reject"><div class="circle-ic">✕</div><div><b>Teklifi Reddet</b><span>Oturum sonlandırılır.</span></div></div>
+  </div>
+  <div class="note-row">
+    <div class="note">ⓘ Ödeme alındıktan sonra üretim başlar.</div>
+    <div class="note">ⓘ Üretim süreci yaklaşık 10–15 dakika sürmektedir.</div>
+  </div>
+  <div class="footer" id="footer"></div>
+</div>
+<script>
+const DATA = {{DATA_JSON}};
+document.getElementById('steps').innerHTML = DATA.adimlar.map(a => `<div class="step ${a.durum}"><div class="circle">${a.durum==='done'?'✓':a.no}</div><div class="label"><b>${a.baslik}</b><span>${a.altbaslik}</span></div></div>`).join('');
+document.getElementById('urunGrid').innerHTML = DATA.urun.map(u => `<div class="info-item"><div><b>${u.label}</b><span>${u.deger}</span></div></div>`).join('');
+document.getElementById('priceAmount').innerText = DATA.fiyat.miktar;
+document.getElementById('priceCurrency').innerText = DATA.fiyat.parabirimi;
+document.getElementById('hizmetList').innerHTML = DATA.hizmetler.map(h => `<div class="hizmet-item"><span class="check">✓</span> ${h}</div>`).join('');
+document.getElementById('teslimGrid').innerHTML = DATA.teslim.map(t => `<div class="info-item"><div><b>${t.label}</b><span>${t.deger}</span></div></div>`).join('');
+document.getElementById('validityBox').innerText = DATA.gecerlilik;
+document.getElementById('footer').innerHTML = `<span>🔖 Bu ekran HLK'nın resmi referansıdır.</span><span>Kod: ${DATA.footer.kod}</span><span>Versiyon: ${DATA.footer.versiyon}</span><span>Tarih: ${DATA.footer.tarih}</span>`;
+</script>
+</body>
+</html>

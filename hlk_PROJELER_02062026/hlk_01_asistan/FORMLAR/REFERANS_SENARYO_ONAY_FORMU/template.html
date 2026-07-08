@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Senaryo Onayı</title>
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+  .card-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; margin-bottom: 18px; }
+  .card-title .num { width: 24px; height: 24px; border-radius: 7px; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; }
+  .badge { font-size: 11px; font-weight: 700; color: var(--blue); background: var(--blue-light); padding: 3px 10px; border-radius: 20px; margin-left: 8px; }
+  .product-row { display: flex; gap: 26px; }
+  .product-img { width: 200px; height: 200px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: #f0f0f0; }
+  .product-caption { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 32px; flex: 1; }
+  .field { display: flex; gap: 10px; }
+  .field .icon { font-size: 15px; margin-top: 1px; }
+  .field b { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .field span { font-size: 14px; font-weight: 600; }
+  .story p { font-size: 14px; line-height: 1.9; margin: 0; color: #1e293b; }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+  .scene { border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+  .scene img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; background: #f0f0f0; }
+  .scene .idx { width: 20px; height: 20px; border-radius: 50%; background: var(--blue); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+  .scene h4 { font-size: 13px; margin: 0 0 4px; }
+  .scene p { font-size: 11.5px; color: var(--muted); margin: 0 0 8px; line-height: 1.4; }
+  .scene .time { font-size: 12px; font-weight: 700; }
+  .scene .dur { font-size: 11px; color: var(--blue); font-weight: 600; }
+  .total-time { text-align: center; font-size: 13px; font-weight: 700; margin-top: 16px; color: #1e293b; }
+  .meta-row { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 16px; }
+  .meta-item { display: flex; gap: 10px; align-items: flex-start; }
+  .meta-item b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .meta-item span { font-size: 13.5px; font-weight: 700; }
+  .notes { display: flex; gap: 16px; margin-bottom: 18px; }
+  .note { flex: 1; font-size: 11px; color: var(--muted); display: flex; gap: 6px; }
+</style>
+</head>
+<body>
+  <div class="sheet" id="sheet">
+    <div class="header">
+      <div class="logo"><span class="name">HLK</span><span class="tag">YAPAY ZEKA REKLAM ASİSTANI</span></div>
+      <div class="title">Senaryo Onayı</div>
+      <div class="subtitle">Onaylamanız için incelemenize sunulmuştur.</div>
+    </div>
+    <div class="steps" id="steps"></div>
+    <div class="card">
+      <div class="card-title"><span class="num">1</span> ÜRÜN ÖZETİ</div>
+      <div class="product-row">
+        <div><img class="product-img" id="productImg" src="" alt="ürün görseli"><div class="product-caption">Görseller temsilidir.</div></div>
+        <div class="fields" id="productFields"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="num">2</span> TANITIM HİKÂYESİ <span class="badge">HLK oluşturdu</span></div>
+      <div class="story"><p id="storyText"></p></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="num">3</span> SAHNE PLANI</div>
+      <div class="scenes" id="scenes"></div>
+      <div class="total-time" id="totalTime"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="num">4</span> SESLENDİRME</div>
+      <div class="meta-row" id="voiceMeta"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="num">5</span> ÜRETİM ÖZETİ</div>
+      <div class="meta-row" id="productionMeta"></div>
+    </div>
+    <div class="actions">
+      <div class="btn approve"><div class="circle-ic">✓</div><div><b>ONAYLA</b><span>Senaryo onaylandığında fiyat adımına geçilecektir.</span></div></div>
+      <div class="btn reject"><div class="circle-ic">✕</div><div><b>REDDET</b><span>Senaryoda değişiklik talep etmek için reddedebilirsiniz.</span></div></div>
+    </div>
+    <div class="notes">
+      <div class="note">ⓘ Bu aşamada herhangi bir ücretlendirme yapılmaz.</div>
+      <div class="note">ⓘ Reddetmeniz durumunda senaryo düzenleme ekranına geri dönülecektir.</div>
+    </div>
+    <div class="footer" id="footer"></div>
+  </div>
+<script>
+const DATA = {{DATA_JSON}};
+document.getElementById('productImg').src = DATA.urun.gorsel;
+document.getElementById('steps').innerHTML = DATA.adimlar.map(a => `<div class="step ${a.durum}"><div class="circle">${a.durum==='done'?'✓':a.no}</div><div class="label"><b>${a.baslik}</b><span>${a.altbaslik}</span></div></div>`).join('');
+const f = DATA.urun;
+const fields = [
+  ['🏷️','Ürün Adı', f.ad],['📱','Video Formatı', f.format],['⭐','Marka', f.marka],['🎬','Çözünürlük', f.cozunurluk],
+  ['📁','Platform', f.platform],['⏱️','Video Süresi', f.sure],['🎯','Kategori', f.kategori],['🎙️','Ses Yapısı', f.sesYapisi],
+  ['📍','Hedef Kitle', f.hedefKitle],['📅','Oluşturulma Tarihi', f.tarih],
+];
+document.getElementById('productFields').innerHTML = fields.map(([icon,label,val]) => `<div class="field"><span class="icon">${icon}</span><div><b>${label}</b><span>${val}</span></div></div>`).join('');
+document.getElementById('storyText').innerText = DATA.hikaye;
+document.getElementById('scenes').innerHTML = DATA.sahneler.map(s => `<div class="scene"><img src="${s.gorsel}" alt=""><div class="idx">${s.no}</div><h4>${s.baslik}</h4><p>${s.aciklama}</p><div class="time">${s.zaman}</div><div class="dur">(${s.sure})</div></div>`).join('');
+document.getElementById('totalTime').innerText = `⏱ Toplam Süre: ${DATA.toplamSure}`;
+document.getElementById('voiceMeta').innerHTML = [['Seslendirme Dili', DATA.seslendirme.dil],['Ses Karakteri', DATA.seslendirme.karakter],['Ses Yapısı', DATA.seslendirme.yapi]].map(([l,v]) => `<div class="meta-item"><div><b>${l}</b><span>${v}</span></div></div>`).join('');
+document.getElementById('productionMeta').innerHTML = [['Platform', DATA.uretim.platform],['Format', DATA.uretim.format],['Çözünürlük', DATA.uretim.cozunurluk],['Video Süresi', DATA.uretim.sure],['Toplam Sahne', DATA.uretim.sahneSayisi]].map(([l,v]) => `<div class="meta-item"><div><b>${l}</b><span>${v}</span></div></div>`).join('');
+document.getElementById('footer').innerHTML = `<span>🔖 Bu ekran HLK'nın resmi referansıdır.</span><span>Kod: ${DATA.footer.kod}</span><span>Versiyon: ${DATA.footer.versiyon}</span><span>Tarih: ${DATA.footer.tarih}</span>`;
+</script>
+</body>
+</html>

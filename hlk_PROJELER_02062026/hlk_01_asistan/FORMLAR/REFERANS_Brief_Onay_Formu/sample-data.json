@@ -1,0 +1,26 @@
+{
+  "adimlar": [
+    { "no": 1, "baslik": "Brief", "altbaslik": "İncelemede", "durum": "active" },
+    { "no": 2, "baslik": "Senaryo", "altbaslik": "Sıradaki Adım", "durum": "pending" },
+    { "no": 3, "baslik": "Fiyat Teklifi", "altbaslik": "Sıradaki Adım", "durum": "pending" }
+  ],
+  "maddeler": [
+    { "onayli": true, "ikon": "🏷️", "baslik": "Ürün Adı", "aciklama": "Analiz edilen ürün", "deger": "HLK Vitamin C Serum" },
+    { "onayli": true, "ikon": "⭐", "baslik": "Marka", "aciklama": "Ürün markası", "deger": "HLK Cosmetics" },
+    { "onayli": true, "ikon": "📱", "baslik": "Platform", "aciklama": "Yayınlanacak platform", "deger": "Instagram / Facebook" },
+    { "onayli": true, "ikon": "🎬", "baslik": "Video Formatı", "aciklama": "Seçilen format", "deger": "Dikey (9:16)" },
+    { "onayli": true, "ikon": "📺", "baslik": "Çözünürlük", "aciklama": "Video çözünürlüğü", "deger": "1080p Full HD" },
+    { "onayli": true, "ikon": "⏱️", "baslik": "Video Süresi", "aciklama": "Tercih edilen süre", "deger": "12 saniye" },
+    { "onayli": true, "ikon": "🎬", "baslik": "Tanıtım Tarzı", "aciklama": "Reklam tarzı", "deger": "UGC Tarzı" },
+    { "onayli": true, "ikon": "👥", "baslik": "Hedef Kitle", "aciklama": "Reklam hedef kitlesi", "deger": "18–34 Yaş Kadın" },
+    { "onayli": true, "ikon": "🎙️", "baslik": "Ses Yapısı", "aciklama": "Ses tercihleri", "deger": "Dış Seslendirme + Fon Müziği" },
+    { "onayli": true, "ikon": "🌍", "baslik": "Seslendirme Dili", "aciklama": "Seçilen dil", "deger": "Türkçe" },
+    { "onayli": true, "ikon": "🎭", "baslik": "Ses Karakteri", "aciklama": "Seslendirme karakteri", "deger": "Kadın Ses" },
+    { "onayli": true, "ikon": "✨", "baslik": "Vurgulanacaklar", "aciklama": "Öne çıkarılacak detaylar", "deger": "Ücretsiz Kargo, Yerli Üretim" }
+  ],
+  "footer": {
+    "kod": "UI_REF_002_BRIEF_ONAY_FORMU_V1",
+    "versiyon": "V1.0",
+    "tarih": "22.06.2026"
+  }
+}

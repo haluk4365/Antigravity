@@ -1,0 +1,43 @@
+{
+  "adimlar": [
+    { "no": 1, "baslik": "Brief", "altbaslik": "Tamamlandı", "durum": "done" },
+    { "no": 2, "baslik": "Senaryo", "altbaslik": "Tamamlandı", "durum": "done" },
+    { "no": 3, "baslik": "Fiyat Teklifi", "altbaslik": "İncelemede", "durum": "active" },
+    { "no": 4, "baslik": "Ödeme", "altbaslik": "Sıradaki Adım", "durum": "pending" }
+  ],
+  "urun": [
+    { "label": "Ürün Adı", "deger": "HLK Vitamin C Serum" },
+    { "label": "Marka", "deger": "HLK Cosmetics" },
+    { "label": "Platform", "deger": "Instagram / Facebook" },
+    { "label": "Video Formatı", "deger": "Dikey (9:16)" },
+    { "label": "Çözünürlük", "deger": "1080p Full HD" },
+    { "label": "Video Süresi", "deger": "12 saniye" },
+    { "label": "Ses Yapısı", "deger": "Dış Seslendirme (TR, Kadın) + Fon Müziği" },
+    { "label": "Tanıtım Tarzı", "deger": "UGC Tarzı" }
+  ],
+  "fiyat": {
+    "miktar": "₺299",
+    "parabirimi": "TL (KDV Dahil)"
+  },
+  "hizmetler": [
+    "Senaryo hazırlama (HLK Yapay Zekâ)",
+    "Yapay zekâ reklam üretimi",
+    "Video üretimi (5 sahne)",
+    "Profesyonel seslendirme",
+    "Telifsiz fon müziği",
+    "Kurgu ve montaj",
+    "Dijital teslim"
+  ],
+  "teslim": [
+    { "label": "Tahmini Teslim Süresi", "deger": "Aynı gün içerisinde" },
+    { "label": "Teslim Formatı", "deger": "MP4 (1080p Full HD)" },
+    { "label": "Revizyon Hakkı", "deger": "1 adet ücretsiz revizyon" },
+    { "label": "Ödeme Yöntemi", "deger": "Banka Havalesi / EFT" }
+  ],
+  "gecerlilik": "⏳ Bu teklif 24 saat süreyle geçerlidir. • Fiyatlar ödeme tarihindeki kur üzerinden TL olarak tahsil edilir.",
+  "footer": {
+    "kod": "UI_REF_006_KULLANICI_FIYAT_TEKLIF_FORMU_V1",
+    "versiyon": "V1.0",
+    "tarih": "30.06.2026"
+  }
+}

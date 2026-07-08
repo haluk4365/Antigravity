@@ -1,0 +1,46 @@
+{
+  "adimlar": [
+    { "no": 1, "baslik": "Brief", "altbaslik": "Tamamlandı", "durum": "done" },
+    { "no": 2, "baslik": "Senaryo", "altbaslik": "İncelemede", "durum": "active" },
+    { "no": 3, "baslik": "Fiyat Teklifi", "altbaslik": "Sıradaki Adım", "durum": "pending" }
+  ],
+  "urun": {
+    "gorsel": "https://via.placeholder.com/200x200.png?text=Urun",
+    "ad": "HLK Vitamin C Serum",
+    "marka": "HLK Cosmetics",
+    "platform": "Instagram / Facebook",
+    "kategori": "Cilt Bakım",
+    "hedefKitle": "18–34 Yaş Kadın",
+    "format": "Dikey (9:16)",
+    "cozunurluk": "1080p (Full HD)",
+    "sure": "12 sn",
+    "sesYapisi": "Dış Seslendirme + Fon Müziği",
+    "tarih": "22.06.2026"
+  },
+  "hikaye": "Yoğun tempoda geçen günlerde cildinize iyi bakmak her zamankinden daha önemli. HLK Vitamin C Serum, yüksek C vitamini içeriğiyle cildinizi aydınlatır, ton eşitsizliğini azaltır ve doğal ışıltınızı ortaya çıkarır. Hafif yapısı sayesinde hızla emilir, cildinizi nemlendirir ve tazelenmiş bir görünüm kazandırır. Her damlasında daha canlı, daha aydınlık ve daha sağlıklı bir cilt!",
+  "sahneler": [
+    { "no": 1, "gorsel": "https://via.placeholder.com/160x100.png?text=1", "baslik": "Dikkat Çekici Giriş", "aciklama": "Ürünle günlük yaşam sahnesi.", "zaman": "0:00 – 0:02", "sure": "2 sn" },
+    { "no": 2, "gorsel": "https://via.placeholder.com/160x100.png?text=2", "baslik": "Ürün Tanıtımı", "aciklama": "Ürün ve içerik vurgusu.", "zaman": "0:02 – 0:05", "sure": "3 sn" },
+    { "no": 3, "gorsel": "https://via.placeholder.com/160x100.png?text=3", "baslik": "Kullanım Gösterimi", "aciklama": "Serumun ciltte uygulanması.", "zaman": "0:05 – 0:08", "sure": "3 sn" },
+    { "no": 4, "gorsel": "https://via.placeholder.com/160x100.png?text=4", "baslik": "Faydalar", "aciklama": "Cilltteki olumlu etkiler.", "zaman": "0:08 – 0:11", "sure": "3 sn" },
+    { "no": 5, "gorsel": "https://via.placeholder.com/160x100.png?text=5", "baslik": "Kapanış", "aciklama": "Kısa kapanış ve çağrı (CTA).", "zaman": "0:11 – 0:12", "sure": "1 sn" }
+  ],
+  "toplamSure": "12 sn",
+  "seslendirme": {
+    "dil": "Türkçe",
+    "karakter": "Kadın • Samimi",
+    "yapi": "Dış Seslendirme + Fon Müziği"
+  },
+  "uretim": {
+    "platform": "Instagram / Facebook",
+    "format": "Dikey (9:16)",
+    "cozunurluk": "1080p (Full HD)",
+    "sure": "12 sn",
+    "sahneSayisi": 5
+  },
+  "footer": {
+    "kod": "UI_REF_001_SENARYO_ONAY_FORMU_V1",
+    "versiyon": "V1.0",
+    "tarih": "22.06.2026"
+  }
+}
