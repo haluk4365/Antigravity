@@ -55,8 +55,49 @@ Kesinlikle uyman gereken kurallar:
 Örnek konular: video prodüksiyon maliyeti, API servis ücretleri, kar marjı hesaplama,
 fiyatlandırma stratejisi, servis seçimi, üretim süresi, ekipman maliyetleri."""
 
+def _build_admin_context(user_data: dict, user_msg: str) -> str:
+    """Yönetici sohbeti için üretim bağlamını oluşturur."""
+    url = user_data.get("website_url", "—")
+    product_name = url.split("/")[-1] if "/" in url else "—"
+    brand = user_data.get("brand", "—")
+    platform = user_data.get("platform", "—")
+    fmt = user_data.get("video_format", "—")
+    resolution = user_data.get("video_resolution", "—")
+    duration = user_data.get("video_duration", "—")
+    style = user_data.get("ad_style", "—")
+    audience = user_data.get("target_audience", "—")
+    voice_lang = user_data.get("voice_language", "—")
+    voice_char = user_data.get("voice_character", "—")
+    katsayi = user_data.get("_admin_katsayi", "—")
+    toplam = user_data.get("_computed_toplam", "—")
+    yonetici_fiyat = user_data.get("_computed_yonetici_fiyat", "—")
+    kdvli = user_data.get("_computed_kdvli", "—")
+
+    toggles = user_data.get("audio_toggles", {})
+    ses_parts = []
+    if toggles.get("silent"): ses_parts.append("Sessiz")
+    if toggles.get("voiceover"): ses_parts.append("Seslendirme")
+    if toggles.get("ambient"): ses_parts.append("Ortam Sesleri")
+    if toggles.get("music"): ses_parts.append("Fon Muzigi")
+    ses_yapisi = ", ".join(ses_parts) if ses_parts else "—"
+
+    return (
+        f"===== URETIM BAGLAMI =====\n"
+        f"Urun: {brand} — {product_name}\n"
+        f"Platform: {platform} | Format: {fmt} | Cozunurluk: {resolution}\n"
+        f"Sure: {duration} sn | Tarz: {style} | Hedef Kitle: {audience}\n"
+        f"Ses: {ses_yapisi} | Seslendirme Dili: {voice_lang} | Karakter: {voice_char}\n"
+        f"Fiyat Katsayisi: {katsayi} | Toplam Servis: {toplam} | Yonetici Fiyat: {yonetici_fiyat} | KDV Dahil: {kdvli}\n"
+        f"===========================\n\n"
+        f"Yoneticinin Sorusu: {user_msg}"
+    )
+
+
 async def _hlk_admin_chat(user_msg: str, user_data: dict) -> str:
-    """HLK'ya admin sorusu sor, OpenAI API'den cevap al."""
+    """HLK'ya admin sorusu sor, OpenAI API'den cevap al.
+
+    Uretim baglami (urun, platform, format, fiyat vb.) ile birlikte gonderilir.
+    """
     try:
         import openai
     except ImportError:
@@ -65,12 +106,13 @@ async def _hlk_admin_chat(user_msg: str, user_data: dict) -> str:
     if not api_key:
         return "API anahtarı bulunamadı."
     try:
+        context_msg = _build_admin_context(user_data, user_msg)
         client = openai.OpenAI(api_key=api_key)
         resp = client.chat.completions.create(
             model="gpt-4o-mini", max_tokens=300,
             messages=[
                 {"role": "system", "content": HLK_ADMIN_SYSTEM},
-                {"role": "user", "content": user_msg},
+                {"role": "user", "content": context_msg},
             ],
         )
         return resp.choices[0].message.content or "—"
