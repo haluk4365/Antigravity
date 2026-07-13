@@ -45,22 +45,24 @@ Formu'nu inceleyen bir yöneticiyle sohbet ediyorsun. Kısa, net, 1-3 cümlelik 
 Türkçe konuş. Fiyat, maliyet, kar marjı, servis seçimi konularında yardımcı ol."""
 
 async def _hlk_admin_chat(user_msg: str, user_data: dict) -> str:
-    """HLK'ya admin sorusu sor, API'den cevap al."""
+    """HLK'ya admin sorusu sor, OpenAI API'den cevap al."""
     try:
-        import anthropic
+        import openai
     except ImportError:
         return "HLK API kütüphanesi yüklü değil."
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         return "API anahtarı bulunamadı."
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        resp = client.messages.create(
-            model="claude-haiku-4-5", max_tokens=300,
-            system=HLK_ADMIN_SYSTEM,
-            messages=[{"role": "user", "content": user_msg}],
+        client = openai.OpenAI(api_key=api_key)
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini", max_tokens=300,
+            messages=[
+                {"role": "system", "content": HLK_ADMIN_SYSTEM},
+                {"role": "user", "content": user_msg},
+            ],
         )
-        return next((b.text for b in resp.content if b.type == "text"), "—")
+        return resp.choices[0].message.content or "—"
     except Exception as e:
         return f"HLK yanıt veremedi: {e}"
 
