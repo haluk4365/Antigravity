@@ -39,6 +39,31 @@ from config.video_paths import (
 
 logger = logging.getLogger(__name__)
 
+# ── HLK Admin Sohbet ────────────────────────────────────────────────────
+HLK_ADMIN_SYSTEM = """Sen HLK, bir Yapay Zeka Reklam Asistanısın. Yönetici Fiyatlandırma
+Formu'nu inceleyen bir yöneticiyle sohbet ediyorsun. Kısa, net, 1-3 cümlelik cevaplar ver.
+Türkçe konuş. Fiyat, maliyet, kar marjı, servis seçimi konularında yardımcı ol."""
+
+async def _hlk_admin_chat(user_msg: str, user_data: dict) -> str:
+    """HLK'ya admin sorusu sor, API'den cevap al."""
+    try:
+        import anthropic
+    except ImportError:
+        return "HLK API kütüphanesi yüklü değil."
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return "API anahtarı bulunamadı."
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model="claude-haiku-4-5", max_tokens=300,
+            system=HLK_ADMIN_SYSTEM,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        return next((b.text for b in resp.content if b.type == "text"), "—")
+    except Exception as e:
+        return f"HLK yanıt veremedi: {e}"
+
 # Daktilo yazısı mesajları (HTML format — <b>HLK</b> bold)
 TYPEWRITER_MESSAGES = {
     "tr": "Merhaba! Ben <b>HLK</b>, <b><i>yapay zeka destekli</i></b> reklam asistanınız. Ürününüz için <b>en iyi reklamı</b> üretmek üzereyim. Başlamadan önce size <b><i>birkaç kısa sorum</i></b> olacak.",
@@ -914,6 +939,56 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     from handlers.website import handle_website_link, handle_material_upload
     from services.scene_engine import conversation_scene_engine
     cancel_timer(update.effective_user.id)
+
+    # Admin katsayı girişi
+    if context.user_data.pop("_admin_waiting_katsayi", False):
+        from handlers.website import _build_admin_pricing_form
+        from services.scene_delivery import scene_delivery
+        val = update.message.text.strip().replace(",", ".")
+        try:
+            k = float(val)
+            if k <= 0: raise ValueError
+        except ValueError:
+            await update.message.reply_text("⚠️ Geçersiz. 0.1 - 10 arası bir sayı girin.")
+            context.user_data["_admin_waiting_katsayi"] = True
+            return
+        context.user_data["_admin_katsayi"] = f"{k:.1f}"
+
+        # FD-008_1: "EKRAN SİLİNİR" — eski formu + prompt'u temizle
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
+        await scene_delivery.cleanup_chat(chat_id=update.effective_chat.id)
+
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        admin_form, computed_data = _build_admin_pricing_form(context.user_data)
+        # Hesaplanan değerleri user_data'ya kaydet
+        context.user_data["_computed_toplam"] = computed_data["toplam"]
+        context.user_data["_computed_yonetici_fiyat"] = computed_data["yonetici_fiyat"]
+        context.user_data["_computed_kdvli"] = computed_data["kdvli"]
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ Katsayı Gir", callback_data="admin_enter_katsayi"),
+             InlineKeyboardButton("💬 HLK'ya Sor", callback_data="admin_hlk_chat")],
+            [InlineKeyboardButton("✅ ONAY", callback_data="admin_price_submit"),
+             InlineKeyboardButton("❌ İPTAL", callback_data="admin_price_cancel")],
+        ])
+        await update.message.reply_text(admin_form, parse_mode="HTML", reply_markup=kb)
+        return
+
+    # Admin HLK sohbet modu
+    if context.user_data.get("_admin_chat_mode"):
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        user_msg = update.message.text
+        wait_msg = await update.message.reply_text("⏳ HLK düşünüyor...")
+        answer = await _hlk_admin_chat(user_msg, context.user_data)
+        try: await wait_msg.delete()
+        except: pass
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ Sohbeti Bitir", callback_data="admin_hlk_chat_end"),
+        ]])
+        await update.message.reply_text(answer, parse_mode="HTML", reply_markup=kb)
+        return
 
     se = StateEngine(context.user_data)
     user_state = se.current
