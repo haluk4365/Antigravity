@@ -373,7 +373,7 @@ STATE_TRANSITIONS: dict[UserState, dict[UserEvent, UserState]] = {
     # ── Video Üretimi (SE-007_4) ──
     UserState.VIDEO_PRODUCTION: {
         UserEvent.VIDEO_PRODUCTION_COMPLETED: UserState.SESSION_COMPLETED,
-        UserEvent.VIDEO_PRODUCTION_FAILED: UserState.SESSION_COMPLETED,
+        UserEvent.VIDEO_PRODUCTION_FAILED: UserState.SESSION_CLOSED,   # OLAY-025 uyumlu
         UserEvent.SESSION_ENDED: UserState.SESSION_COMPLETED,
         # Geriye dönük uyumluluk:
         UserEvent.VIDEO_PRODUCTION_DONE: UserState.SESSION_COMPLETED,
