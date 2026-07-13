@@ -18,8 +18,8 @@ from utils.state_engine import StateEngine, UserState, UserEvent
 from helpers.typewriter_animation import typewriter_animation
 from services.scene_delivery import scene_delivery
 from services.scene_engine import conversation_scene_engine
-from services.render_service import render_brief_onay
 from services.scene_registry import get_scene_for_state, SCENE_REGISTRY
+from config.i18n import t, get_lang
 
 # CEE + EEC + Olay Kayıt Merkezi entegrasyonu
 from services.constitution_enforcement import constitution_enforcement
@@ -407,13 +407,14 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
     user = query.from_user
     chat_id = query.message.chat_id
 
+    lang = get_lang(context.user_data)
     format_map = {
-        "format_9_16": ("Dikey 9:16", "Telegram, TikTok, Instagram Reels, YouTube Shorts"),
-        "format_16_9": ("Yatay 16:9", "YouTube, Facebook"),
-        "format_1_1": ("Kare 1:1", "Instagram (Feed), Facebook"),
+        "format_9_16": (t("s03.vertical", lang), t("s03.vertical_desc", lang)),
+        "format_16_9": (t("s03.horizontal", lang), t("s03.horizontal_desc", lang)),
+        "format_1_1": (t("s03.square", lang), t("s03.square_desc", lang)),
     }
     format_adi, platformlar = format_map.get(query.data, (query.data, ""))
-    await query.answer(f"Seçilen: {format_adi}")
+    await query.answer(f"{t('common.saved', lang)}")
 
     logger.info(f"🎯 {user.id} format seçti: {format_adi}")
     context.user_data["video_format"] = format_adi
@@ -456,13 +457,14 @@ async def handle_resolution_selection(update: Update, context: ContextTypes.DEFA
     user = query.from_user
     chat_id = query.message.chat_id
 
+    lang = get_lang(context.user_data)
     resolution_map = {
-        "resolution_480p": "480p",
-        "resolution_720p": "720p HD",
-        "resolution_1080p": "1080p Full HD",
+        "resolution_480p": t("s04.480p", lang),
+        "resolution_720p": t("s04.720p", lang),
+        "resolution_1080p": t("s04.1080p", lang),
     }
     resolution = resolution_map.get(query.data, query.data)
-    await query.answer(f"Seçilen: {resolution}")
+    await query.answer(f"{t('common.saved', lang)}")
 
     logger.info(f"🎯 {user.id} çözünürlük seçti: {resolution}")
     context.user_data["video_resolution"] = resolution
@@ -511,14 +513,15 @@ async def handle_platform_selection(update: Update, context: ContextTypes.DEFAUL
     if await _after_scene_edit(chat_id, context):
         return
 
+    lang = get_lang(context.user_data)
     platform_map = {
         "platform_tiktok": "TikTok",
         "platform_instagram": "Instagram Reels",
         "platform_youtube": "YouTube",
-        "platform_other": "Diğer",
+        "platform_other": "Other",
     }
     platform_adi = platform_map.get(query.data, query.data)
-    await query.answer(f"Seçilen: {platform_adi}")
+    await query.answer(f"{t('common.saved', lang)}")
 
     logger.info(f"🎯 {user.id} platform seçti: {platform_adi}")
     context.user_data["platform"] = platform_adi
@@ -639,6 +642,7 @@ async def handle_audio_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     user = query.from_user
     chat_id = query.message.chat_id
+    lang = get_lang(context.user_data)
 
     option = query.data.replace("audio_toggle_", "")
     logger.info(f"🎙️ {user.id} audio toggle: {option}")
@@ -654,7 +658,7 @@ async def handle_audio_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE
             toggles["voiceover"] = False
             toggles["ambient"] = False
             toggles["music"] = False
-            await query.answer("🔇 Sessiz mod aktif — diğer seçenekler devre dışı")
+            await query.answer(f"🔇 {t('s08.silent', lang)}")
         else:
             # Sessiz kaldırıldı → diğer seçenekler tekrar aktif
             await query.answer("Sessiz mod kaldırıldı — diğer seçenekler tekrar aktif")
@@ -802,9 +806,9 @@ async def handle_material_upload(update: Update, context: ContextTypes.DEFAULT_T
     # bir sonrası beklediğini benzer kelimelerle söyler"
     if count == 1:
         ack_text = (
-            f"{emoji} <b>İlk materyalinizi</b> aldım, teşekkürler! 🙏\n\n"
-            "<i>Bir sonraki materyali göndermeye devam edebilirsiniz.</i>\n"
-            "İşiniz bittiğinde <b>✅ Bitti</b> butonuna basın."
+            f"{emoji} <b>Ilk materyalinizi</b> aldim, tesekkurler! \n\n"
+            "<i>Bir sonraki materyali gondermeye devam edebilirsiniz.</i>\n"
+            "Isiniz bittiginde <b> Bitti</b> butonuna basin."
         )
     else:
         ack_text = (
@@ -851,13 +855,14 @@ async def handle_style_selection(update: Update, context: ContextTypes.DEFAULT_T
     user = query.from_user
     chat_id = query.message.chat_id
 
+    lang = get_lang(context.user_data)
     style_map = {
-        "style_ugc": "UGC Tarzı", "style_traditional": "Geleneksel & Modern",
-        "style_cinematic": "Sanatsal / Sinematik", "style_custom": "Kendim Yazacağım",
-        "style_hlk": "HLK'ya Bırak",
+        "style_ugc": t("s06.ugc", lang), "style_traditional": t("s06.traditional", lang),
+        "style_cinematic": t("s06.cinematic", lang), "style_custom": t("s06.custom", lang),
+        "style_hlk": t("s06.hlk_decides", lang),
     }
     style = style_map.get(query.data, query.data)
-    await query.answer(f"Seçilen: {style}")
+    await query.answer(f"{t('common.saved', lang)}")
     context.user_data["ad_style"] = style
     logger.info(f"🎬 {user.id} tanıtım tarzı: {style}")
 
@@ -910,14 +915,15 @@ async def handle_audience_selection(update: Update, context: ContextTypes.DEFAUL
     user = query.from_user
     chat_id = query.message.chat_id
 
+    lang = get_lang(context.user_data)
     audience_map = {
-        "audience_0_12": "Çocuk (0-12)", "audience_13_17": "Genç (13-17)",
-        "audience_18_24": "Genç Yetişkin (18-24)", "audience_25_34": "Yetişkin (25-34)",
-        "audience_35_44": "Aile Kurmuş (35-44)", "audience_45_54": "Orta Yaş (45-54)",
-        "audience_55_64": "Olgun Yetişkin (55-64)", "audience_65_plus": "65 Yaş ve Üzeri",
+        "audience_0_12": t("s07.children", lang), "audience_13_17": t("s07.teen", lang),
+        "audience_18_24": t("s07.young_adult", lang), "audience_25_34": t("s07.adult", lang),
+        "audience_35_44": t("s07.family", lang), "audience_45_54": t("s07.middle_age", lang),
+        "audience_55_64": t("s07.mature", lang), "audience_65_plus": t("s07.senior", lang),
     }
     audience = audience_map.get(query.data, query.data)
-    await query.answer(f"Seçilen: {audience}")
+    await query.answer(f"{t('common.saved', lang)}")
     context.user_data["target_audience"] = audience
     logger.info(f"👥 {user.id} hedef kitle: {audience}")
 
@@ -953,6 +959,7 @@ async def handle_voice_language(update: Update, context: ContextTypes.DEFAULT_TY
     user = query.from_user
     chat_id = query.message.chat_id
 
+    voice_lang = get_lang(context.user_data)
     lang_map = {
         "voicelang_tr": "Türkçe", "voicelang_en": "English",
         "voicelang_de": "Deutsch", "voicelang_fr": "Français",
@@ -960,7 +967,7 @@ async def handle_voice_language(update: Update, context: ContextTypes.DEFAULT_TY
         "voicelang_ar": "العربية", "voicelang_kr": "Kurdî",
     }
     lang = lang_map.get(query.data, query.data)
-    await query.answer(f"Seçilen: {lang}")
+    await query.answer(f"{t('common.saved', voice_lang)}")
     context.user_data["voice_language"] = lang
     logger.info(f"🎙️ {user.id} seslendirme dili: {lang}")
 
@@ -998,13 +1005,14 @@ async def handle_voice_character(update: Update, context: ContextTypes.DEFAULT_T
     user = query.from_user
     chat_id = query.message.chat_id
 
+    lang = get_lang(context.user_data)
     char_map = {
-        "voicechar_female": "Kadın Ses",
-        "voicechar_male": "Erkek Ses",
-        "voicechar_child": "Çocuk Ses",
+        "voicechar_female": t("s10.female", lang),
+        "voicechar_male": t("s10.male", lang),
+        "voicechar_child": t("s10.child", lang),
     }
     char = char_map.get(query.data, query.data)
-    await query.answer(f"Seçilen: {char}")
+    await query.answer(f"{t('common.saved', lang)}")
     context.user_data["voice_character"] = char
     logger.info(f"🎭 {user.id} ses karakteri: {char}")
 
@@ -1041,12 +1049,13 @@ async def handle_emphasis(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user = query.from_user
     chat_id = query.message.chat_id
 
+    lang = get_lang(context.user_data)
     emphasis_map = {
-        "emphasis_discount": "🏷️ İndirim",
-        "emphasis_shipping": "🚚 Ücretsiz Kargo",
-        "emphasis_gift": "🎁 Hediye Paket",
-        "emphasis_newseason": "✨ Yeni Sezon",
-        "emphasis_local": "🇹🇷 Yerli Üretim",
+        "emphasis_discount": f"🏷️ {t('s11.discount', lang)}",
+        "emphasis_shipping": f"🚚 {t('s11.shipping', lang)}",
+        "emphasis_gift": f"🎁 {t('s11.gift', lang)}",
+        "emphasis_newseason": f"✨ {t('s11.new_season', lang)}",
+        "emphasis_local": f"🇹🇷 {t('s11.local', lang)}",
     }
     key = query.data
     selected = context.user_data.setdefault("emphasis_selections", [])
@@ -1055,11 +1064,11 @@ async def handle_emphasis(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if key == "emphasis_custom":
         context.user_data["_waiting_custom_emphasis"] = True
         context.user_data["_emphasis_kb_msg_id"] = query.message.message_id
-        await query.answer("✏️ Lütfen eklemek istediğiniz vurguyu yazın")
+        await query.answer(f"✏️ {t('s11.custom', lang)}")
         prompt_id = await scene_delivery.send_and_track(
             chat_id=chat_id,
-            text="✏️ <b>Özel Vurgu</b>\n\n"
-                 "Eklemek istediğiniz vurguyu aşağıya <b>yazıp gönderin</b>.\n\n"
+            text=f"✏️ <b>{t('s11.custom', lang)}</b>\n\n"
+                 f"{t('s11.custom_prompt', lang)}\n\n"
                  "<i>Örnek: %50 İndirim, 2 Al 1 Öde, Sınırlı Stok</i>",
         )
         context.user_data["_emphasis_prompt_msg_id"] = prompt_id
@@ -1067,10 +1076,10 @@ async def handle_emphasis(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if key in selected:
         selected.remove(key)
-        await query.answer("Kaldırıldı")
+        await query.answer(f"{t('common.saved', lang)}")
     else:
         selected.append(key)
-        await query.answer(f"Eklendi: {emphasis_map.get(key, key)}")
+        await query.answer(f"{emphasis_map.get(key, key)}")
     context.user_data["emphasis_selections"] = selected
     logger.info(f"✨ {user.id} vurgu: {selected}")
 
@@ -1213,6 +1222,78 @@ async def handle_emphasis_done(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# SAHNE-12: Brief Onay HTML Üreticisi (AR-002_65 En Yüksek Sadakat) ─────────────
+
+def _build_brief_html(user_data: dict, checks: dict) -> str:
+    """Brief Onay Formu'nu Telegram HTML olarak oluşturur (PNG kullanılmaz).
+
+    AR-002_65 uyumlu: Veri bütünlüğü + işlevsel eşdeğerlik + görsel sadakat.
+    Telegram resmi bileşenleriyle (<b>, <code>, <i>, InlineKeyboardButton) uygulanır.
+    """
+    aciklama_map = {
+        "brief_link":       "Analiz edilen ürün sayfası",
+        "brief_material":   "Kullanıcının yüklediği materyaller",
+        "brief_platform":   "Yayınlanacak platform",
+        "brief_format":     "Seçilen video formatı",
+        "brief_resolution": "Video çözünürlüğü",
+        "brief_duration":   "Tercih edilen video süresi",
+        "brief_style":      "Reklam tanıtım tarzı",
+        "brief_audience":   "Reklam hedef kitlesi",
+        "brief_audio":      "Ses tercihleri",
+        "brief_voicelang":  "Seçilen seslendirme dili",
+        "brief_voicechar":  "Seslendirme karakteri",
+        "brief_emphasis":   "Öne çıkarılacak detaylar",
+    }
+    maddeler = []
+    for field_key, label, scene_id, editable in BRIEF_FIELDS:
+        ikon = label.split(" ", 1)[0] if " " in label else ""
+        baslik = label.split(" ", 1)[1] if " " in label else label
+        maddeler.append({
+            "onayli": checks.get(field_key, True),
+            "ikon": ikon,
+            "baslik": baslik,
+            "aciklama": aciklama_map.get(field_key, "Brief bilgisi"),
+            "deger": _get_brief_value(user_data, field_key),
+        })
+
+    lang = get_lang(user_data)
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    lines = []
+    lines.append(f"{SEP}")
+    lines.append(f"<b>📋 {t('s12.title', lang)}</b>")
+    lines.append(f"<code>🔵1.Brief  ›  ⏳2.Senaryo  ›  ⏳3.Fiyat Teklifi</code>")
+    lines.append(f"{SEP}")
+    lines.append(f"<b>📋 {t('s12.summary_title', lang)}</b>")
+    lines.append(f"<i>{t('s12.summary_text', lang)}</i>")
+    lines.append("")
+
+    for i in range(0, len(maddeler), 2):
+        left = maddeler[i]
+        is_first = i < 2
+        tik_l = "" if is_first else ("✅" if left["onayli"] else "☐") + " "
+        sol = f"{tik_l}{left['ikon']} <b>{left['baslik']}:</b> <b>{left['deger']}</b>"
+
+        if i + 1 < len(maddeler):
+            right = maddeler[i + 1]
+            ri = i + 1
+            tik_r = "" if ri < 2 else ("✅" if right["onayli"] else "☐") + " "
+            sag = f"{tik_r}{right['ikon']} <b>{right['baslik']}:</b> <b>{right['deger']}</b>"
+            if is_first:
+                lines.append(sol)
+                lines.append(sag)
+            else:
+                lines.append(f"<code>{sol}</code>")
+                lines.append(f"<code>{sag}</code>")
+        else:
+            if is_first:
+                lines.append(sol)
+            else:
+                lines.append(f"<code>{sol}</code>")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 # SAHNE-12: Brief Onay Tablosu — REFERANS_Brief_Onay_Formu Referans Form uyumlu
 # (AR-002_64 + FD-008_1 + MASTER-010)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1333,57 +1414,34 @@ def _get_brief_checks(user_data: dict) -> dict:
 
 
 async def _deliver_brief_table(chat_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """SAHNE-12: REFERANS_Brief_Onay_Formu → PNG + Aktif Onay Butonları (MASTER-010).
+    """SAHNE-12: REFERANS_Brief_Onay_Formu → Telegram HTML + InlineKeyboard (AR-002_65).
 
-    MASTER-010 uyarınca REFERANS_Brief_Onay_Formu Referans Formu PNG olarak render edilir.
-    PNG sonrası Telegram inline butonları ile kullanıcı onayı alınır:
-    - ✅ ONAYLIYORUM → BRIEF_APPROVED → SAHNE-13 akışı
-    - ✏️ DÜZELTMEK İSTİYORUM → SAHNE-12 düzeltme modu
+    AR-002_65 En Yüksek Sadakat İlkesi uyarınca PNG render kullanılmaz;
+    Telegram resmi bileşenleriyle (<b>, <code>, <i>, InlineKeyboardButton) uygulanır.
+    Veri bütünlüğü + işlevsel eşdeğerlik + görsel sadakat korunur.
     """
     checks = _get_brief_checks(context.user_data)
+    html = _build_brief_html(context.user_data, checks)
 
-    from io import BytesIO
-    png_bytes = await render_brief_onay(context.user_data, checks)
-    if png_bytes is None:
-        logger.error(f"❌ [SAHNE-12] PNG render başarısız.")
-        raise RuntimeError("SAHNE-12 PNG render başarısız — Referans Form oluşturulamadı.")
-
-    # 1. PNG olarak Brief Özeti gönder
-    msg = await context.bot.send_photo(
-        chat_id=chat_id,
-        photo=BytesIO(png_bytes),
-        filename="HLK_Brief_Ozeti",
-        caption=(
-            "📋 <b>Brief Özeti</b>\n"
-            "<i>Yukarıdaki formu inceleyip seçiminizi yapınız.</i>"
-        ),
-        parse_mode="HTML",
-    )
-    logger.info(f"📋 [SAHNE-12] PNG gönderildi: msg={msg.message_id}")
-
-    # 2. Aktif onay butonları (MASTER-010: Referans Form butonları interaktif olmalı)
+    lang = get_lang(context.user_data)
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ ONAYLIYORUM", callback_data="brief_approve")],
-        [InlineKeyboardButton("✏️ DÜZELTMEK İSTİYORUM", callback_data="brief_edit")],
+        [InlineKeyboardButton(f"✅ {t('s12.approve', lang)}", callback_data="brief_approve")],
+        [InlineKeyboardButton(f"✏️ {t('s12.edit', lang)}", callback_data="brief_edit")],
     ])
-    btn_msg = await context.bot.send_message(
+
+    msg = await context.bot.send_message(
         chat_id=chat_id,
-        text=(
-            "✅ <b>ONAYLIYORUM</b> — Tüm bilgiler doğru, senaryo aşamasına geçilsin.\n"
-            "✏️ <b>DÜZELTMEK İSTİYORUM</b> — Değiştirmek istediğim bilgiler var."
-        ),
+        text=html,
         reply_markup=kb,
         parse_mode="HTML",
     )
-    logger.info(f"📋 [SAHNE-12] Onay butonları gönderildi: msg={btn_msg.message_id}")
+    logger.info(f"📋 [SAHNE-12] Brief HTML gönderildi: msg={msg.message_id} ({len(html)} chars)")
 
     scene_delivery.register_chat_messages(chat_id, {
         "success_msg_id": msg.message_id,
-        "btn_msg_id": btn_msg.message_id,
     })
     context.user_data["brief_msg_id"] = msg.message_id
-    context.user_data["brief_btn_msg_id"] = btn_msg.message_id
 
 
 # ── SAHNE-12 Callback Handler'ları ─────────────────────────────────────────────
@@ -1434,7 +1492,8 @@ async def handle_brief_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 callback_data=f"brief_edit_{f[0]}"
             )])
 
-    kb_rows.append([InlineKeyboardButton("✅ DÜZENLEME TAMAM", callback_data="brief_approve")])
+    lang = get_lang(context.user_data)
+    kb_rows.append([InlineKeyboardButton(f"✅ {t('s12.edit_done', lang)}", callback_data="brief_approve")])
 
     kb = InlineKeyboardMarkup(kb_rows)
 
@@ -1442,14 +1501,14 @@ async def handle_brief_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         await query.message.delete()
     except Exception:
         pass
+    await scene_delivery.cleanup_chat(chat_id)
 
     await context.bot.send_message(
         chat_id=chat_id,
         text=(
-            "✏️ <b>Brief Düzeltme Modu</b>\n\n"
-            "Değiştirmek istediğiniz alana tıklayın, ilgili adıma yönlendirileceksiniz.\n"
-            "Düzenleme sonrası bu ekrana geri döneceksiniz.\n\n"
-            "<i>İşiniz bittiğinde</i> <b>DÜZENLEME TAMAM</b> <i>butonuna basın.</i>"
+            f"✏️ <b>{t('s12.edit_title', lang)}</b>\n\n"
+            f"{t('s12.edit_prompt', lang)}\n\n"
+            f"<i>İşiniz bittiğinde</i> <b>{t('s12.edit_done', lang)}</b> <i>butonuna basın.</i>"
         ),
         reply_markup=kb,
         parse_mode="HTML",
@@ -1522,6 +1581,40 @@ async def handle_brief_edit_field(update: Update, context: ContextTypes.DEFAULT_
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SAHNE-13: Brief Tamamlandı Akışı (FD-008_1 uyumlu)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _build_senaryo_html(data: dict) -> str:
+    """Senaryo Onay Formu'nu Telegram HTML olarak oluşturur (AR-002_65)."""
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    u = data["urun"]
+    lines = [SEP,
+             "<b>━━━━ 🎬 SENARYO ONAY FORMU ━━━━</b>",
+             "<code>✅1.Brief  ›  🔵2.Senaryo  ›  ⏳3.Fiyat Teklifi</code>",
+             SEP, "",
+             f"MARKA: <b>{u['marka']}</b>",
+             f"ÜRÜN: <b>{u['ad']}</b>",
+             "", SEP, "",
+             "<b>📖 Tanıtım Hikayesi</b>",
+             f"<i>{data['hikaye']}</i>",
+             "", SEP, "",
+             f"<b>🎞️ Sahne Planı ({data['toplamSure']})</b>"]
+
+    sahneler = data.get("sahneler", [])
+    for s in sahneler:
+        lines.append(f"<b>S{s['no']}: {s['baslik']}</b>  <code>⏱{s['zaman']} ({s['sure']})</code>")
+        lines.append(f"  <i>{s['aciklama']}</i>")
+        lines.append("")
+    lines.append(SEP)
+
+    ses = data["seslendirme"]
+    uret = data["uretim"]
+    lines.append(f"<b>🎙️ {ses['dil']} | {ses['karakter']} | {ses['yapi']}</b>")
+    lines.append(f"<b>🎬 {uret['platform']} • {uret['format']} • {uret['cozunurluk']} • {uret['sure']} • {uret['sahneSayisi']} sahne</b>")
+    lines.append(""); lines.append(SEP)
+
+    return "\n".join(lines)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 
 async def _run_sahne13_flow(

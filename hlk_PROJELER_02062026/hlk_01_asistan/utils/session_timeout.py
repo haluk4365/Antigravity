@@ -10,8 +10,13 @@ from utils.state_engine import StateEngine, UserEvent
 
 logger = logging.getLogger(__name__)
 
-WARNING_MSG = "<b>HLK Reklam Asistanı</b> ile açık bir Telegram oturumunuz kaldı, <b>2 dakika</b> içinde bu oturum kapatılacaktır."
-CLOSE_MSG = "<b>HLK Reklam Asistanı</b> ile açık olan Telegram oturumunuz <b>kapatılmıştır.</b>"
+def _get_timeout_msgs(lang: str = "tr") -> tuple:
+    """AR-002_30: Timeout mesajlarini kullanicinin dilinde dondurur."""
+    from config.i18n import t
+    return (
+        t("final.timeout_warning", lang),
+        t("final.timeout_closed", lang),
+    )
 
 _tasks: dict[int, asyncio.Task] = {}
 
@@ -35,12 +40,15 @@ def start_timer(user_id: int, chat_id: int, bot, user_data: dict) -> None:
             se = StateEngine(user_data)
             logger.info(f"🔷 State Engine: {se.current.value}")
 
+            lang = user_data.get("language", "tr")
+            warn_msg, close_msg = _get_timeout_msgs(lang)
+
             await bot.send_message(
                 chat_id=chat_id,
-                text=WARNING_MSG,
+                text=warn_msg,
                 parse_mode="HTML",
             )
-            logger.info(f"⚠️ Timeout uyarısı: {user_id}")
+            logger.info(f"⚠️ Timeout uyarisi: {user_id}")
 
             await asyncio.sleep(120)  # 2 dakika daha
             se.fire(UserEvent.TIMEOUT_REACHED)
@@ -49,10 +57,10 @@ def start_timer(user_id: int, chat_id: int, bot, user_data: dict) -> None:
 
             await bot.send_message(
                 chat_id=chat_id,
-                text=CLOSE_MSG,
+                text=close_msg,
                 parse_mode="HTML",
             )
-            logger.info(f"🔒 Oturum kapatıldı: {user_id}")
+            logger.info(f"🔒 Oturum kapatildi: {user_id}")
         except asyncio.CancelledError:
             pass
         except Exception as e:

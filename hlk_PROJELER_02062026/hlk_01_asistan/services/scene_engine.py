@@ -56,6 +56,119 @@ class ConversationSceneEngine:
         self._production_log: list[dict] = []
         self._active_scene_id: str | None = None
 
+    @staticmethod
+    def _translate_scene_text(scene_id: str, text: str, user_data: dict) -> str:
+        """AR-002_30: Sahne metnini kullanıcının seçtiği dile çevirir.
+
+        Sahne ID'sine göre i18n anahtarı kullanır. Çeviri yoksa orijinal metni döndürür.
+        """
+        import logging
+        _log = logging.getLogger(__name__)
+        from config.i18n import t
+        lang = user_data.get("language", "tr")
+        _log.info(f"🌐 [i18n] Scene '{scene_id}' -> lang='{lang}'")
+
+        i18n_map = {
+            # Tüm sahneler için çeviri anahtarları (AR-002_30)
+            "scene_collect_materials_info": ("material", "prompt_has"),
+            "scene_platform_selection": ("platform", "prompt"),
+            "SAHNE-03": ("s03", "prompt"),
+            "SAHNE-04": ("s04", "prompt"),
+            "SAHNE-05": ("s05", "prompt"),
+            "SAHNE-06": ("s06", "prompt"),
+            "SAHNE-07": ("s07", "prompt"),
+            "SAHNE-08": ("s08", "prompt"),
+            "SAHNE-09": ("s09", "prompt"),
+            "SAHNE-10": ("s10", "prompt"),
+            "SAHNE-11": ("s11", "prompt"),
+        }
+
+        mapped = i18n_map.get(scene_id)
+        if mapped:
+            section, key = mapped
+            translated = t(f"{section}.{key}", lang)
+            _log.info(f"🌐 [i18n] key={section}.{key} translated={translated[:50]}...")
+            if translated != f"{section}.{key}":
+                return translated
+        _log.warning(f"🌐 [i18n] Scene '{scene_id}' — ceviri bulunamadi, orijinal metin kullaniliyor")
+        return text
+
+    @staticmethod
+    def _translate_buttons(buttons: list, user_data: dict) -> list:
+        """AR-002_30: Buton metinlerini kullanıcının seçtiği dile çevirir."""
+        from config.i18n import t
+        lang = user_data.get("language", "tr")
+
+        btn_i18n = {
+            # Material scene
+            "upload_material": ("material", "var"),
+            "skip_material": ("material", "yok"),
+            # SAHNE-03
+            "format_9_16": ("s03", "vertical"),
+            "format_16_9": ("s03", "horizontal"),
+            "format_1_1": ("s03", "square"),
+            # SAHNE-04
+            "resolution_480p": ("s04", "480p"),
+            "resolution_720p": ("s04", "720p"),
+            "resolution_1080p": ("s04", "1080p"),
+            # SAHNE-05
+            "duration_hlk": ("s05", "hlk_decides"),
+            # SAHNE-06
+            "style_ugc": ("s06", "ugc"),
+            "style_traditional": ("s06", "traditional"),
+            "style_cinematic": ("s06", "cinematic"),
+            "style_custom": ("s06", "custom"),
+            "style_hlk": ("s06", "hlk_decides"),
+            # SAHNE-07
+            "audience_0_12": ("s07", "children"),
+            "audience_13_17": ("s07", "teen"),
+            "audience_18_24": ("s07", "young_adult"),
+            "audience_25_34": ("s07", "adult"),
+            "audience_35_44": ("s07", "family"),
+            "audience_45_54": ("s07", "middle_age"),
+            "audience_55_64": ("s07", "mature"),
+            "audience_65_plus": ("s07", "senior"),
+            # SAHNE-08
+            "audio_toggle_voiceover": ("s08", "voiceover"),
+            "audio_toggle_ambient": ("s08", "ambient"),
+            "audio_toggle_music": ("s08", "music"),
+            "audio_toggle_silent": ("s08", "silent"),
+            "audio_devam": ("s08", "continue"),
+            # SAHNE-10
+            "voicechar_female": ("s10", "female"),
+            "voicechar_male": ("s10", "male"),
+            "voicechar_child": ("s10", "child"),
+            # SAHNE-11
+            "emphasis_discount": ("s11", "discount"),
+            "emphasis_shipping": ("s11", "shipping"),
+            "emphasis_gift": ("s11", "gift"),
+            "emphasis_newseason": ("s11", "new_season"),
+            "emphasis_local": ("s11", "local"),
+            "emphasis_custom": ("s11", "custom"),
+            "emphasis_done": ("s11", "done"),
+        }
+
+        translated = []
+        for row in buttons:
+            new_row = []
+            for btn in row:
+                new_btn = dict(btn)
+                cb = btn.get("callback_data", "")
+                mapped = btn_i18n.get(cb)
+                if mapped:
+                    section, key = mapped
+                    translated_text = t(f"{section}.{key}", lang)
+                    if translated_text != f"{section}.{key}":
+                        # İkonu koru (varsa)
+                        orig_text = btn.get("text", "")
+                        if orig_text and orig_text[0] in "📱🖥️🔄🎬👥🎙️🔊🔇🎵🎭✨🏷️🚚🎁🇹🇷✏️":
+                            new_btn["text"] = f"{orig_text[0]} {translated_text}" if " " not in orig_text[:3] else translated_text
+                        else:
+                            new_btn["text"] = translated_text
+                new_row.append(new_btn)
+            translated.append(new_row)
+        return translated
+
     async def produce_and_deliver(
         self,
         user_data: dict,
@@ -174,6 +287,8 @@ class ConversationSceneEngine:
         # Flow Diagram speech_directive = yalnızca SceneDefinition yoksa fallback.
         if scene_def and scene_def.text:
             scene_text = scene_def.text
+            # AR-002_30: Sahne metnini seçilen dile çevir
+            scene_text = self._translate_scene_text(scene_def.scene_id, scene_text, user_data)
             log_entry["steps"].append({
                 "step": "content_from_scene_definition",
                 "text_length": len(scene_text),
@@ -273,13 +388,16 @@ class ConversationSceneEngine:
                 "special_behaviors": flow_section.get("special_behaviors"),
             }
 
+        # AR-002_30: Buton metinlerini seçilen dile çevir
+        buttons = self._translate_buttons(scene_def.buttons, user_data) if scene_def.buttons else None
+
         payload = ScenePayload(
             scene_id=scene_id,
             chat_id=chat_id,
             text=scene_text,
             parse_mode=scene_def.parse_mode,
             audio_path=audio_path,
-            buttons=scene_def.buttons if scene_def.buttons else None,
+            buttons=buttons,
             metadata=payload_metadata,
         )
         if audio_path:
@@ -429,7 +547,7 @@ class ConversationSceneEngine:
             if flow_section and flow_section.get("speech_directive"):
                 scene_text = flow_section["speech_directive"]
             elif scene_def:
-                scene_text = scene_def.text
+                scene_text = self._translate_scene_text(scene_def.scene_id, scene_def.text, user_data)
             else:
                 logger.warning(f"⚠️ [SceneEngine] Event konuşması üretilemedi: {trigger_event}")
                 return None
@@ -438,9 +556,11 @@ class ConversationSceneEngine:
                 "source": "flow_directive" if (flow_section and flow_section.get("speech_directive")) else "scene_definition",
             })
 
-        # Butonlar: SceneDefinition'dan (state'e göre)
+        # Butonlar: SceneDefinition'dan (state'e göre) + AR-002_30 çeviri
         scene_def = get_scene_for_state(current_state)
         buttons = scene_def.buttons if scene_def else None
+        if buttons:
+            buttons = self._translate_buttons(buttons, user_data)
 
         # Payload üret ve teslim et
         payload = ScenePayload(

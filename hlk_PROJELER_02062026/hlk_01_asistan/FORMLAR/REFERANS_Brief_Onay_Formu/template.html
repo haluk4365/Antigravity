@@ -6,20 +6,21 @@
 <link rel="stylesheet" href="../shared/base.css">
 <style>
   :root { --check-bg: #f0f9f4; }
-  .section-title { font-size: 16px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
-  .checklist { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .section-title { font-size: 30px; font-weight: 800; margin-bottom: 20px; display: flex; align-items: center; gap: 14px; }
+  .checklist { display: flex; flex-direction: column; gap: 16px; margin-bottom: 30px; }
   .check-item {
-    display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+    display: flex; align-items: center; gap: 22px; padding: 22px 26px;
     border: 1px solid var(--border); border-radius: 12px; background: var(--check-bg);
     cursor: pointer; transition: all .15s;
   }
   .check-item.unchecked { background: var(--card-bg); opacity: .65; }
-  .check-icon { font-size: 20px; flex-shrink: 0; }
+  .check-icon { font-size: 36px; flex-shrink: 0; }
   .check-item .info { flex: 1; }
-  .check-item .info b { display: block; font-size: 14px; }
-  .check-item .info span { font-size: 12.5px; color: var(--muted); }
-  .check-item .value { font-size: 14px; font-weight: 700; text-align: right; }
-  .note { font-size: 11px; color: var(--muted); display: flex; gap: 6px; margin-bottom: 10px; }
+  .check-item .info b { display: block; font-size: 26px; }
+  .check-item .info span { font-size: 23px; color: var(--muted); }
+  .check-item .value { font-size: 26px; font-weight: 700; text-align: right; }
+  .note { font-size: 21px; color: var(--muted); display: flex; gap: 8px; margin-bottom: 14px; }
+  .footer { font-size: 18px !important; }
 </style>
 </head>
 <body>
