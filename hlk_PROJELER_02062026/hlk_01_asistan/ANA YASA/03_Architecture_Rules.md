@@ -4036,35 +4036,34 @@ Kod geliştirme süreci ancak bu analiz tamamlandıktan sonra başlatılabilir.
 
 Kodun görevi kullanıcı arayüzünü tasarlamak değildir.
 
-Kodun görevi, `template.html` ve `render.js` üzerinden Referans Formda tanımlanan kullanıcı arayüzünü Telegram üzerinde birebir uygulamaktır.
+Kodun görevi, ilgili Referans Form klasöründeki `template.html` ve `render.js` aracılığıyla, Referans `.png` dosyasında tanımlanan kullanıcı arayüzünü hedef platform üzerinde **en yüksek sadakatle** uygulamaktır.
+
+**Referans `.png` dosyası, kullanıcı arayüzünün değiştirilemez anayasal tasarım otoritesidir.** Kod, bu otoriteye bağlı kalarak hedef platformda uygulanabilir en yakın görsel, işlevsel ve kullanıcı deneyimi karşılığını üretmekle yükümlüdür.
+
+**Platform Sınırlamaları:** Her platformun kendine özgü teknik sınırları vardır. Telegram; `<table>`, `<div>`, `<style>`, CSS grid/flexbox, özel fontlar ve gömülü görsel bileşenleri desteklemez. Bu teknik sınırlamalar anayasal sapma değil, platform gerçekliğidir. Hedef platform tarafından desteklenmeyen bir Referans Form bileşeni, aynı amacı yerine getiren resmi platform bileşeni ile uygulanır.
 
 Kod;
 
 * Referans `.png` dosyasını değiştiremez.
 * Referans Formu yeniden yorumlayamaz.
+* Referans Formdaki veri yapısını ve içeriği eksiksiz korumak zorundadır.
+* Referans Formdaki kullanıcı etkileşimlerini (onay, red, seçim, düzeltme) birebir uygulamak zorundadır.
 * Referans Formda bulunmayan yeni kullanıcı arayüzü bileşenleri oluşturamaz.
-* Referans Formdan farklı ekran düzeni oluşturamaz.
+* Referans Formun bilgi hiyerarşisini ve sıralamasını korumak zorundadır.
 
-Telegram'da kullanıcıya gösterilen ekran;
+Çalışan kullanıcı arayüzü, Referans `.png` dosyası ile aşağıdaki kriterlere göre doğrulanır:
 
-* ekran düzeni,
-* bilgi yerleşimi,
-* tablo yapısı,
-* bilgi sıralaması,
-* ikonlar,
-* onay kutuları,
-* kullanıcı etkileşimleri,
-* butonlar,
-* ekran davranışları
-
-bakımından Referans `.png` dosyası ile birebir uyumlu olmak zorundadır.
+1. **Veri Bütünlüğü:** Tüm Referans Form verileri çalışan ekranda eksiksiz mevcut mu?
+2. **İşlevsel Eşdeğerlik:** Tüm kullanıcı etkileşimleri hedef platformda çalışıyor mu?
+3. **Görsel Sadakat:** Platformun teknik sınırları içinde en yakın görsel karşılık sağlanmış mı?
 
 Referans `.png` dosyası ile çalışan kullanıcı arayüzü arasında farklılık oluşursa;
 
-* Kod düzeltilir.
+* Kod, hedef platformun desteklediği en yakın karşılık ile düzeltilir.
 * Referans `.png` dosyası değiştirilmez.
+* Platform sınırlaması nedeniyle birebir uygulanamayan bileşenler anayasal sapma sayılmaz; yeter ki yukarıdaki üç doğrulama kriteri karşılansın.
 
-Referans Form her zaman kullanıcı arayüzünün resmi otoritesidir.
+Referans Form her zaman kullanıcı arayüzünün anayasal tasarım otoritesidir.
 
 HLK içerisinde geliştirilecek her yeni kullanıcı ekranı için önce ilgili Referans Form klasörü oluşturulur.
 
@@ -4072,14 +4071,15 @@ Referans Form klasörü oluşturulmadan kullanıcı arayüzü geliştirilmez.
 
 ### Temel İlke
 
-**Referans Formlar, HLK Telegram kullanıcı arayüzünün resmi üretim spesifikasyonudur. Kodun görevi kullanıcı arayüzünü tasarlamak değil, `template.html` ve `render.js` aracılığıyla Referans `.png` dosyasında tanımlanan ekranı birebir uygulamaktır.**
+**Referans Formlar, HLK kullanıcı arayüzünün değiştirilemez anayasal tasarım otoritesidir. Kodun görevi kullanıcı arayüzünü tasarlamak değil, bu tasarımı hedef platformun teknik sınırları içerisinde en yüksek sadakatle uygulamaktır. Veri bütünlüğü, işlevsel eşdeğerlik ve görsel sadakat esastır.**
 
 ### Beklenen Sonuç
 
-* Tüm Telegram ekranları ilgili Referans Form esas alınarak geliştirilir.
-* Referans Form ile çalışan ekran arasında fark oluşmaz.
+* Tüm kullanıcı arayüzleri ilgili Referans Form esas alınarak geliştirilir.
+* Çalışan ekran, Referans Formun veri yapısını ve kullanıcı etkileşimlerini eksiksiz uygular.
 * Kod, Referans Formun uygulama katmanı olarak kalır; UI tasarımı yapmaz.
 * Yeni ekran geliştirmelerinde önce Referans Form klasörü oluşturulur, sonra kod yazılır.
+* Platform sınırlaması kaynaklı görsel farklılıklar anayasal sapma sayılmaz; veri bütünlüğü, işlevsel eşdeğerlik ve görsel sadakat kriterleri karşılanır.
 * Anayasal UI otoritesi olarak Referans Formlar, Flow Diagram ile birlikte kullanıcı deneyiminin çift katmanlı anayasal güvencesini oluşturur.
 
 ---
@@ -4110,34 +4110,49 @@ Telegram
 
 Kodun görevi kullanıcı arayüzünü tasarlamak değildir.
 
-Kodun görevi, ilgili Referans Form klasöründeki `template.html` ve `render.js` aracılığıyla, Referans `.png` dosyasında tanımlanan kullanıcı arayüzünü Telegram üzerinde birebir uygulamaktır.
+Kodun görevi, ilgili Referans Form klasöründeki `template.html` ve `render.js` aracılığıyla, Referans `.png` dosyasında tanımlanan kullanıcı arayüzünü Telegram üzerinde **en yüksek sadakatle** uygulamaktır.
+
+**Referans `.png` dosyası, kullanıcı arayüzünün değiştirilemez anayasal otoritesidir.** Kod, bu otoriteye bağlı kalarak Telegram platformunda uygulanabilir en yakın görsel, işlevsel ve kullanıcı deneyimi karşılığını üretmekle yükümlüdür.
+
+**Platform Sınırlamaları:** Telegram HTML desteği sınırlıdır (`<b>`, `<i>`, `<u>`, `<s>`, `<code>`, `<pre>`, `<blockquote>`, `<a>`, `<tg-spoiler>`). `<table>`, `<div>`, `<style>`, CSS grid/flexbox, özel fontlar ve gömülü görsel bileşenler Telegram tarafından desteklenmez. Bu teknik sınırlamalar anayasal sapma değil, platform gerçekliğidir.
+
+**En Yüksek Sadakat İlkesi (Highest Fidelity Principle):** Referans `.png` dosyasında tanımlanan bir UI bileşeni Telegram tarafından teknik olarak desteklenmiyorsa, kod;
+
+* Bileşeni atlamaz veya yok saymaz.
+* Bileşenin taşıdığı veriyi, işlevi ve kullanıcı etkileşimini korur.
+* Bileşeni, Telegram'ın resmi UI bileşenleriyle (`InlineKeyboardButton`, `ReplyKeyboardMarkup`, `<code>`, `<blockquote>`, `<pre>` vb.) en yakın görsel ve işlevsel karşılıkla uygular.
+* Görsel birebirlik yerine **veri bütünlüğü + işlevsel eşdeğerlik + kullanıcı deneyimi tutarlılığı** hedeflenir.
 
 Kod;
 
-* Referans Formu yeniden yorumlayamaz.
-* Referans Formdan farklı kullanıcı arayüzü oluşturamaz.
+* Referans Formdaki veri yapısını ve içeriği eksiksiz korumak zorundadır.
+* Referans Formdaki kullanıcı etkileşimlerini (onay, red, seçim, düzeltme) birebir uygulamak zorundadır.
 * Referans Formda bulunmayan yeni UI bileşeni ekleyemez.
-* Referans Formdaki kullanıcı etkileşimlerini değiştiremez.
+* Referans Formun bilgi hiyerarşisini ve sıralamasını korumak zorundadır.
 
-Kod tamamlandıktan sonra çalışan Telegram ekranı ilgili Referans `.png` dosyası ile doğrulanacaktır.
+Kod tamamlandıktan sonra çalışan Telegram ekranı ilgili Referans `.png` dosyası ile aşağıdaki kriterlere göre doğrulanacaktır:
+
+1. **Veri Bütünlüğü:** Tüm Referans Form verileri Telegram ekranında eksiksiz mevcut mu?
+2. **İşlevsel Eşdeğerlik:** Tüm kullanıcı etkileşimleri Telegram'da çalışıyor mu?
+3. **Görsel Sadakat:** Telegram'ın teknik sınırları içinde en yakın görsel karşılık sağlanmış mı?
 
 Herhangi bir farklılık tespit edilirse;
 
-* Kod düzeltilir.
+* Kod, Telegram'ın desteklediği en yakın karşılık ile düzeltilir.
 * Referans `.png` dosyası değiştirilmez.
-
-Telegram ekranı Referans `.png` dosyası ile birebir uyumlu olmak zorundadır.
+* Platform sınırlaması nedeniyle birebir uygulanamayan bileşenler anayasal sapma sayılmaz; yeter ki yukarıdaki üç doğrulama kriteri karşılansın.
 
 ### Temel İlke
 
-**Kod, Referans Formun uygulayıcısıdır; tasarlayıcısı değildir. Geliştirme sırası STATE → Flow Diagram → Referans Form Klasörü → Kod olarak uygulanır. Referans Form ile Telegram ekranı arasındaki her fark anayasal sapmadır ve kod düzeltilerek giderilir.**
+**Kod, Referans Formun uygulayıcısıdır; tasarlayıcısı değildir. Geliştirme sırası STATE → Flow Diagram → Referans Form Klasörü → Kod olarak uygulanır. Referans `.png` dosyası görsel otoritedir. Telegram'ın teknik sınırları içinde en yüksek sadakat esastır: veri bütünlüğü, işlevsel eşdeğerlik ve kullanıcı deneyimi tutarlılığı önceliklidir.**
 
 ### Beklenen Sonuç
 
 * Tüm kullanıcı arayüzü geliştirmeleri STATE → Flow Diagram → Referans Form Klasörü → Kod sırasıyla yapılır.
-* Kod, Referans Formun Telegram üzerindeki birebir uygulaması olarak kalır.
-* Kod bağımsız UI tasarımı yapmaz; yalnızca Referans Formu uygular.
-* Telegram ekranı ile Referans `.png` dosyası arasında sıfır fark hedeflenir.
+* Kod, Referans Formun veri yapısını ve kullanıcı etkileşimlerini eksiksiz uygular.
+* Kod bağımsız UI tasarımı yapmaz; yalnızca Referans Formu Telegram platformunda uygulanabilir en yakın karşılıkla hayata geçirir.
+* Telegram tarafından desteklenmeyen bileşenler, resmi Telegram bileşenleriyle en yüksek sadakatle değiştirilir.
+* Veri bütünlüğü, işlevsel eşdeğerlik ve görsel sadakat doğrulama kriterleri karşılanır.
 * Herhangi bir farklılıkta kod düzeltilir, Referans `.png` korunur.
 
 ---
@@ -4150,17 +4165,20 @@ Telegram ekranı Referans `.png` dosyası ile birebir uyumlu olmak zorundadır.
 
 ### Kural
 
-HLK içerisinde Referans Form mimarisi ile tanımlanmış hiçbir kullanıcı arayüzü çalışma zamanında doğrudan Telegram mesajı (`send_message`, `reply_text` vb.) olarak üretilemez.
+HLK içerisinde Referans Form mimarisi ile tanımlanmış hiçbir kullanıcı arayüzü çalışma zamanında eski mesaj tabanlı kullanıcı arayüzü (`send_message`, `reply_text` vb. düz metin) olarak üretilemez.
 
 Referans Form tanımlanmış bir STATE'e ulaşıldığında HLK aşağıdaki mimariyi uygulamak zorundadır:
 
 1. İlgili Referans Form klasörü yüklenir.
-2. Referans `.png` dosyası ilgili formun değiştirilemez tek görsel otoritesi olarak esas alınır.
-3. `template.html` yüklenir.
+2. Referans `.png` dosyası ilgili formun değiştirilemez anayasal tasarım otoritesi olarak esas alınır.
+3. Referans Formun veri yapısı (`sample-data.json`) ve kullanıcı arayüzü şablonu (`template.html`) yüklenir.
 4. Geliştirme aşamasında `sample-data.json`, çalışma zamanında ise gerçek Runtime verileri kullanılır.
-5. `render.js` çalıştırılarak nihai kullanıcı arayüzü oluşturulur.
-6. Oluşturulan arayüz PNG olarak render edilir.
-7. Render edilen PNG Telegram kullanıcısına görsel olarak gönderilir.
+5. Referans UI, hedef platformun teknik sınırları içerisinde **En Yüksek Sadakat İlkesi** ile implemente edilir.
+6. Çıktı formatı hedef platformun desteklediği en uygun yöntemle belirlenir:
+   * Platform PNG/görsel render'ı destekliyorsa → `render.js` → PNG → görsel gönderim.
+   * Platform HTML/metin render'ı destekliyorsa → Referans Form verisi, platformun resmi UI bileşenleri (`InlineKeyboardButton`, `<code>`, `<blockquote>`, `<pre>` vb.) kullanılarak uygulanır.
+   * Her iki durumda da **Veri Bütünlüğü, İşlevsel Eşdeğerlik ve Görsel Sadakat** doğrulama kriterleri karşılanır.
+7. Oluşturulan çıktı hedef platformda kullanıcıya gönderilir.
 
 Referans Form tanımlanmış hiçbir STATE içerisinde eski mesaj tabanlı kullanıcı arayüzü kullanılamaz.
 
@@ -4177,19 +4195,21 @@ Bu durumda hata kayıt altına alınır ve HLK'nın tanımlı hata yönetimi sü
 Bu kuralın amacı;
 
 * Referans Form mimarisinin çalışma zamanında eksiksiz uygulanmasını sağlamak,
-* Tüm kullanıcı arayüzlerinin tek mimari standart üzerinden üretilmesini zorunlu hale getirmek,
+* Tüm kullanıcı arayüzlerinin Referans UI anayasal tasarım otoritesi altında üretilmesini zorunlu hale getirmek,
 * Referans Form tanımlı ekranlarda eski mesaj tabanlı arayüzlerin tekrar kullanılmasını önlemek,
-* Runtime davranışını Referans Form mimarisi ile tam uyumlu hale getirmektir.
+* Runtime'ın hedef platforma uygun implementasyon yöntemini seçmesine olanak tanımak,
+* Runtime davranışını Referans UI mimarisi ile En Yüksek Sadakat İlkesi çerçevesinde uyumlu hale getirmektir.
 
 ---
 
 ### Beklenen Sonuç
 
-* Referans Form tanımlı tüm STATE'lerde kullanıcı arayüzü `template.html` + `render.js` → PNG olarak üretilir.
-* `send_message` / `reply_text` yalnızca Referans Form tanımlanmamış adımlarda kullanılır.
+* Referans Form tanımlı tüm STATE'lerde kullanıcı arayüzü Referans UI esas alınarak üretilir.
+* Çıktı formatı hedef platformun teknik kapasitesine göre belirlenir; PNG veya platform resmi UI bileşenleri kullanılır.
+* `send_message` / `reply_text` düz metin yalnızca Referans Form tanımlanmamış adımlarda kullanılır.
 * Eski mesaj tabanlı arayüzler Referans Form tanımlı STATE'lerden tamamen kaldırılır.
 * Render başarısız olduğunda fallback yerine hata yönetimi çalıştırılır.
-* Tüm kullanıcı arayüzleri tek standart üzerinden üretilir ve Referans `.png` ile uyumlu olur.
+* Tüm implementasyonlarda Veri Bütünlüğü, İşlevsel Eşdeğerlik ve Görsel Sadakat doğrulama kriterleri karşılanır.
 
 ---
 
@@ -4201,21 +4221,23 @@ Bu kuralın amacı;
 
 ### Kural
 
-Bu kural, Referans Form Mimarisi kuralının çalışma zamanı (Runtime) uygulama standardını tanımlar.
+Bu kural, Runtime'ın Referans Form tanımlanmış sahnelerde uygulayacağı teknik standardı tanımlar. AR-002_66 Runtime'ın anayasal davranışını, bu kural ise teknik uygulama adımlarını düzenler.
 
 HLK, her STATE geçişinde öncelikle `08_HLK_FLOW_DIAGRAM.md` dosyasını esas alarak bulunduğu sahne için Referans Form tanımlanıp tanımlanmadığını kontrol eder.
 
 Referans Form tanımlanmamış sahnelerde HLK, mevcut Konuşma Arayüzü (Conversation UI) mimarisini kullanmaya devam eder.
 
-Referans Form tanımlanmış sahnelerde ise aşağıdaki mimari zorunlu olarak uygulanır:
+Referans Form tanımlanmış sahnelerde ise aşağıdaki teknik uygulama standardı zorunlu olarak uygulanır:
 
-1. İlgili Referans Form klasörü yüklenir.
-2. Referans `.png` dosyası ilgili formun değiştirilemez tek görsel otoritesi olarak kabul edilir.
-3. `template.html` yüklenir.
-4. Geliştirme aşamasında `sample-data.json`, çalışma zamanında ise gerçek Runtime verileri kullanılır.
-5. `render.js` çalıştırılarak Referans PNG'ye uygun nihai kullanıcı arayüzü oluşturulur.
-6. Oluşturulan çıktı hedef platforma uygun formatta render edilir.
-7. Telegram çalışma ortamında bu çıktı Referans Form olarak kullanıcıya gönderilir.
+1. İlgili Referans Form klasörü yüklenir ve Referans `.png` dosyası anayasal tasarım otoritesi olarak esas alınır.
+2. Referans Formun veri yapısı (`sample-data.json`) DATA CONTRACT olarak yüklenir; Runtime verileri bu sözleşmeye göre doldurulur.
+3. Runtime, hedef platformu tespit eder ve platformun teknik kapasitesini değerlendirir.
+4. Çıktı formatı, hedef platformun desteklediği resmi bileşenler kullanılarak belirlenir:
+   * **Görsel Render Yolu:** Platform görsel çıktıyı destekliyorsa — `render.js` çalıştırılır, çıktı platforma uygun formatta render edilir.
+   * **Yerel Bileşen Yolu:** Platform yerel UI bileşenlerini destekliyorsa — Referans Form verisi, platformun resmi bileşenleri (`InlineKeyboardButton`, `<code>`, `<blockquote>`, `<pre>` vb.) kullanılarak uygulanır.
+   * Her iki yol da anayasal olarak eşdeğerdir; seçim platform kapasitesine göre Runtime tarafından yapılır.
+5. Oluşturulan çıktı, **En Yüksek Sadakat İlkesi** doğrultusunda hedef platformda kullanıcıya sunulur.
+6. Çıktı; Veri Bütünlüğü, İşlevsel Eşdeğerlik ve Görsel Sadakat kriterlerine göre doğrulanır.
 
 Referans Form tanımlanmış hiçbir STATE içerisinde kullanıcı arayüzü doğrudan `send_message`, `reply_text` veya benzeri düz metin mesajları ile üretilemez.
 
@@ -4227,7 +4249,9 @@ Bu durumda;
 
 * hata kayıt altına alınır,
 * ilgili hata yönetim süreci çalıştırılır,
-* Runtime davranışı Referans Form mimarisini ihlal edecek şekilde değiştirilemez.
+* Runtime davranışı Referans UI anayasal tasarım otoritesini ihlal edecek şekilde değiştirilemez.
+
+Implementasyon yöntemi hedef platforma, kullanılan teknolojiye ve çalışma ortamına göre değişebilir. Bu durum anayasal sapma değildir; yeter ki yukarıdaki doğrulama kriterleri karşılansın.
 
 ---
 
@@ -4235,22 +4259,25 @@ Bu durumda;
 
 Bu kuralın amacı;
 
-* Referans Form mimarisinin çalışma zamanında eksiksiz uygulanmasını sağlamak,
-* `08_HLK_FLOW_DIAGRAM.md` içerisinde Referans Form tanımlanmış tüm sahnelerde tek kullanıcı arayüzü standardını zorunlu hale getirmek,
-* Referans Form tanımlı ekranlarda eski mesaj tabanlı kullanıcı arayüzlerinin tekrar kullanılmasını önlemek,
-* Runtime davranışını Referans Form mimarisi ile tam uyumlu hale getirmek,
-* Kullanıcı arayüzünün tek görsel otoritesinin Referans Formlar olmasını garanti altına almaktır.
+* Runtime'ın Referans Form tanımlı sahnelerde uygulayacağı teknik standardı tanımlamak,
+* `08_HLK_FLOW_DIAGRAM.md` ile Runtime davranışı arasındaki teknik bağlantıyı kurmak,
+* Hedef platformun teknik kapasitesine göre uygun çıktı formatının seçilmesini sağlamak,
+* Referans Form tanımlı ekranlarda eski mesaj tabanlı kullanıcı arayüzlerinin tekrar kullanılmasını teknik olarak önlemek,
+* Tüm implementasyon yollarında Veri Bütünlüğü, İşlevsel Eşdeğerlik ve Görsel Sadakat kriterlerinin teknik doğrulamasını zorunlu hale getirmek,
+* Implementasyon yöntemi seçiminin platform gerçekliğine dayanmasını ve anayasal sapma sayılmamasını garanti altına almaktır.
 
 ---
 
 ### Beklenen Sonuç
 
 * Her STATE geçişinde Flow Diagram üzerinden Referans Form kontrolü yapılır.
-* Referans Form tanımlı sahnelerde `template.html` + Runtime veri + `render.js` → PNG zorunlu olarak uygulanır.
+* Referans Form tanımlı sahnelerde Runtime, hedef platforma uygun implementasyon yöntemini seçer.
+* Çıktı formatı (görsel render veya yerel platform bileşenleri) platform kapasitesine göre belirlenir.
+* Tüm çıktılar En Yüksek Sadakat İlkesi ile üretilir ve üç doğrulama kriterinden geçer.
 * Referans Form tanımlanmamış sahnelerde mevcut Konuşma Arayüzü (Conversation UI) korunur.
-* `send_message` / `reply_text` yalnızca Referans Form tanımlanmamış konuşma adımlarında kullanılır.
+* `send_message` / `reply_text` düz metin yalnızca Referans Form tanımlanmamış konuşma adımlarında kullanılır.
 * Render başarısız olduğunda fallback uygulanmaz; hata loglanır ve hata yönetimi çalıştırılır.
-* Tüm kullanıcı arayüzleri Referans `.png` görsel otoritesi ile uyumlu olur.
+* Implementasyon yöntemi farklılıkları anayasal sapma sayılmaz.
 
 ---
 
@@ -4409,3 +4436,2543 @@ Bu kuralın amacı;
 * Runtime, her form için yalnızca o formun kendi referans bileşenlerini kullanır.
 * Formlar arası çapraz bağımlılık oluşması Constitution Violation olarak tespit edilir.
 * Constitution Scan Engine, her formun bağımsızlığını doğrulayabilir.
+
+---
+
+## AR-002_70
+
+### Başlık
+
+**STATE_VIDEO_PRODUCTION Runtime Architecture**
+
+### Amaç
+
+HLK'nın `STATE_VIDEO_PRODUCTION` durumuna girişinden, üretim sürecinin anayasal olarak başlatılmasına kadar çalışacak resmi runtime mimarisini tanımlamak.
+
+### Kural
+
+HLK, `STATE_VIDEO_PRODUCTION` durumuna yalnızca anayasal iş akışları tamamlandıktan sonra girebilir.
+
+STATE_VIDEO_PRODUCTION'a giriş için ön koşul:
+
+* STATE_PAYMENT_VERIFICATION aşamasında EVENT_PAYMENT_APPROVED oluşmuş olmalıdır (AR-002_56).
+* Yönetici Video Üretim Onayı mevcut olmalıdır (AR-002_56: Yönetici Ödeme Onay Formu → ÖDEMEYİ ONAYLA).
+
+Bu state'e giriş yapıldığında HLK aşağıdaki çalışma sırasını korumak zorundadır.
+
+**Adım 1 — STATE Doğrulaması**
+
+HLK, State Engine (SE-007_3/4/5/6) üzerinden mevcut state'in `STATE_VIDEO_PRODUCTION` olduğunu doğrular.
+
+State geçişi yalnızca aşağıdaki anayasal yol ile gerçekleşebilir (SE-007_4):
+
+```
+STATE_PAYMENT_VERIFICATION
+→ EVENT_PAYMENT_APPROVED (OLAY-030)
+→ STATE_VIDEO_PRODUCTION
+```
+
+Bu geçiş dışında STATE_VIDEO_PRODUCTION'a giriş yapılamaz.
+
+**Adım 2 — Brief Lock Doğrulaması**
+
+HLK, brief'in kilitli (Locked) olduğunu doğrular.
+
+Brief onayı SAHNE-12'de alınmış ve STATE_BRIEF_COMPLETED → STATE_SCENARIO_APPROVAL geçişi tamamlanmış olmalıdır (SE-007_4, FD-008_1).
+
+Brief üzerinde değişiklik yapılamaz. Brief içeriği salt okunurdur.
+
+**Adım 3 — Senaryo Onay Doğrulaması**
+
+HLK, senaryo onayının mevcut olduğunu doğrular.
+
+STATE_SCENARIO_APPROVAL aşamasında EVENT_SCENARIO_APPROVED (OLAY-011) oluşmuş olmalıdır (SE-007_5, FD-008_1).
+
+Senaryo onayı olmadan üretim başlatılamaz.
+
+**Adım 4 — Yönetici Video Üretim Onayı Doğrulaması**
+
+HLK, Yönetici Video Üretim Onayının mevcut olduğunu doğrular.
+
+Bu onay, AR-002_56 kapsamında STATE_PAYMENT_VERIFICATION aşamasında yönetici tarafından verilir.
+
+Yönetici onayı olmadan üretim başlatılamaz.
+
+**Adım 5 — Production Runtime Başlatılması**
+
+HLK, Production Runtime'ı başlatır.
+
+Production Runtime; bu mimari tarafından tanımlanan ve yalnızca STATE_VIDEO_PRODUCTION state'ine girişte başlatılan resmi runtime ortamıdır.
+
+Production Runtime başlatıldığı andan itibaren, bu üretime ait tüm işlemler Production Runtime kapsamında yürütülür.
+
+Production Runtime başlatılmadan hiçbir üretim işlemi gerçekleştirilemez.
+
+**Adım 6 — Production Event Oluşturulması**
+
+HLK, ilgili Production Event'i oluşturur.
+
+Oluşturulacak Event: `EVENT_VIDEO_PRODUCTION_STARTED` (OLAY-023, 14_OLAY_KAYIT_MERKEZI.md).
+
+Bu Event;
+* Olay Kayıt Merkezi'ne kaydedilir,
+* EEC (Execution Event Collector) tarafından toplanır,
+* LAC (Live Activity Center) üzerinden izlenebilir hale gelir,
+* PID ile ilişkilendirilir.
+
+**Adım 7 — PID Oluşturma Sürecinin Başlatılması**
+
+HLK, PID oluşturma sürecini başlatır.
+
+PID; AR-002_57 (Production ID Mimari Standardı) uyarınca:
+* STATE_VIDEO_PRODUCTION state'ine girişte,
+* Video Production süreci başlamadan hemen önce,
+* Yönetici Video Üretim Onayı sonrasında,
+* HLK tarafından otomatik olarak oluşturulur.
+
+PID formatı: `PID-YYYYMMDD-NNNN` (GC_PID_PREFIX, GC_PID_DATE_FORMAT, GC_PID_SEQUENCE_LENGTH, GC_PID_SEQUENCE_START — 01_Global_Configuration.md).
+
+PID oluşturulduğu andan itibaren:
+* Production Package kaydına yazılır,
+* Bu üretime ait tüm event'ler PID ile ilişkilendirilir,
+* Değiştirilemez ve silinemez.
+
+Bu mimari PID oluşturma sürecini başlatır. Gerçek PID üretimi, PID Runtime tarafından yönetilir.
+
+**Adım 8 — Production Package Oluşturma Sürecinin Başlatılması**
+
+HLK, Production Package oluşturma sürecini başlatır.
+
+Production Package; AR-002_58 (Production Package Architecture) ve 16_PRODUCTION_PACKAGE_STANDARD.md uyarınca:
+* PID ile ilişkilendirilir,
+* Bu üretime ait tüm bilgi, varlık ve Task Package'lerin ana kapsayıcısıdır,
+* PID oluşturulduktan hemen sonra HLK tarafından oluşturulur.
+
+Production Package içerisinde:
+* Ürün bilgileri,
+* Brief verileri,
+* Senaryo verileri,
+* Kullanıcı tercihleri,
+* Araştırma sonuçları,
+* Materyal arşivi
+
+bu üretime ait referans paketi olarak saklanır.
+
+Bu mimari Production Package oluşturma sürecini başlatır. Gerçek Production Package üretimi, Production Package Runtime tarafından yönetilir.
+
+**Adım 9 — Task Package Oluşturma Sürecinin Başlatılması**
+
+HLK, Task Package oluşturma sürecini başlatır.
+
+Task Package; Production Package altında, her Agent için özel olarak hazırlanan görev paketidir.
+
+Task Package'ler:
+* Her Agent için ayrı ayrı oluşturulur,
+* Her Agent yalnızca kendi Task Package'ine erişebilir,
+* Production Package'a bağlıdır,
+* PID ile ilişkilendirilir.
+
+Bu mimari Task Package oluşturma sürecini başlatır. Gerçek Task Package üretimi, Task Package Runtime tarafından yönetilir.
+
+**Adım 10 — Video Production Pipeline'ın Hazırlanması**
+
+HLK, Video Production Pipeline'ı başlatılmaya hazır hale getirir.
+
+Bu aşamada:
+* Tüm ön koşullar doğrulanmıştır (Adım 1-4).
+* Production Runtime aktiftir (Adım 5).
+* Production Event oluşturulmuştur (Adım 6).
+* PID hazırdır (Adım 7).
+* Production Package hazırdır (Adım 8).
+* Task Package'ler hazırdır (Adım 9).
+
+Video Production Pipeline, tüm bu bileşenler hazır olduktan sonra devreye alınabilir.
+
+---
+
+### Çalışma Sırası Zorunluluğu
+
+Bu mimaride tanımlanan 10 adım, belirtilen sıraya göre yürütülmek zorundadır.
+
+Hiçbir adım atlanamaz.
+
+Her adım tamamlanmadan bir sonraki adıma geçilemez.
+
+Her adımın tamamlanması, ilgili Event sistemi üzerinden kayıt altına alınmalıdır (14_OLAY_KAYIT_MERKEZI.md, EEC).
+
+Runtime sırasında oluşan tüm kararlar Decision History ile ilişkilendirilebilir olmalıdır (MASTER-004, AR-002_22).
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+* video üretimini doğrudan gerçekleştirmez,
+* yalnızca üretim altyapısını anayasal sıraya göre hazırlar,
+* yalnızca Production Runtime başlangıcını tanımlar.
+
+Gerçek Video Production, aşağıdaki bağımsız anayasal mimariler tarafından yönetilir:
+
+| Bileşen | Yöneten Mimari | Referans |
+|---|---|---|
+| PID Üretimi | PID Runtime | AR-002_57 |
+| Production Package | Production Package Runtime | AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md |
+| Task Package | Task Package Runtime | 20_TASK_ENGINE.md |
+| Video Üretimi | Video Production Pipeline | İlgili OR/MR kuralları |
+
+Bu mimari, yukarıdaki bileşenlerin başlatılma sırasını ve ön koşullarını tanımlar; bileşenlerin iç işleyişine karışmaz.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — bu mimari en üst otoriteye tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — her adım denetlenebilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — nihai karar HLK'nındır |
+| **MASTER** | MASTER-009 | Flow Diagram Otoritesi — FD-008_1 bu mimarinin UX referansıdır |
+| **AR** | AR-002_56 | STATE_PRICING → STATE_PAYMENT_VERIFICATION → STATE_VIDEO_PRODUCTION geçişi |
+| **AR** | AR-002_57 | PID standardı — Adım 7'nin referans mimarisi |
+| **AR** | AR-002_58 | Production Package mimarisi — Adım 8'in referans mimarisi |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — her adımın denetim döngüsü |
+| **SE** | SE-007_3 | STATE_VIDEO_PRODUCTION state tanımı |
+| **SE** | SE-007_4 | State geçiş kuralları — STATE_PAYMENT_VERIFICATION → STATE_VIDEO_PRODUCTION |
+| **SE** | SE-007_5 | Event tetikleme — EVENT_PAYMENT_APPROVED |
+| **SE** | SE-007_6 | State Action Mapping — STATE_VIDEO_PRODUCTION'da çalışacak modüller |
+| **FD** | FD-008_1 | Kullanıcı akışı — STATE_VIDEO_PRODUCTION ekran sırası |
+| **GC** | GC_PID_PREFIX, GC_PID_DATE_FORMAT, GC_PID_SEQUENCE_LENGTH, GC_PID_SEQUENCE_START | PID format parametreleri (01_Global_Configuration.md) |
+| **FEAT** | FEAT-012 | Production Pipeline — bu mimarinin hazırladığı pipeline |
+| **OLAY** | OLAY-023, OLAY-024, OLAY-031 | Production event'leri (14_OLAY_KAYIT_MERKEZI.md) |
+
+---
+
+### Beklenen Sonuç
+
+* STATE_VIDEO_PRODUCTION standart hale gelir.
+* Production Runtime tek giriş noktası olur.
+* PID oluşturma süreci standartlaşır.
+* Production Package oluşturma süreci standartlaşır.
+* Task Package süreci standartlaşır.
+* Video Production başlangıç sırası anayasal olarak tanımlanmış olur.
+* Her adım Event sistemi üzerinden kayıt altına alınır.
+* Production Runtime, PID Runtime, Production Package Runtime ve Task Package Runtime kendi anayasal mimarileri tarafından bağımsız olarak yönetilir.
+* Constitution Scan Engine, STATE_VIDEO_PRODUCTION'a giriş koşullarını ve adım sırasını doğrulayabilir.
+
+---
+
+## AR-002_71
+
+### Başlık
+
+**PID Runtime Architecture**
+
+### Amaç
+
+HLK'nın Production Runtime sırasında Production ID (PID) oluşturma sürecini anayasal olarak standartlaştırmak.
+
+### Kural
+
+HLK, PID oluşturma işlemini yalnızca `STATE_VIDEO_PRODUCTION` süreci başladıktan sonra başlatabilir.
+
+PID oluşturma sürecinin ön koşulu:
+
+* STATE_VIDEO_PRODUCTION Runtime başlatılmış olmalıdır (AR-002_70, Adım 5).
+* Production Runtime aktif durumda olmalıdır.
+* Yönetici Video Üretim Onayı mevcut olmalıdır (AR-002_56, AR-002_70 Adım 4).
+
+PID, her üretim için yalnızca bir kez oluşturulmalıdır (AR-002_57: PID Tekillik Kuralı).
+
+PID oluşturulmadan;
+
+* Production Package oluşturulamaz (AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md).
+* Task Package oluşturulamaz (20_TASK_ENGINE.md).
+* Video Production Pipeline başlatılamaz (AR-002_70 Adım 10).
+* Dijital Varlık kayıtları oluşturulamaz (12_DIGITAL_ASSET_ARCHIVE.md, 13_DIGITAL_ASSET_CATALOG.md).
+
+---
+
+### PID Oluşturma Çalışma Sırası
+
+HLK, PID oluşturma sürecinde aşağıdaki çalışma sırasını korumak zorundadır.
+
+**Adım 1 — PID Oluşturma Koşullarının Doğrulanması**
+
+HLK, PID oluşturma için gerekli tüm ön koşulları doğrular:
+
+* STATE_VIDEO_PRODUCTION state'i aktiftir (SE-007_3).
+* Production Runtime başlatılmıştır (AR-002_70).
+* Brief Locked durumdadır (AR-002_70 Adım 2).
+* Senaryo onayı mevcuttur (AR-002_70 Adım 3).
+* Yönetici Video Üretim Onayı mevcuttur (AR-002_70 Adım 4).
+* Bu üretim için daha önce bir PID oluşturulmamıştır (AR-002_57: PID Tekillik Kuralı).
+
+Herhangi bir koşul sağlanmıyorsa PID oluşturma süreci başlatılamaz.
+
+**Adım 2 — Global Configuration PID Standartlarının Kullanılması**
+
+HLK, PID üretiminde Global Configuration içerisinde tanımlanan PID standartlarını kullanır (01_Global_Configuration.md):
+
+| Parametre | Değer | Açıklama |
+|---|---|---|
+| `GC_PID_PREFIX` | `PID` | Production ID ön eki |
+| `GC_PID_DATE_FORMAT` | `YYYYMMDD` | PID tarih formatı |
+| `GC_PID_SEQUENCE_LENGTH` | `4` | PID sıra numarası basamak sayısı (sıfır dolgulu) |
+| `GC_PID_SEQUENCE_START` | `0001` | PID günlük sıra numarası başlangıç değeri |
+
+HLK, PID formatını bu GC parametrelerine göre oluşturur:
+
+```
+PID-{YYYYMMDD}-{NNNN}
+```
+
+HLK, GC parametrelerini doğrudan kullanır. Hiçbir modül kendi PID formatını tanımlayamaz.
+
+**Adım 3 — Benzersiz PID Üretilmesi**
+
+HLK, benzersiz bir PID üretir.
+
+PID üretiminde:
+
+* Günlük sıra numarası `GC_PID_SEQUENCE_START` değerinden başlar.
+* Aynı gün içerisinde her yeni üretim için sıra numarası bir artırılır.
+* Sıra numarası `GC_PID_SEQUENCE_LENGTH` kadar haneye sıfır dolgulu olarak yazılır.
+* Günlük sıra numarası takibi HLK tarafından merkezi olarak yönetilir.
+
+Hiçbir modül kendi PID'sini üretemez (AR-002_57: PID Merkeziyet Kuralı).
+
+**Adım 4 — PID'nin Production Runtime'a Bağlanması**
+
+HLK, üretilen PID'yi ilgili Production Runtime'a bağlar.
+
+Bu bağlantı ile:
+
+* PID, bu üretimin Production Runtime içerisindeki tek resmi kimliği haline gelir.
+* Production Runtime içerisinde gerçekleşen tüm işlemler bu PID ile ilişkilendirilir.
+* PID, Production Runtime yaşam döngüsü boyunca sabit kalır.
+
+**Adım 5 — PID Oluşturma Event'inin Üretilmesi**
+
+HLK, PID oluşturma Event'ini üretir.
+
+Bu Event:
+
+* Olay Kayıt Merkezi'ne kaydedilir (14_OLAY_KAYIT_MERKEZI.md).
+* EEC (Execution Event Collector) tarafından toplanır (22_EXECUTION_EVENT_COLLECTOR.md).
+* LAC (Live Activity Center) üzerinden izlenebilir hale gelir (FEAT-015).
+* PID alanı zorunlu olarak içerir (AR-002_57: PID Zorunluluk Kuralı).
+* PID ile ilişkilendirilir.
+
+PID oluşturma Event'i, Production Package oluşturma sürecinin tetikleyicisidir (OLAY-031: EVENT_PRODUCTION_PACKAGE_CREATED).
+
+**Adım 6 — PID'nin Production Package Ana Referansı Olarak Kullanılması**
+
+HLK, oluşturulan PID'yi Production Package'in ana referansı olarak kullanır (AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md).
+
+Bu aşamada:
+
+* PID, Production Package kaydına yazılır.
+* Production Package, PID üzerinden ilişkilendirilir.
+* PID ↔ Production Package birebir ilişkisi kurulur (16_PRODUCTION_PACKAGE_STANDARD.md: Her PID yalnızca bir adet Production Package oluşturabilir).
+
+---
+
+### PID Bütünlük Kuralları
+
+**Değiştirilemezlik:**
+
+PID oluşturulduktan sonra değiştirilmemelidir (AR-002_57).
+
+PID, üretim yaşam döngüsü boyunca sabit kalır. Üretim kayıtları arşivlense dahi PID bilgisi korunur.
+
+**Tekillik:**
+
+Aynı üretim için ikinci bir PID oluşturulamaz (AR-002_57: PID Tekillik Kuralı).
+
+Her PID yalnızca bir üretim paketini temsil eder. Aynı PID birden fazla üretim için kullanılamaz.
+
+**Merkeziyet:**
+
+PID yalnızca HLK tarafından, STATE_VIDEO_PRODUCTION girişinde, merkezi olarak oluşturulur (AR-002_57: PID Merkeziyet Kuralı).
+
+Hiçbir modül, servis, ajan veya sistem bileşeni kendi PID'sini oluşturamaz. Tüm bileşenler ortak PID'yi kullanmak zorundadır.
+
+---
+
+### PID İlişkilendirme Kapsamı
+
+PID oluşturulduktan sonra, aşağıdaki tüm Production süreçleri ve sistem bileşenleri bu PID üzerinden ilişkilendirilmelidir:
+
+| Bileşen | İlişkilendirme | Referans |
+|---|---|---|
+| Production Package | Birebir — PID, Production Package'in ana referansıdır | AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md |
+| Task Package'ler | PID üzerinden Production Package'e bağlı | 20_TASK_ENGINE.md |
+| Event Kayıtları | PID alanı zorunlu | AR-002_57, 14_OLAY_KAYIT_MERKEZI.md |
+| Decision History | Tüm kararlar PID üzerinden ilişkilendirilir | 15_KARAR_GEREKCESI_STANDARDI.md |
+| Digital Asset Archive | Dijital varlıklar PID ile etiketlenir | 12_DIGITAL_ASSET_ARCHIVE.md |
+| Digital Asset Catalog | Varlık kataloğu PID referansı içerir | 13_DIGITAL_ASSET_CATALOG.md |
+| Delivery Süreçleri | Teslimat kayıtları PID ile ilişkilendirilir | AR-002_36 |
+| Production Log'ları | Tüm log'lar PID altında toplanır | EEC, LAC |
+| Kalite Raporları | Kalite kayıtları PID referanslıdır | QR-004 |
+| Kredi/Maliyet Kayıtları | Servis kullanımı ve kredi tüketimi PID ile izlenir | Operasyon Veri Merkezi |
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* PID'nin nasıl oluşturulacağını, hangi sırayla ve hangi koşullarda başlatılacağını tanımlar,
+* PID'nin formatını, tekillik ve merkeziyet kurallarını uygular.
+
+Bu mimari;
+
+* PID format standardını tanımlamaz — format AR-002_57 tarafından yönetilir.
+* PID'nin saklanacağı veri yapısını tanımlamaz — bu, depolama mimarisinin sorumluluğundadır.
+* PID sıra numarası üretim algoritmasını tanımlamaz — bu, HLK'nın iç uygulama detayıdır.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — bu mimari en üst otoriteye tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — PID oluşturma denetlenebilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — PID oluşturma kararı HLK'nındır |
+| **GC** | GC_PID_PREFIX, GC_PID_DATE_FORMAT, GC_PID_SEQUENCE_LENGTH, GC_PID_SEQUENCE_START | PID format parametreleri (01_Global_Configuration.md) |
+| **AR** | AR-002_56 | STATE_PRICING → STATE_VIDEO_PRODUCTION geçişi |
+| **AR** | AR-002_57 | PID Mimari Standardı — format, tekillik, merkeziyet, zorunluluk |
+| **AR** | AR-002_58 | Production Package mimarisi — PID ↔ Production Package birebir ilişkisi |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — PID oluşturmanın ön koşulu |
+| **SE** | SE-007_3 | STATE_VIDEO_PRODUCTION state tanımı |
+| **SE** | SE-007_4 | State geçiş kuralları |
+| **SE** | SE-007_5 | Event tetikleme — PID oluşturma Event'i |
+| **FD** | FD-008_1 | Kullanıcı akışı — STATE_VIDEO_PRODUCTION ekran sırası |
+| **OLAY** | OLAY-023 | EVENT_VIDEO_PRODUCTION_STARTED — PID zorunlu alan |
+| **OLAY** | OLAY-024 | EVENT_VIDEO_PRODUCTION_COMPLETED — PID zorunlu alan |
+| **OLAY** | OLAY-031 | EVENT_PRODUCTION_PACKAGE_CREATED — PID oluşturulması ile tetiklenir |
+| **FEAT** | FEAT-012 | Production Pipeline — PID bu pipeline'ın kimlik katmanıdır |
+| **FEAT** | FEAT-015 | Live Activity Center — PID üzerinden üretim izleme |
+
+---
+
+### Beklenen Sonuç
+
+* PID oluşturma süreci standart hale gelir.
+* Her üretim tek bir PID ile yönetilir.
+* Production Package için anayasal referans oluşur.
+* Üretim sürecinin tüm bileşenleri ortak PID üzerinden ilişkilendirilir.
+* Runtime içerisinde PID bütünlüğü garanti altına alınır.
+* Event kayıtlarında PID alanı zorunlu olarak bulunur.
+* Decision History, Digital Asset Archive, Digital Asset Catalog ve Delivery süreçleri PID üzerinden çapraz referanslanabilir hale gelir.
+* Hiçbir modül kendi PID'sini oluşturamaz; tüm sistem ortak PID standardını kullanır.
+* PID oluşturma süreci Constitution Scan Engine tarafından doğrulanabilir.
+
+---
+
+## AR-002_72
+
+### Başlık
+
+**Production Package Runtime Architecture**
+
+### Amaç
+
+HLK'nın PID oluşturulduktan sonra Production Package'i anayasal kurallara uygun şekilde oluşturmasını, yönetmesini ve Production Runtime süresince tek resmi üretim kapsayıcısı olarak kullanmasını standartlaştırmak.
+
+### Kural
+
+HLK, Production Package'i yalnızca geçerli bir PID oluşturulduktan sonra oluşturabilir.
+
+Production Package oluşturmanın ön koşulu:
+
+* PID oluşturulmuş ve geçerli olmalıdır (AR-002_57, AR-002_71).
+* PID, Production Runtime'a bağlanmış olmalıdır (AR-002_71 Adım 4).
+* PID oluşturma Event'i üretilmiş olmalıdır (AR-002_71 Adım 5).
+* STATE_VIDEO_PRODUCTION state'i aktif olmalıdır (SE-007_3, AR-002_70).
+
+Her PID için yalnızca bir adet Production Package oluşturulabilir (AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md: Her PID yalnızca bir adet Production Package oluşturabilir).
+
+Production Package oluşturulmadan;
+
+* Task Package oluşturulamaz (AR-002_47, 20_TASK_ENGINE.md).
+* Video Production Pipeline başlatılamaz (AR-002_70 Adım 10).
+* Dijital varlıklar ilişkilendirilemez (12_DIGITAL_ASSET_ARCHIVE.md, 13_DIGITAL_ASSET_CATALOG.md).
+* Üretim logları kaydedilemez (EEC, LAC).
+* Quality Control başlatılamaz (QR-004, FEAT-010).
+* Delivery süreci başlatılamaz (AR-002_36).
+
+---
+
+### Production Package Oluşturma Çalışma Sırası
+
+HLK, Production Package oluşturma sürecinde aşağıdaki çalışma sırasını korumak zorundadır.
+
+**Adım 1 — PID Geçerliliğinin Doğrulanması**
+
+HLK, PID'nin geçerliliğini doğrular:
+
+* PID oluşturulmuştur (AR-002_71 Adım 3).
+* PID formatı GC standartlarına uygundur (`PID-YYYYMMDD-NNNN`).
+* PID benzersizdir — aynı PID ile daha önce bir Production Package oluşturulmamıştır.
+* PID, Production Runtime'a bağlanmıştır (AR-002_71 Adım 4).
+* PID değiştirilmemiştir (AR-002_57: PID değiştirilemez).
+
+PID geçerliliği doğrulanmadan Production Package oluşturulamaz.
+
+**Adım 2 — Production Package'in Oluşturulması**
+
+HLK, Production Package'i oluşturur.
+
+Production Package; AR-002_58 ve 16_PRODUCTION_PACKAGE_STANDARD.md'de tanımlanan yapıya uygun olarak, 21 bölümden oluşan ana üretim kapsayıcısıdır.
+
+Production Package oluşturulduğunda:
+
+* Production Package, PID'ye bağlanır (birebir ilişki).
+* Production Package, Production Runtime içerisinde aktif kapsayıcı haline gelir.
+* Production Package Engine (FEAT-014), Production Package'in yönetiminden sorumlu Feature olarak devreye girer.
+
+Production Package, WF-008 (Video Production) workflow'u kapsamında oluşturulur (09_WORKFLOW_MANIFEST.md, 11_WORKFLOW_FEATURE_MAP.md).
+
+**Adım 3 — Production Metadata'nın Oluşturulması**
+
+HLK, Production Metadata'yı oluşturur ve Production Package'e yazar.
+
+Production Metadata (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 2):
+
+* Üretim tarihi ve saati,
+* Üretim türü (İlk Üretim / Revizyon),
+* Üretim durumu (Başlatıldı / Devam Ediyor / Tamamlandı / Arşivlendi),
+* Sürüm bilgisi (V1.0, V1.1, vb.),
+* PID referansı,
+* İlgili Workflow referansı (WF-008).
+
+Production Metadata, Production Package'in zorunlu bölümüdür ve Production Package oluşturulur oluşturulmaz doldurulur.
+
+**Adım 4 — Production Package'in PID ile İlişkilendirilmesi**
+
+HLK, Production Package'i ilgili PID ile ilişkilendirir.
+
+Bu ilişkilendirme ile:
+
+* PID ↔ Production Package birebir bağlantısı kurulur (AR-002_58).
+* Production Package kaydına PID yazılır.
+* PID, Production Package'in birincil referans anahtarı haline gelir.
+* Tüm alt bileşenler (Task Package, Event, Log, Varlık) bu PID üzerinden Production Package'e bağlanır.
+
+**Adım 5 — Production Package Oluşturma Event'inin Üretilmesi**
+
+HLK, Production Package oluşturma Event'ini üretir.
+
+Oluşturulacak Event: `EVENT_PRODUCTION_PACKAGE_CREATED` (OLAY-031, 14_OLAY_KAYIT_MERKEZI.md).
+
+Bu Event:
+
+* Olay Kayıt Merkezi'ne kaydedilir,
+* EEC (Execution Event Collector) tarafından toplanır,
+* LAC (Live Activity Center) üzerinden izlenebilir hale gelir,
+* PID alanı zorunlu olarak içerir,
+* WF-008 workflow'una bağlıdır,
+* FEAT-014 (Production Package Engine) Feature'ı ile ilişkilendirilir.
+
+OLAY-031'in tetikleyicisi PID oluşturulmasıdır. Olay çıktısı olarak Task Package'ler hazırlanır ve Agent'lar görevlendirilir.
+
+**Adım 6 — Production Runtime Boyunca Kayıtların Toplanması**
+
+HLK, Production Runtime süresince oluşacak tüm kayıtları bu Production Package altında toplar.
+
+Production Package, Production Runtime tamamlanıncaya kadar aktif üretim kapsayıcısı olarak kullanılır.
+
+---
+
+### Production Package Kapsamındaki Bileşenler
+
+Production Runtime süresince aşağıdaki tüm bileşenler, ilgili anayasal standartlara uygun olarak aynı Production Package altında ilişkilendirilmelidir:
+
+| # | Bileşen | Anayasal Referans | Zorunluluk |
+|---|---|---|---|
+| 1 | **Brief** | FD-008_1, SAHNE-12 | Zorunlu |
+| 2 | **Senaryo** | AR-002_65, SAHNE-13 | Zorunlu |
+| 3 | **Prompt Setleri** | 16_PRODUCTION_PACKAGE_STANDARD.md | Zorunlu |
+| 4 | **Task Package'ler** | AR-002_47, 20_TASK_ENGINE.md | Zorunlu |
+| 5 | **Araştırma Sonuçları** | AR-002_13, AR-002_20 | Zorunlu |
+| 6 | **Referans Görseller** | AR-002_24, AR-002_25, AR-002_26 | Zorunlu |
+| 7 | **Kullanıcı Dosyaları** | AR-002_15 | İsteğe Bağlı |
+| 8 | **Dijital Varlıklar** | 12_DIGITAL_ASSET_ARCHIVE.md, 13_DIGITAL_ASSET_CATALOG.md | Zorunlu |
+| 9 | **Ses Dosyaları** | AR-002_29, AR-002_30, AR-002_31 | İsteğe Bağlı |
+| 10 | **Video Parametreleri** | SAHNE-03 ~ SAHNE-08 | Zorunlu |
+| 11 | **Servis Kullanımları** | Operasyon Veri Merkezi | Zorunlu |
+| 12 | **Agent Logları** | SE-007_1, SE-007_2 | Zorunlu |
+| 13 | **Event Logları** | 14_OLAY_KAYIT_MERKEZI.md, EEC | Zorunlu |
+| 14 | **Kalite Raporları** | QR-004, FEAT-010 | Zorunlu |
+| 15 | **Revizyon Geçmişi** | AR-002_56 | İsteğe Bağlı |
+| 16 | **Teslim Bilgileri** | AR-002_36 | Zorunlu |
+| 17 | **Karar Gerekçeleri** | 15_KARAR_GEREKCESI_STANDARDI.md | Zorunlu |
+| 18 | **Nihai Video** | AR-002_36 | Zorunlu |
+
+---
+
+### Erişim ve İzolasyon Kuralları
+
+Production Package'in anayasal erişim kuralları (AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md):
+
+* Production Package'in tamamına yalnızca HLK erişebilir.
+* Hiçbir Agent doğrudan Production Package'in tamamına erişemez.
+* Agent'lar yalnızca kendilerine atanmış Task Package üzerinden işlem yapmalıdır (AR-002_47).
+* Her Agent yalnızca kendi Task Package'ine erişebilir; diğer Task Package'lere erişemez.
+* Yönetici, Yönetici formları aracılığıyla Production Package özetine erişebilir.
+* Kullanıcı yalnızca nihai çıktılara (video, teklif, senaryo) erişebilir.
+
+---
+
+### Production Package Yaşam Döngüsü
+
+Production Package, Production Runtime tamamlanıncaya kadar aktif üretim kapsayıcısı olarak kullanılmalıdır.
+
+```
+STATE_VIDEO_PRODUCTION Girişi (AR-002_70)
+    ↓
+PID Oluşturulur (AR-002_57, AR-002_71)
+    ↓
+Production Package Oluşturulur (bu mimari)
+    ↓
+EVENT_PRODUCTION_PACKAGE_CREATED (OLAY-031)
+    ↓
+Production Metadata Doldurulur
+    ↓
+Task Package'ler Oluşturulur (AR-002_47, 20_TASK_ENGINE.md)
+    ↓
+Agent'lar Görevlendirilir
+    ↓
+Video Üretimi Gerçekleşir
+    ↓
+Kalite Kontrol Yapılır
+    ↓
+Nihai Video Teslim Edilir
+    ↓
+Production Package Arşivlenir
+```
+
+Üretim tamamlandıktan sonra:
+
+* Production Package arşivlenir (16_PRODUCTION_PACKAGE_STANDARD.md).
+* Production Package silinemez; yalnızca anayasal kurallar doğrultusunda arşivlenebilir.
+* Arşivlenen Production Package, Digital Asset Archive ve Digital Asset Catalog ile ilişkilendirilir.
+* PID bilgisi arşivde korunur.
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* Production Package'in nasıl oluşturulacağını, hangi sırayla ve hangi koşullarda başlatılacağını tanımlar,
+* Production Package'in kapsadığı bileşenleri ve ilişkilendirme kurallarını belirler,
+* Production Package'in yaşam döngüsünü ve erişim kurallarını uygular.
+
+Bu mimari;
+
+* Production Package'in iç yapısını tanımlamaz — yapı AR-002_58 ve 16_PRODUCTION_PACKAGE_STANDARD.md tarafından yönetilir.
+* Task Package'lerin iç yapısını tanımlamaz — bu AR-002_47 ve 20_TASK_ENGINE.md'nin sorumluluğundadır.
+* PID standardını tanımlamaz — bu AR-002_57'nin sorumluluğundadır.
+* Production Package'in depolama yapısını tanımlamaz — bu, depolama mimarisinin sorumluluğundadır.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — bu mimari en üst otoriteye tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — Production Package denetlenebilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — Production Package oluşturma kararı HLK'nındır |
+| **AR** | AR-002_36 | Scene Delivery — teslim süreci Production Package ile ilişkilidir |
+| **AR** | AR-002_47 | Task Package Engine — Task Package'lerin üst katmanı |
+| **AR** | AR-002_56 | STATE_VIDEO_PRODUCTION geçiş zinciri |
+| **AR** | AR-002_57 | PID standardı — Production Package'in birincil referansı |
+| **AR** | AR-002_58 | Production Package Architecture — yapısal mimari (WHAT) |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — giriş noktası |
+| **AR** | AR-002_71 | PID Runtime — PID oluşturma ön koşulu |
+| **SE** | SE-007_3 | STATE_VIDEO_PRODUCTION state tanımı |
+| **SE** | SE-007_6 | State Action Mapping — Production Package Engine aktivasyonu |
+| **WF** | WF-008 | Video Production workflow'u (09_WORKFLOW_MANIFEST.md) |
+| **FEAT** | FEAT-012 | Production Pipeline |
+| **FEAT** | FEAT-014 | Production Package Engine — Production Package yönetiminden sorumlu |
+| **FEAT** | FEAT-015 | Live Activity Center — PID üzerinden üretim izleme |
+| **OLAY** | OLAY-031 | EVENT_PRODUCTION_PACKAGE_CREATED |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | Production Package yapı, bölüm ve yaşam döngüsü standardı |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Decision History — Production Package altında saklanır |
+| **VARLIK** | 12_DIGITAL_ASSET_ARCHIVE.md | Dijital varlıklar PID üzerinden ilişkilendirilir |
+| **VARLIK** | 13_DIGITAL_ASSET_CATALOG.md | Varlık kataloğu PID referansı içerir |
+
+---
+
+### Beklenen Sonuç
+
+* Production Package oluşturma süreci standart hale gelir.
+* Her üretim tek bir Production Package ile yönetilir.
+* Production Runtime boyunca oluşan tüm üretim bileşenleri tek resmi kapsayıcı altında toplanır.
+* PID, Task Package, Event, Digital Asset, Quality Control ve Delivery süreçleri aynı Production Package üzerinden ilişkilendirilir.
+* Production Runtime mimarisi anayasal olarak tamamlanmış olur.
+* Hiçbir Agent Production Package'in tamamına erişemez; veri izolasyonu korunur.
+* Production Package silinemez; yalnızca arşivlenebilir.
+* Constitution Scan Engine, Production Package oluşturma koşullarını ve adım sırasını doğrulayabilir.
+
+---
+
+## AR-002_73
+
+### Başlık
+
+**Production Event Runtime Architecture**
+
+### Amaç
+
+Production Runtime boyunca oluşan tüm üretim olaylarının (Production Event), anayasal olarak standartlaştırılmasını, Event yaşam döngüsünün tek merkezden yönetilmesini ve Production Package ile tam ilişkilendirilmesini sağlamak.
+
+### Kural
+
+HLK, Production Runtime sırasında meydana gelen tüm üretim işlemlerini yalnızca resmi Production Event'leri üzerinden yönetmelidir.
+
+Production Event'lerin kaynağı ve standardı:
+
+* Tüm Event'lerin tek resmi tanım kaynağı **14_OLAY_KAYIT_MERKEZI.md** dosyasıdır (SE-007_5: Event Ownership).
+* Her Event, Olay Kayıt Merkezi'nde tanımlanan Teknik Sabit, Olay Kimliği (OLAY-NNN), PID zorunluluğu ve diğer alanlara uygun olmalıdır.
+* Event'lerin runtime'da toplanması ve izlenmesi **EEC (Execution Event Collector)** tarafından yönetilir (22_EXECUTION_EVENT_COLLECTOR.md).
+
+---
+
+### Production Event Zorunluluk İlkesi
+
+Production Runtime başladığı andan itibaren oluşan her önemli operasyon bir Production Event üretmelidir.
+
+Her Production Event:
+
+* yalnızca bir kez üretilmelidir (aynı operasyon için mükerrer Event oluşturulamaz),
+* benzersiz bir EventID taşımalıdır (14_OLAY_KAYIT_MERKEZI.md standardı),
+* ilgili PID ile ilişkilendirilmelidir (AR-002_57: PID Zorunluluk Kuralı),
+* ilgili Production Package ile ilişkilendirilmelidir (AR-002_58, AR-002_72),
+* ilgili State bilgisini taşımalıdır (SE-007_3/5),
+* ilgili Workflow referansını içermelidir (09_WORKFLOW_MANIFEST.md, WF-008),
+* ilgili Feature referansını içermelidir (10_FEATURE_REGISTRY.md),
+* ilgili Module bilgisini taşımalıdır (06_Module_Rule.md, ilgili MR kuralları).
+
+Production Event oluşturulmadan;
+
+* sonraki Production adımına geçilemez,
+* ilgili Runtime işlemi tamamlanmış kabul edilemez.
+
+Bu ilke, AR-002_70 (STATE_VIDEO_PRODUCTION Runtime) ve AR-002_71 (PID Runtime) içerisinde tanımlanan adım sıralarının her birinin Event üretimi ile kayıt altına alınmasını garanti eder.
+
+---
+
+### Production Event Çalışma Sırası
+
+Her Production Event için HLK aşağıdaki çalışma sırasını korumak zorundadır.
+
+**Adım 1 — Event'in Olay Kayıt Merkezi Standardına Uygun Oluşturulması**
+
+HLK, Event'i 14_OLAY_KAYIT_MERKEZI.md standardına uygun olarak oluşturur.
+
+Her Event için zorunlu alanlar:
+
+| Alan | Açıklama | Referans |
+|---|---|---|
+| Olay Kimliği (OLAY-NNN) | Benzersiz olay numarası | 14_OLAY_KAYIT_MERKEZI.md |
+| Teknik Sabit | `EVENT_` ön ekli sabit adı | 14_OLAY_KAYIT_MERKEZI.md |
+| PID | Production ID | AR-002_57 (Zorunlu) |
+| Açıklama | Olayın ne olduğu | 14_OLAY_KAYIT_MERKEZI.md |
+| Kaynak Durum | Event'in tetiklendiği State | SE-007_5 |
+| Hedef Durum | Event'in yönlendirdiği State | SE-007_5 |
+| Üreten Bileşen | Event'i üreten modül/servis | 14_OLAY_KAYIT_MERKEZI.md |
+| İlgili Workflow | WF referansı (WF-008) | 09_WORKFLOW_MANIFEST.md |
+| İlgili Feature | FEAT referansı | 10_FEATURE_REGISTRY.md |
+
+**Adım 2 — Event Yaşam Döngüsünün Tamamlanması**
+
+HLK, her Event'in yaşam döngüsünü eksiksiz tamamlar.
+
+Event yaşam döngüsü:
+
+```
+Event Oluşturulur
+    ↓
+Event Kaydedilir (Olay Kayıt Merkezi)
+    ↓
+Event Toplanır (EEC)
+    ↓
+Event Görüntülenir (LAC)
+    ↓
+Event Loglanır (Production Package → Event Logları)
+    ↓
+Event Tetikleyici Olarak Çalışır (sonraki State'e geçiş)
+    ↓
+Event Yaşam Döngüsü Tamamlanır
+```
+
+Yaşam döngüsü tamamlanmamış bir Event, geçerli kabul edilmez.
+
+**Adım 3 — Event'in Production Package Altında Kayıt Altına Alınması**
+
+HLK, her Production Event'i Production Package altında kayıt altına alır.
+
+Production Package'in **Event Logları** bölümü (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 16), Production Runtime boyunca oluşan tüm Event'lerin resmi kayıt noktasıdır.
+
+Her Event kaydı:
+* PID ile ilişkilendirilir,
+* EventID ile indekslenir,
+* Production Package içerisinde kronolojik olarak saklanır.
+
+**Adım 4 — Event'in Event Loglarına Yazılması**
+
+HLK, Event'i Event Loglarına yazar.
+
+Event Logları:
+* Production Package altında tutulur (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 16),
+* EEC tarafından toplanır (22_EXECUTION_EVENT_COLLECTOR.md),
+* PID üzerinden sorgulanabilir,
+* Kronolojik olarak sıralanır.
+
+**Adım 5 — Event'in Decision History ile İlişkilendirilmesi**
+
+HLK, Event'i Decision History ile ilişkilendirilebilir hale getirir.
+
+Production Package'in **Karar Gerekçeleri (Decision History)** bölümü (15_KARAR_GEREKCESI_STANDARDI.md), Event'ler aracılığıyla tetiklenen kararları ve bu kararların sonuçlarını kaydeder.
+
+Event → Decision History ilişkisi:
+* Bir Event, bir kararı tetikleyebilir.
+* Bir karar, bir veya birden fazla Event üretebilir.
+* Event ve Decision History kayıtları PID üzerinden çapraz referanslanabilir.
+
+**Adım 6 — Event'in EEC Tarafından İzlenmesi**
+
+HLK, her Event'in EEC (Execution Event Collector) tarafından izlenebilir olmasını sağlar.
+
+EEC (22_EXECUTION_EVENT_COLLECTOR.md):
+* Event'i `emit_event()` ile toplar,
+* Event tipini (EECEventType) sınıflandırır,
+* Yürütme fazını (ExecutionPhase: PRE_CHECK / EXECUTE / POST_CHECK) belirler,
+* Event'i kalıcı kayıt altına alır,
+* PID ile ilişkilendirir.
+
+Her Production Event, EEC tarafından toplanmadan tamamlanmış kabul edilmez.
+
+**Adım 7 — Event'in LAC Tarafından Gerçek Zamanlı Görüntülenmesi**
+
+HLK, her Event'in LAC (Live Activity Center) tarafından gerçek zamanlı görüntülenebilir olmasını sağlar.
+
+LAC (FEAT-015):
+* Event akışını PID bazında canlı olarak gösterir,
+* Yönetici tarafından izlenebilir,
+* Event'lere müdahale edemez (salt okunur),
+* PID seçimi ile ilgili üretimin Event akışını filtreler.
+
+---
+
+### Production Runtime Event Kategorileri
+
+Production Runtime sırasında oluşan Event'ler aşağıdaki anayasal süreçlerin tetikleyicisi olarak kullanılmalıdır:
+
+| Kategori | Event Örnekleri | Tetiklediği Süreç | Referans |
+|---|---|---|---|
+| **Üretim Başlangıcı** | `EVENT_VIDEO_PRODUCTION_STARTED` (OLAY-023) | Production Pipeline başlatılır | AR-002_70 Adım 6 |
+| **PID** | PID oluşturma Event'i | Production Package oluşturulur | AR-002_71 Adım 5 |
+| **Production Package** | `EVENT_PRODUCTION_PACKAGE_CREATED` (OLAY-031) | Task Package'ler oluşturulur | AR-002_72 Adım 5 |
+| **Task Package** | Task Package oluşturma Event'i | Agent'lar görevlendirilir | AR-002_47 |
+| **Executor** | Executor başlangıç/tamamlanma Event'leri | AR-002_22 Feedback Loop | EEC |
+| **Quality Control** | Kalite kontrol Event'leri | Kalite raporu oluşturulur | QR-004, FEAT-010 |
+| **Archive** | Arşivleme Event'i | Digital Asset Archive güncellenir | 12_DIGITAL_ASSET_ARCHIVE.md |
+| **Catalog** | Kataloglama Event'i | Digital Asset Catalog güncellenir | 13_DIGITAL_ASSET_CATALOG.md |
+| **Delivery** | Teslimat Event'i | Kullanıcıya video gönderilir | AR-002_36 |
+| **Session Completion** | `EVENT_VIDEO_PRODUCTION_COMPLETED` (OLAY-024) | STATE_SESSION_COMPLETED | SE-007_4 |
+
+Bu liste sınırlayıcı değildir. HLK, Production Runtime geliştikçe yeni Event kategorileri eklenebilir. Her yeni Event kategorisi, 14_OLAY_KAYIT_MERKEZI.md'de resmi olarak tanımlanmalıdır.
+
+---
+
+### Event Bütünlük Kuralları
+
+**Değiştirilemezlik:**
+
+Production Event'leri geriye dönük değiştirilemez.
+
+Bir Event oluşturulduktan ve kaydedildikten sonra içeriği değiştirilemez. Event kaydı, üretim yaşam döngüsünün değiştirilemez tarihsel kaydıdır.
+
+**Silinemezlik:**
+
+Production Event'leri silinemez veya yeniden üretilemez.
+
+Bir Event silinemez. Aynı operasyon için mükerrer Event oluşturulamaz. Event kayıtları, üretim arşivlense dahi korunur.
+
+**Tamamlanma Zorunluluğu:**
+
+Her Production Event, yaşam döngüsünü tamamlamak zorundadır (Adım 2).
+
+Yaşam döngüsü tamamlanmamış Event'ler, bağlı oldukları Production adımının tamamlanmasını engeller.
+
+**İzlenebilirlik:**
+
+Production Runtime tamamlandıktan sonra tüm Event kayıtları:
+
+* ilgili Production Package içerisinde korunmalı (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 16),
+* PID üzerinden sorgulanabilir olmalı,
+* gerektiğinde denetlenebilir olmalı,
+* Decision History ile çapraz referanslanabilir olmalıdır (15_KARAR_GEREKCESI_STANDARDI.md).
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* Production Event'lerin runtime davranışını, yaşam döngüsünü ve ilişkilendirme kurallarını tanımlar,
+* Event'lerin EEC, LAC, Production Package ve Decision History ile entegrasyonunu yönetir.
+
+Bu mimari;
+
+* Event'lerin teknik tanımını yapmaz — tüm Event tanımları 14_OLAY_KAYIT_MERKEZI.md'nin sorumluluğundadır (SE-007_5: Event Ownership).
+* EEC'nin iç yapısını tanımlamaz — EEC standardı 22_EXECUTION_EVENT_COLLECTOR.md tarafından yönetilir.
+* LAC'in iç yapısını tanımlamaz — LAC mimarisi FEAT-015 tarafından yönetilir.
+* Yeni Event'ler tanımlamaz — yeni Event'ler yalnızca 14_OLAY_KAYIT_MERKEZI.md'de tanımlanabilir.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — bu mimari en üst otoriteye tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — Event kayıtları denetlenebilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — Event tetikleme kararları HLK'nındır |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — Event'ler Feedback Loop'u tetikler |
+| **AR** | AR-002_36 | Scene Delivery — Delivery Event'leri ile ilişki |
+| **AR** | AR-002_47 | Task Package Engine — Task Package Event'leri |
+| **AR** | AR-002_57 | PID standardı — PID alanı tüm Event'lerde zorunlu |
+| **AR** | AR-002_58 | Production Package Architecture |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — Event zincirinin başlangıcı |
+| **AR** | AR-002_71 | PID Runtime — PID oluşturma Event'i |
+| **AR** | AR-002_72 | Production Package Runtime — EVENT_PRODUCTION_PACKAGE_CREATED |
+| **SE** | SE-007_3 | State tanımları |
+| **SE** | SE-007_4 | State geçiş kuralları — Event'ler geçişleri tetikler |
+| **SE** | SE-007_5 | State Event Trigger Architecture — Event ↔ State ilişkisi |
+| **WF** | WF-008 | Video Production workflow'u (09_WORKFLOW_MANIFEST.md) |
+| **FEAT** | FEAT-010 | Quality Control — QC Event'leri |
+| **FEAT** | FEAT-012 | Production Pipeline |
+| **FEAT** | FEAT-014 | Production Package Engine |
+| **FEAT** | FEAT-015 | Live Activity Center — gerçek zamanlı Event izleme |
+| **OLAY** | 14_OLAY_KAYIT_MERKEZI.md | Tüm Event tanımlarının tek resmi kaynağı (Single Source of Truth) |
+| **OLAY** | OLAY-023 | EVENT_VIDEO_PRODUCTION_STARTED |
+| **OLAY** | OLAY-024 | EVENT_VIDEO_PRODUCTION_COMPLETED |
+| **OLAY** | OLAY-031 | EVENT_PRODUCTION_PACKAGE_CREATED |
+| **EEC** | 22_EXECUTION_EVENT_COLLECTOR.md | Event toplama, sınıflandırma ve izleme |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Decision History — Event ↔ Karar ilişkisi |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | Event Logları bölümü (Bölüm 16) |
+| **VARLIK** | 12_DIGITAL_ASSET_ARCHIVE.md | Archive Event'leri |
+| **VARLIK** | 13_DIGITAL_ASSET_CATALOG.md | Catalog Event'leri |
+
+---
+
+### Beklenen Sonuç
+
+* Production Runtime boyunca oluşan tüm olaylar anayasal standartta yönetilir.
+* Production Event yapısı tek standart altında toplanır.
+* Event → PID → Production Package ilişkisi garanti edilir.
+* Event kayıtları EEC ve LAC tarafından gerçek zamanlı izlenebilir.
+* Production Runtime tamamen izlenebilir, denetlenebilir ve açıklanabilir hale gelir.
+* Hiçbir Event değiştirilemez, silinemez veya mükerrer oluşturulamaz.
+* Her Event, yaşam döngüsünü tamamlamadan ilgili Production adımı tamamlanmış kabul edilmez.
+* Constitution Scan Engine, Event bütünlüğünü ve yaşam döngüsü tamamlanmasını doğrulayabilir.
+
+---
+
+## AR-002_74
+
+### Başlık
+
+**Task Package Runtime Integration Architecture**
+
+### Amaç
+
+Production Runtime sırasında oluşturulan Task Package'lerin anayasal kurallara uygun şekilde Production Runtime'a entegre edilmesini, Agent çalışma sınırlarının korunmasını ve Runtime koordinasyonunun standart hale getirilmesini sağlamak.
+
+### Kural
+
+HLK, Task Package yapılarını yalnızca geçerli bir Production Package oluşturulduktan sonra Runtime sürecine dahil edebilir.
+
+Task Package Runtime entegrasyonunun ön koşulu:
+
+* Production Package oluşturulmuş ve PID ile ilişkilendirilmiş olmalıdır (AR-002_72, AR-002_58).
+* EVENT_PRODUCTION_PACKAGE_CREATED (OLAY-031) üretilmiş olmalıdır (AR-002_73).
+* Production Package'in **Task Package Listesi** bölümü (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 7) hazır durumda olmalıdır.
+
+---
+
+### Task Package Yapısal İlkeleri
+
+Her Task Package, AR-002_47 (Task Package Engine Architecture) standardına uygun olarak:
+
+* yalnızca bir Production Package'e bağlı olmalıdır (AR-002_58: her Task Package yalnızca bir Production Package'e aittir),
+* yalnızca bir PID ile ilişkilendirilmelidir (AR-002_57: PID tüm bileşenlerin ortak referansıdır),
+* yalnızca kendi görev kapsamını temsil etmelidir (AR-002_47: her ajan yalnızca kendi görevini yerine getirebilmesi için gerekli bilgiye erişebilir).
+
+---
+
+### Task Package Runtime Çalışma Sırası
+
+Production Runtime sırasında HLK, aşağıdaki çalışma sırasını korumak zorundadır.
+
+**Adım 1 — Gerekli Task Package'lerin Oluşturulması**
+
+HLK, Production gereksinimlerine göre gerekli Task Package'leri oluşturur.
+
+Her Task Package; AR-002_47'de tanımlanan içerik standardına uygun olarak en az aşağıdaki bilgileri içermelidir:
+
+* Task ID (benzersiz görev kimliği),
+* Workflow Kimliği (WF-008, 09_WORKFLOW_MANIFEST.md),
+* Agent Kimliği (atanacak Agent'ın tanımlayıcısı),
+* Görev Tanımı (Agent'ın ne yapacağı),
+* Görev Amacı (görevin neden gerekli olduğu),
+* Giriş Verileri (Agent'ın kullanacağı veriler),
+* Beklenen Çıktılar (Agent'ın ne üretmesi gerektiği),
+* Kalite Kriterleri (QR-004 uyumlu),
+* Öncelik Seviyesi,
+* Zaman Limiti (GC parametrelerine göre),
+* İlgili Asset Referansları (12_DIGITAL_ASSET_ARCHIVE.md, 13_DIGITAL_ASSET_CATALOG.md),
+* İlgili Feature Referansları (10_FEATURE_REGISTRY.md),
+* Güvenlik ve Erişim Kuralları.
+
+Task Package'ler, Production Package'in alt bileşeni olarak çalışır (AR-002_58: Task Package yapısı korunur; Production Package, Task Package'lerin üst katmanı olarak çalışır).
+
+**Adım 2 — Her Task Package'in Production Package ile İlişkilendirilmesi**
+
+HLK, her Task Package'i ilgili Production Package ile ilişkilendirir.
+
+Bu ilişkilendirme ile:
+
+* Her Task Package, Production Package'in **Task Package Listesi** bölümüne kaydedilir (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 7),
+* Her Task Package, Production Package'in PID'sini referans olarak taşır,
+* Task Package → Production Package → PID zinciri tamamlanmış olur.
+
+**Adım 3 — Her Task Package için Uygun Agent Atamasının Gerçekleştirilmesi**
+
+HLK, her Task Package için uygun Agent'ı belirler ve atar.
+
+Agent atamasında HLK:
+
+* Dinamik Ajan Öncelik Sıralamasını kullanır (AR-002_3, AR-002_4, AR-002_5),
+* Agent'ın uzmanlık alanını görev gereksinimleriyle eşleştirir,
+* Agent'ın operasyonel durumunu kontrol eder (SE-007_1: Agent State Classification — AGENT_ACTIVE, AGENT_DISABLED, AGENT_NO_CREDITS, vb.),
+* Agent'ın kullanılabilirliğini doğrular (AR-002_19: Ajan Sürekliliği ve Operasyonel Eskalasyon),
+* Gerekirse alternatif Agent seçimi yapar (AR-002_21: Ajan Değiştirme ve Yeniden Seçim).
+
+**Adım 4 — Agent Çalışma Yetkilerinin Sınırlandırılması**
+
+HLK, her Agent'ın çalışma yetkilerini yalnızca ilgili Task Package ile sınırlar.
+
+Bu sınırlandırma ile:
+
+* Hiçbir Agent, başka bir Agent'ın Task Package'ine erişemez (AR-002_47: Veri İzolasyonu).
+* Hiçbir Agent, Production Package'in tamamına erişemez (AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md: Production Package'in tamamına yalnızca HLK erişebilir).
+* Hiçbir Agent, başka bir Task Package üzerinde doğrudan işlem yapamaz.
+* Her Agent yalnızca kendi Task Package'inde tanımlanan verilere ve kaynaklara erişebilir.
+
+**Adım 5 — Task Runtime Başlangıç Event'lerinin Oluşturulması**
+
+HLK, her Task Package için Task Runtime başlangıç Event'ini oluşturur.
+
+Bu Event'ler:
+
+* Olay Kayıt Merkezi standardına uygun olarak oluşturulur (14_OLAY_KAYIT_MERKEZI.md),
+* PID alanı zorunlu olarak içerir (AR-002_57),
+* Production Package altında kayıt altına alınır (AR-002_73 Adım 3),
+* EEC tarafından toplanır (22_EXECUTION_EVENT_COLLECTOR.md),
+* LAC üzerinden izlenebilir hale gelir (FEAT-015),
+* Production Event Runtime kurallarına tabidir (AR-002_73).
+
+**Adım 6 — Runtime Boyunca Görev Çıktılarının Toplanması**
+
+HLK, Runtime boyunca oluşan tüm görev çıktılarını ilgili Task Package altında toplar.
+
+Toplanan çıktılar:
+
+* Agent'ın ürettiği tüm sonuçlar,
+* Agent logları (SE-007_1/2),
+* Servis kullanım kayıtları,
+* Kredi tüketim bilgileri,
+* Görev süresi ve performans metrikleri.
+
+Tüm çıktılar Task Package üzerinden Production Package'e bağlanır.
+
+**Adım 7 — Task Tamamlandığında Event Üretimi ve Production Runtime'a Geri Bildirim**
+
+HLK, her Task tamamlandığında:
+
+* İlgili tamamlanma Event'ini üretir (AR-002_73),
+* Event'i Production Package altında kaydeder,
+* Görev sonucunu Production Runtime'a geri bildirir,
+* Gerekirse sonraki Task'ı tetikler,
+* Başarısızlık durumunda AR-002_19 (Ajan Sürekliliği) ve AR-002_21 (Ajan Değiştirme) kurallarını uygular,
+* AR-002_22 (Constitutional Feedback Loop) gerekiyorsa devreye girer.
+
+---
+
+### Agent İzolasyon ve Koordinasyon Kuralları
+
+**Agent İzolasyonu:**
+
+* Hiçbir Agent, başka bir Agent'ın Task Package'ine erişemez (AR-002_47).
+* Hiçbir Agent, Production Package'in tamamına erişemez (AR-002_58).
+* Hiçbir Agent, başka bir Task Package üzerinde doğrudan işlem yapamaz.
+* Her Agent yalnızca kendi görev kapsamındaki verilere erişebilir (AR-002_47: Veri İzolasyonu).
+
+**Task Package'ler Arası Koordinasyon:**
+
+* Task Package'ler birbirleriyle doğrudan haberleşmez.
+* Task Package'ler arasındaki koordinasyon yalnızca HLK Runtime Orchestrator tarafından yönetilir (AR-002_47, AR-002_58).
+* Bir Task Package'in çıktısı, başka bir Task Package'in girdisi olacaksa, bu aktarım HLK üzerinden gerçekleşir.
+* Hiçbir Agent, başka bir Agent'ın çıktısına doğrudan erişemez.
+
+---
+
+### Task Runtime Event Kayıtları
+
+Task Runtime boyunca oluşan aşağıdaki durumlar, ilgili Event mekanizması üzerinden kayıt altına alınmalıdır (AR-002_73):
+
+| Durum | Event Türü | Referans |
+|---|---|---|
+| Görev başlangıcı | Task başlangıç Event'i | AR-002_73, EEC |
+| Görev tamamlanması | Task tamamlanma Event'i | AR-002_73, EEC |
+| Görev başarısızlığı | Task başarısız Event'i | AR-002_19, AR-002_73 |
+| Yeniden deneme | Retry Event'i | AR-002_22 (Feedback Loop) |
+| Agent değişimi | AGENT_REPLACED Event'i | AR-002_21, SE-007_1 |
+| Operasyonel eskalasyon | Eskalasyon Event'i | AR-002_19, AR-002_22 |
+
+Tüm bu Event'ler:
+
+* PID ile ilişkilendirilir (AR-002_57),
+* Production Package altında kaydedilir (AR-002_72, AR-002_73),
+* Decision History ile ilişkilendirilebilir olmalıdır (15_KARAR_GEREKCESI_STANDARDI.md).
+
+---
+
+### Production Runtime Tamamlanması
+
+Production Runtime tamamlandığında:
+
+* Tüm Task Package çıktıları ilgili Production Package içerisinde korunur (AR-002_72).
+* Task Package kayıtları değiştirilemez ve silinemez.
+* Task Package çıktıları, sonraki süreçler tarafından kullanılabilir olmalıdır:
+  * **Quality Control** — kalite raporları için (QR-004, FEAT-010),
+  * **Archive** — Digital Asset Archive güncellemesi için (12_DIGITAL_ASSET_ARCHIVE.md),
+  * **Catalog** — Digital Asset Catalog güncellemesi için (13_DIGITAL_ASSET_CATALOG.md),
+  * **Delivery** — nihai video teslimatı için (AR-002_36).
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* Task Package'lerin Production Runtime'a nasıl entegre edileceğini, hangi sırayla ve hangi koşullarda çalıştırılacağını tanımlar,
+* Agent çalışma sınırlarını ve Task Package'ler arası koordinasyon kurallarını belirler,
+* Task Runtime Event kayıt standartlarını uygular.
+
+Bu mimari;
+
+* Task Package'lerin iç yapısını tanımlamaz — yapı AR-002_47 (Task Package Engine Architecture) tarafından yönetilir.
+* Agent seçim kriterlerini tanımlamaz — bu AR-002_3, AR-002_4, AR-002_5 ve AR-002_21'in sorumluluğundadır.
+* Agent durum sınıflandırmasını tanımlamaz — bu SE-007_1 ve SE-007_2'nin sorumluluğundadır.
+* Production Package'in iç yapısını tanımlamaz — bu AR-002_58 ve 16_PRODUCTION_PACKAGE_STANDARD.md'nin sorumluluğundadır.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — bu mimari en üst otoriteye tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — Task Runtime denetlenebilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — Agent atama kararları HLK'nındır |
+| **AR** | AR-002_3 | Dinamik Ajan Öncelik Sıralaması — Agent seçim kriterleri |
+| **AR** | AR-002_4 | Benzer Görevlerde Yeniden Kullanım |
+| **AR** | AR-002_5 | Kurumsal Deneyim — başarılı Task sonuçlarının kaydı |
+| **AR** | AR-002_7 | Eş Zamanlı Ajan Çalıştırma — aynı görev için tek Agent |
+| **AR** | AR-002_19 | Ajan Sürekliliği ve Operasyonel Eskalasyon |
+| **AR** | AR-002_21 | Ajan Değiştirme ve Yeniden Seçim |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — Task başarısızlık denetimi |
+| **AR** | AR-002_36 | Scene Delivery — nihai çıktıların teslimi |
+| **AR** | AR-002_47 | Task Package Engine Architecture — Task Package yapısal standardı (WHAT) |
+| **AR** | AR-002_57 | PID standardı — tüm Task Package'ler PID ile ilişkilendirilir |
+| **AR** | AR-002_58 | Production Package Architecture — PID → PP → TP → Agent hiyerarşisi |
+| **AR** | AR-002_72 | Production Package Runtime — PP oluşturma (ön koşul) |
+| **AR** | AR-002_73 | Production Event Runtime — Task Event'lerinin kayıt standardı |
+| **SE** | SE-007_1 | Agent State Classification — Agent durum takibi |
+| **SE** | SE-007_2 | Agent State Transition Rules — Agent durum geçişleri |
+| **WF** | WF-008 | Video Production workflow'u (09_WORKFLOW_MANIFEST.md) |
+| **FEAT** | FEAT-012 | Production Pipeline |
+| **FEAT** | FEAT-014 | Production Package Engine |
+| **FEAT** | FEAT-015 | Live Activity Center — Task izleme |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | Production Package bölümleri ve Task Package Listesi |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Decision History — Task kararları |
+| **VARLIK** | 12_DIGITAL_ASSET_ARCHIVE.md | Archive süreci |
+| **VARLIK** | 13_DIGITAL_ASSET_CATALOG.md | Catalog süreci |
+
+---
+
+### Beklenen Sonuç
+
+* Task Package Runtime entegrasyonu standart hale gelir.
+* Agent çalışma sınırları anayasal olarak korunur.
+* Runtime koordinasyonu HLK tarafından merkezi olarak yönetilir.
+* Task Package, PID ve Production Package ilişkisi garanti altına alınır.
+* Production Runtime mimarisinin altyapısı tamamlanmış olur.
+* Hiçbir Agent, kendi Task Package'i dışındaki verilere veya kaynaklara erişemez.
+* Task Package'ler arası koordinasyon yalnızca HLK üzerinden gerçekleşir.
+* Tüm Task Runtime olayları Event sistemi ve Decision History ile ilişkilendirilir.
+* Constitution Scan Engine, Task Package Runtime entegrasyonunu doğrulayabilir.
+
+---
+
+## AR-002_75
+
+### Başlık
+
+**Production Service Selection Architecture**
+
+### Amaç
+
+HLK'nın, reklam üretim sürecinde kullanılacak servis sağlayıcılarını marka bağımlı olmadan, anayasal karar mekanizmasına uygun şekilde dinamik olarak seçmesini standartlaştırmak.
+
+### Kural
+
+HLK hiçbir servis sağlayıcıyı varsayılan, zorunlu veya kalıcı üretim servisi olarak kabul etmez.
+
+Bu ilke, AR-002_2'nin Production Runtime özelinde uygulanmasıdır:
+
+> AR-002_2: "HLK, kendisine verilen bir görevi yerine getirirken belirli bir teknolojiye, belirli bir ajana, belirli bir modele veya belirli bir servise bağımlı bir mimari oluşturmaz."
+
+---
+
+### Servis Seçim Zamanı
+
+Production Runtime başladığında HLK, üretim görevini merkeze alarak aday servis sağlayıcıları kendi karar mekanizması ile değerlendirir.
+
+Servis seçimi:
+
+* Production Runtime başlangıcında (AR-002_70),
+* PID oluşturulduktan sonra (AR-002_71),
+* Production Package oluşturulduktan sonra (AR-002_72),
+* Task Package'ler oluşturulmadan önce (AR-002_74)
+
+gerçekleştirilir. Böylece her Agent, görevlendirilmeden önce hangi servis sağlayıcısını kullanacağını bilir.
+
+---
+
+### Değerlendirme Kriterleri
+
+Servis seçimi tek bir kritere göre yapılmaz.
+
+HLK, mümkün olduğu durumlarda aşağıdaki değerlendirme alanlarını birlikte analiz eder:
+
+| # | Kriter | Açıklama | Anayasal Kaynak |
+|---|---|---|---|
+| 1 | **Üretilecek göreve uygunluk** | Servis bu spesifik görevi yerine getirebiliyor mu? | AR-002_3, Task Package |
+| 2 | **Üretilecek ürün kategorisine uygunluk** | Servis bu ürün kategorisinde başarılı mı? | AR-002_3, AR-002_4 |
+| 3 | **Hedef platforma uygunluk** | Servis çıktısı hedef platformla uyumlu mu? | SAHNE-02, SAHNE-03 |
+| 4 | **Kullanıcı brief'i** | Servis, kullanıcının tercihlerine uygun mu? | AR-002_3 |
+| 5 | **Beklenen çıktı kalitesi** | Servis istenen kalite seviyesini sağlayabilir mi? | QR-004 |
+| 6 | **Geçmiş üretim başarıları** | Bu servis ile daha önce başarılı üretim yapıldı mı? | AR-002_4, AR-002_5 |
+| 7 | **Bağımsız benchmark ve değerlendirme sonuçları** | Üçüncü taraf performans verileri ne gösteriyor? | AR-002_3 |
+| 8 | **Servis sağlık durumu** | Servis şu anda operasyonel mi? | OR-004 |
+| 9 | **API erişilebilirliği** | API anahtarı mevcut ve geçerli mi? | AR-002_19, OR-004 |
+| 10 | **Kredi ve kota durumu** | Yeterli kredi/kota mevcut mu? | GC, OR-004 |
+| 11 | **Tahmini üretim maliyeti** | Bu servis ile üretim maliyeti ne olur? | AR-002_3, GC |
+| 12 | **Tahmini üretim süresi** | Bu servis ile üretim ne kadar sürer? | GC |
+| 13 | **Servis güven skoru** | Servisin güvenilirlik puanı nedir? | Operasyon Veri Merkezi |
+| 14 | **Alternatif servis bulunabilirliği** | Bu servis başarısız olursa alternatif var mı? | AR-002_19, AR-002_21 |
+| 15 | **Gerekli gördüğü diğer objektif kriterler** | HLK, üretim bağlamına göre ek kriterler belirleyebilir | MASTER-004 |
+
+Bu kriterler sınırlayıcı değildir. HLK, üretim görevinin gereksinimlerine göre değerlendirme kapsamını genişletebilir veya daraltabilir.
+
+---
+
+### Kriter Ağırlıklandırma
+
+Değerlendirme kriterlerinin ağırlıkları sabit değildir.
+
+HLK, her üretim görevinde kendi karar mekanizması ile kriter ağırlıklarını dinamik olarak belirler (MASTER-004, AR-002_3).
+
+Örneğin:
+
+* Yüksek kalite gerektiren bir üretimde "beklenen çıktı kalitesi" ve "geçmiş üretim başarıları" kriterleri daha yüksek ağırlıklandırılabilir.
+* Kredi seviyesi kritik seviyede ise "tahmini üretim maliyeti" ve "kredi ve kota durumu" kriterleri öncelik kazanabilir.
+* Hızlı teslimat gerektiren bir üretimde "tahmini üretim süresi" kriteri daha yüksek ağırlık alabilir.
+
+Kriter ağırlıklandırması, HLK'nın karar mekanizmasının bir parçasıdır ve her üretim için ayrı ayrı belirlenir.
+
+---
+
+### Bağımsız Verilerin Rolü
+
+Bağımsız benchmark, kullanıcı değerlendirmeleri veya üçüncü taraf performans raporları tek başına karar oluşturamaz.
+
+Bu veriler yalnızca HLK'nın karar mekanizmasını besleyen bilgi kaynaklarıdır (AR-002_3, MASTER-004).
+
+Nihai servis seçimi yalnızca HLK tarafından yapılır. Hiçbir dış veri kaynağı, HLK'nın karar mekanizmasının yerine geçemez.
+
+---
+
+### Seçim Gerekçelerinin Kaydedilmesi
+
+Seçilen servis sağlayıcısı, seçim gerekçeleri ile birlikte karar kayıtlarına işlenmelidir.
+
+Bu kayıt:
+
+* Production Package'in **Karar Gerekçeleri (Decision History)** bölümünde saklanır (15_KARAR_GEREKCESI_STANDARDI.md),
+* PID ile ilişkilendirilir (AR-002_57),
+* Hangi kriterlerin kullanıldığını,
+* Kriter ağırlıklarını,
+* Değerlendirilen alternatif servisleri,
+* Seçilen servisin gerekçesini,
+* Seçilmeyen servislerin neden seçilmediğini
+
+içerir.
+
+Bu kayıt, gelecekteki benzer üretimlerde HLK'nın kurumsal deneyimini güçlendirir (AR-002_5).
+
+---
+
+### Servis Değişimi
+
+Servis seçiminden sonra çalışma koşullarının değişmesi durumunda HLK, mevcut seçimi yeniden değerlendirebilir.
+
+Servis değişimi aşağıdaki durumlarda gerçekleşebilir:
+
+* Seçilen servis kullanılamaz hale gelirse (AR-002_19: Ajan Sürekliliği),
+* Seçilen servis timeout verirse (AR-002_7),
+* Seçilen servis beklenen kaliteyi sağlayamazsa (QR-004),
+* Daha uygun bir alternatif tespit edilirse (AR-002_21),
+* Operasyonel koşullar değişirse (kredi tükenmesi, API erişim sorunu — OR-004).
+
+Servis değişimi, AR-002_22 (Constitutional Feedback Loop) kapsamında denetlenir.
+
+HLK, mümkün olduğu sürece üretimi durdurmaz; anayasal kurallar doğrultusunda alternatif servis sağlayıcısına geçebilir (AR-002_19).
+
+---
+
+### Temel İlke
+
+Bu mimarinin amacı belirli bir servis sağlayıcısını tercih etmek değil, her üretim görevi için en uygun servis sağlayıcısını anayasal karar mekanizması ile belirlemektir.
+
+Hiçbir servis sağlayıcısı:
+
+* HLK'nın karar mekanizmasının üzerinde değildir (MASTER-001).
+* HLK'nın yerine karar veremez (MASTER-004).
+* Kalıcı veya değiştirilemez olarak tanımlanamaz (AR-002_2).
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — servis seçimi ANA YASA'ya tabidir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — nihai servis seçimi HLK'nındır |
+| **AR** | AR-002_2 | Teknoloji/Servis Bağımsızlığı — belirli bir servise bağımlılık yasağı |
+| **AR** | AR-002_3 | Dinamik Ajan Öncelik Sıralaması — değerlendirme kriterleri |
+| **AR** | AR-002_4 | Benzer Görevlerde Yeniden Kullanım — geçmiş başarıların değerlendirilmesi |
+| **AR** | AR-002_5 | Kurumsal Deneyim — başarılı servis seçimlerinin kaydı |
+| **AR** | AR-002_7 | Eş Zamanlı Ajan Çalıştırma — timeout/başarısızlıkta alternatife geçiş |
+| **AR** | AR-002_19 | Ajan Sürekliliği ve Operasyonel Eskalasyon — servis kullanılamadığında |
+| **AR** | AR-002_21 | Ajan Değiştirme ve Yeniden Seçim — servis değişim kuralları |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — servis değişim kararlarının denetimi |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — servis seçiminin yapıldığı aşama |
+| **AR** | AR-002_74 | Task Package Runtime Integration — Agent'lara servis ataması |
+| **OR** | OR-004 | Operasyonel kontroller — API, kredi, kota yönetimi |
+| **GC** | GC kredi/kota parametreleri | Kredi limitleri ve kota eşikleri (01_Global_Configuration.md) |
+| **QR** | QR-004 | Kalite Kuralları — çıktı kalitesi değerlendirmesi |
+| **MR** | MR-005 | Modül Kuralları — servis bazlı modül yönetimi |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Seçim gerekçelerinin kaydı |
+
+---
+
+### Beklenen Sonuç
+
+* Servis seçimi marka bağımlılığından kurtulur.
+* HLK her üretim için en uygun servis sağlayıcısını dinamik olarak seçer.
+* Bağımsız benchmark verileri karar mekanizmasına katkı sağlar ancak karar vermez.
+* Servis seçimleri gerekçeleriyle kayıt altına alınır.
+* Yeni servis sağlayıcıları anayasal değişiklik gerektirmeden sisteme dahil edilebilir.
+* Hiçbir servis sağlayıcısı kalıcı veya değiştirilemez konumda değildir.
+* Servis değişim kararları Feedback Loop tarafından denetlenir.
+* Constitution Scan Engine, servis seçim gerekçelerinin Decision History'de kayıtlı olduğunu doğrulayabilir.
+
+---
+
+## AR-002_76
+
+### Başlık
+
+**Üretim Yürütme Mimarisi — Production Execution Architecture**
+
+### Amaç
+
+HLK tarafından oluşturulan Production Runtime kararlarının güvenli, izlenebilir ve anayasal kurallara uygun şekilde yürütülmesini standartlaştırmak.
+
+### Kural
+
+HLK içerisinde üretim yürütme işlemleri yalnızca Üretim Yürütme Mimarisi (Production Executor) tarafından gerçekleştirilir.
+
+---
+
+### Executor'un Anayasal Konumu
+
+Üretim Yürütme Mimarisi, HLK'nın **uygulayıcı** katmanıdır. Karar verici veya denetleyici değildir.
+
+Bu ilke, MASTER-007'nin Production Runtime özelinde uygulanmasıdır:
+
+> MASTER-007: "AI Geliştirici, HLK sisteminde yalnızca uygulayıcıdır. Karar verici veya denetleyici değildir."
+
+Executor:
+
+* karar vermez (karar yalnızca HLK Decision Engine'indir — MASTER-004),
+* görev seçmez (görev seçimi Task Package Engine'indir — AR-002_47),
+* servis seçmez (servis seçimi HLK karar mekanizmasınındır — AR-002_75),
+* prompt oluşturmaz veya değiştirmez (prompt'lar Decision Engine tarafından hazırlanır),
+* kalite değerlendirmesi yapmaz (kalite kontrol QR-004 ve FEAT-010'indir),
+* üretim stratejisini değiştirmez (strateji HLK karar mekanizmasınındır).
+
+Executor yalnızca HLK tarafından oluşturulan ve onaylanan Decision Packet'i yürütür.
+
+---
+
+### Yürütme Öncesi Doğrulama Adımları
+
+Her yürütme işlemi başlamadan önce HLK, aşağıdaki doğrulamaları eksiksiz tamamlamak zorundadır.
+
+**Adım 1 — Production Runtime Durumunun Doğrulanması**
+
+HLK, Production Runtime'ın aktif ve sağlıklı olduğunu doğrular:
+
+* STATE_VIDEO_PRODUCTION state'i aktiftir (SE-007_3, AR-002_70).
+* Production Runtime başlatılmıştır (AR-002_70 Adım 5).
+* Production Runtime içerisinde kritik bir hata veya eskalasyon durumu yoktur.
+
+**Adım 2 — PID Doğrulaması**
+
+HLK, PID'nin geçerli olduğunu doğrular:
+
+* PID oluşturulmuştur (AR-002_71).
+* PID formatı GC standartlarına uygundur.
+* PID benzersizdir ve değiştirilmemiştir (AR-002_57).
+
+**Adım 3 — Production Package Doğrulaması**
+
+HLK, Production Package'in yürütmeye hazır olduğunu doğrular:
+
+* Production Package oluşturulmuştur (AR-002_72).
+* Production Package, PID ile ilişkilendirilmiştir.
+* Production Package'in zorunlu bölümleri doldurulmuştur (16_PRODUCTION_PACKAGE_STANDARD.md).
+
+**Adım 4 — İlgili Task Package'in Belirlenmesi**
+
+HLK, yürütülecek görev için ilgili Task Package'i belirler:
+
+* Task Package oluşturulmuştur (AR-002_74 Adım 1).
+* Task Package, Production Package ile ilişkilendirilmiştir (AR-002_74 Adım 2).
+* Task Package için uygun Agent atanmıştır (AR-002_74 Adım 3).
+* Task Package, görev kapsamına uygun verileri içermektedir (AR-002_47).
+
+**Adım 5 — Kullanılacak Servis Sağlayıcısının Doğrulanması**
+
+HLK, seçilen servis sağlayıcısının yürütmeye hazır olduğunu doğrular:
+
+* Servis seçimi yapılmıştır (AR-002_75).
+* Servis operasyoneldir (OR-004).
+* API erişimi mevcuttur (AR-002_19).
+* Kredi/kota yeterlidir (GC, OR-004).
+
+**Adım 6 — Yürütülecek Decision Packet'in Hazırlanması**
+
+HLK, yürütülecek Decision Packet'i hazırlar:
+
+* Decision Packet, Decision Engine tarafından üretilmiştir (MASTER-004).
+* Decision Packet, Constitutional Validator'den geçmiştir (AR-002_22).
+* Decision Packet, yürütme için gerekli tüm parametreleri içermektedir.
+
+Üretim Yürütme Mimarisi yalnızca bu altı doğrulama tamamlandıktan sonra çalıştırılabilir.
+
+Hiçbir doğrulama adımı atlanamaz.
+
+---
+
+### Yürütme Çalışma Sırası
+
+Her yürütme süreci aşağıdaki çalışma sırasını takip eder.
+
+**Adım 1 — Decision Packet'in Alınması**
+
+Executor, Decision Engine tarafından üretilen ve Constitutional Validator tarafından onaylanan Decision Packet'i alır.
+
+Decision Packet; Executor'un ne yapacağını, hangi parametrelerle yapacağını ve beklenen çıktının ne olduğunu tanımlar. Executor, Decision Packet'in içeriğini değiştiremez.
+
+**Adım 2 — İlgili Task Package'in Yüklenmesi**
+
+Executor, belirlenen Task Package'i yükler.
+
+Task Package; Executor'un görevi yerine getirmesi için ihtiyaç duyduğu tüm verileri, kaynak referanslarını ve kalite kriterlerini içerir (AR-002_47).
+
+**Adım 3 — Görevin Yürütülmesi**
+
+Executor, belirlenen servis sağlayıcısını kullanarak görevi yürütür.
+
+Yürütme sırasında:
+
+* Executor, Task Package'te tanımlanan görev kapsamının dışına çıkamaz.
+* Executor, karar değişikliği yapamaz.
+* Executor, yalnızca kendisine atanan servis sağlayıcısını kullanır.
+* Görev süresi, GC parametreleri ile belirlenen zaman limitini aşamaz (AR-002_7).
+
+**Adım 4 — Execution Event'lerinin Üretilmesi**
+
+Executor, yürütme sırasında Execution Event'lerini üretir.
+
+Bu Event'ler:
+
+* Production Event Runtime standardına uygundur (AR-002_73),
+* PID alanı zorunlu olarak içerir (AR-002_57),
+* EEC tarafından toplanır (22_EXECUTION_EVENT_COLLECTOR.md),
+* LAC üzerinden gerçek zamanlı izlenebilir (FEAT-015).
+
+**Adım 5 — Üretim Çıktılarının Kaydedilmesi**
+
+Executor, üretim çıktılarını ilgili Production Package'e kaydeder.
+
+Çıktılar:
+
+* Production Package'in ilgili bölümlerine yazılır (16_PRODUCTION_PACKAGE_STANDARD.md),
+* PID ile ilişkilendirilir,
+* Task Package altında saklanır (AR-002_74).
+
+**Adım 6 — Execution Result'ın Oluşturulması**
+
+Executor, yürütme sonucunda bir Execution Result oluşturur.
+
+Execution Result en az aşağıdaki bilgileri içermelidir:
+
+* status: SUCCESS / FAILED / TIMEOUT / PARTIAL (AR-002_22)
+* output: Görev çıktısı
+* duration_ms: Görev süresi
+* error_detail: Hata detayı (FAILED/TIMEOUT ise)
+
+**Adım 7 — Execution Result'ın Feedback Loop'a İletilmesi**
+
+Executor, Execution Result'ı Feedback Loop'a iletir (AR-002_22).
+
+Executor'un görevi burada sona erer. Executor, Execution Result'ın değerlendirmesini yapmaz, sonraki adımı belirlemez.
+
+Feedback Loop, Execution Result'ı alır ve değerlendirir:
+
+* SUCCESS → yeni Event → normal akış devam eder,
+* FAILED / TIMEOUT / PARTIAL → neden analizi → Decision Engine yeniden çağrılır (AR-002_22 Adım 2-3).
+
+---
+
+### Yürütme Durumları ve Event Kayıtları
+
+Üretim sırasında oluşan durumlar, ilgili Event sistemi üzerinden kayıt altına alınmalıdır (AR-002_73):
+
+| Durum | Execution Result Status | Event Kaydı | Sonraki Adım |
+|---|---|---|---|
+| **Başarı** | SUCCESS | Tamamlanma Event'i | Feedback Loop → normal akış |
+| **Başarısızlık** | FAILED | Başarısızlık Event'i | Feedback Loop → neden analizi |
+| **Timeout** | TIMEOUT | Timeout Event'i | AR-002_7 → alternatif Agent/servis |
+| **İptal** | CANCELLED | İptal Event'i | STATE_SESSION_CLOSED |
+| **Kısmi Tamamlama** | PARTIAL | Kısmi tamamlanma Event'i | Feedback Loop → eksik kısım için ek karar |
+| **Servis Değişikliği** | — | AGENT_REPLACED Event'i | AR-002_21 → yeni servis seçimi |
+
+Tüm bu Event'ler:
+
+* PID ile ilişkilendirilir (AR-002_57),
+* Production Package altında saklanır (AR-002_72),
+* Decision History ile çapraz referanslanabilir (15_KARAR_GEREKCESI_STANDARDI.md).
+
+---
+
+### Anayasal Sınırlar
+
+Üretim Yürütme Mimarisi hiçbir durumda anayasal karar mekanizmasının yerine geçemez.
+
+| Executor Yapabilir | Executor Yapamaz |
+|---|---|
+| ✅ Decision Packet'i yürütmek | ❌ Karar vermek (MASTER-004) |
+| ✅ Task Package verilerini kullanmak | ❌ Task Package'i değiştirmek |
+| ✅ Belirlenen servisi kullanmak | ❌ Servis seçmek veya değiştirmek (AR-002_75) |
+| ✅ Execution Result üretmek | ❌ Execution Result'ı değerlendirmek |
+| ✅ Execution Event'leri üretmek | ❌ Event'leri yorumlamak |
+| ✅ Çıktıları Production Package'e kaydetmek | ❌ Çıktı kalitesini değerlendirmek (QR-004) |
+| ✅ Feedback Loop'a sonuç iletmek | ❌ Feedback Loop'u atlamak (AR-002_22) |
+
+Karar değişikliği gerektiğinde süreç Feedback Loop üzerinden yeniden HLK Decision Engine'ine yönlendirilmelidir (AR-002_22). Executor, karar değişikliğini kendisi yapamaz.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — Executor en alt katmandır |
+| **MASTER** | MASTER-004 | Karar Mekanizması — Executor karar vermez, yalnızca yürütür |
+| **MASTER** | MASTER-007 | Geliştirici Çalışma Metodolojisi — Executor (uygulayıcı) ≠ HLK (karar verici) |
+| **AR** | AR-002_7 | Eş Zamanlı Ajan Çalıştırma — timeout yönetimi |
+| **AR** | AR-002_19 | Ajan Sürekliliği — başarısızlıkta eskalasyon |
+| **AR** | AR-002_21 | Ajan Değiştirme — servis değişimi |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — Execution Result → Feedback Loop |
+| **AR** | AR-002_47 | Task Package Engine — Executor'un veri kaynağı |
+| **AR** | AR-002_57 | PID standardı — tüm kayıtlarda PID zorunlu |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — yürütme ortamı |
+| **AR** | AR-002_71 | PID Runtime — PID doğrulama |
+| **AR** | AR-002_72 | Production Package Runtime — çıktıların kaydedileceği kapsayıcı |
+| **AR** | AR-002_73 | Production Event Runtime — Execution Event standardı |
+| **AR** | AR-002_74 | Task Package Runtime Integration — Task Package yükleme |
+| **AR** | AR-002_75 | Production Service Selection — servis doğrulama |
+| **SE** | SE-007_3 | STATE_VIDEO_PRODUCTION state tanımı |
+| **GC** | GC zaman limiti parametreleri | Görev timeout süreleri (01_Global_Configuration.md) |
+| **EEC** | 22_EXECUTION_EVENT_COLLECTOR.md | Execution Event'lerinin toplanması |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Decision History — yürütme kararlarının kaydı |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | Çıktıların kaydedileceği bölümler |
+| **FEAT** | FEAT-012 | Production Pipeline |
+| **FEAT** | FEAT-015 | Live Activity Center — gerçek zamanlı yürütme izleme |
+
+---
+
+### Beklenen Sonuç
+
+* Üretim ve karar mekanizması birbirinden ayrılır.
+* Executor yalnızca yürütmeden sorumlu olur.
+* HLK tek karar verici olmaya devam eder.
+* Tüm yürütme işlemleri izlenebilir hale gelir.
+* Execution Result, Feedback Loop'un standart girdisi olur.
+* Production Runtime anayasal olarak güvenli ve denetlenebilir şekilde yürütülür.
+* Hiçbir yürütme işlemi, ön doğrulama adımları tamamlanmadan başlatılamaz.
+* Executor anayasal sınırlarını aşamaz; karar değişikliği yalnızca Feedback Loop → Decision Engine zinciri ile gerçekleşir.
+* Constitution Scan Engine, yürütme öncesi doğrulama adımlarının tamamlandığını denetleyebilir.
+
+---
+
+## AR-002_77
+
+### Başlık
+
+**Yaratıcı İçerik Üretim Mimarisi — Creative Content Production Architecture**
+
+### Amaç
+
+HLK'nın reklam üretim sürecinde ihtiyaç duyduğu tüm yaratıcı içerikleri, tek bir modele veya servis sağlayıcısına bağlı kalmadan, anayasal karar mekanizmasına uygun şekilde üretmesini standartlaştırmak.
+
+### Kural
+
+HLK, yaratıcı içerik üretimini yalnızca senaryo yazımı olarak değerlendirmez.
+
+Yaratıcı içerik üretimi; reklamın iletişim stratejisini, anlatım yapısını ve üretim kararlarını kapsayan bütüncül bir süreçtir.
+
+Bu yaklaşım, AR-002_14'ün Production Runtime özelinde uygulanmasıdır:
+
+> AR-002_14: "HLK'ye kullanıcı ile kuracağı iletişim için hazır cümleler, hazır soru kalıpları veya sabit konuşma metinleri tanımlanmaz."
+
+HLK, yaratıcı içerikleri de hazır kalıplarla değil, kendi karar mekanizmasıyla dinamik olarak üretir.
+
+---
+
+### Yaratıcı İçerik Kapsamı
+
+HLK, gerekli gördüğü durumlarda aşağıdaki yaratıcı içerikleri oluşturabilir:
+
+| # | İçerik Türü | Açıklama | İlgili Production Package Bölümü |
+|---|---|---|---|
+| 1 | **Reklam Stratejisi** | Ürün için en uygun reklam yaklaşımı | Brief (Bölüm 3) |
+| 2 | **Reklam Yaklaşımı** | UGC, sinematik, geleneksel vb. | Brief (Bölüm 3) |
+| 3 | **Anlatım Dili** | Marka tonu, samimiyet seviyesi, hitap tarzı | Brief (Bölüm 3) |
+| 4 | **Reklam Senaryosu** | Tam reklam metni ve sahne akışı | Senaryo (Bölüm 4) |
+| 5 | **Sahne Akışı** | Sahneler arası geçiş ve zamanlama | Storyboard (Bölüm 5) |
+| 6 | **Sahne Açıklamaları** | Her sahnenin görsel ve işitsel detayları | Storyboard (Bölüm 5) |
+| 7 | **Hook Yapısı** | İlk 2 saniyede izleyiciyi yakalama stratejisi | Senaryo (Bölüm 4) |
+| 8 | **CTA (Call To Action)** | Harekete geçirici mesaj | Senaryo (Bölüm 4) |
+| 9 | **Konuşma Metinleri** | Seslendirme ve diyalog metinleri | Prompt Setleri (Bölüm 6) |
+| 10 | **Ekran Metinleri** | Video üzerinde görünecek yazılar | Prompt Setleri (Bölüm 6) |
+| 11 | **Görsel Yönlendirmeler** | Kamera açıları, renk paleti, kompozisyon | Prompt Setleri (Bölüm 6) |
+| 12 | **Üretim Notları** | Prodüksiyon ekibine teknik talimatlar | Prompt Setleri (Bölüm 6) |
+| 13 | **Gerekli Diğer İçerikler** | HLK'nın üretim bağlamına göre belirlediği ek içerikler | İlgili bölüm |
+
+Bu liste sınırlayıcı değildir. HLK, üretim görevinin gereksinimlerine göre yeni içerik türleri oluşturabilir veya bazı içerik türlerini birleştirebilir.
+
+Tüm yaratıcı içerikler, ilgili Production Package bölümlerinde saklanır (16_PRODUCTION_PACKAGE_STANDARD.md).
+
+---
+
+### Model ve Servis Bağımsızlığı
+
+HLK hiçbir yapay zekâ modelini, LLM'i veya yaratıcı servis sağlayıcısını varsayılan içerik üreticisi olarak kabul etmez.
+
+Bu ilke, AR-002_2 ve AR-002_75'in yaratıcı içerik üretimi özelinde uygulanmasıdır:
+
+* AR-002_2: "HLK belirli bir teknolojiye, belirli bir ajana, belirli bir modele veya belirli bir servise bağımlı bir mimari oluşturmaz."
+* AR-002_75: "HLK hiçbir servis sağlayıcıyı varsayılan, zorunlu veya kalıcı üretim servisi olarak kabul etmez."
+
+Kullanılacak yaratıcı üretim servisi, Production Service Selection Architecture (AR-002_75) kapsamında HLK'nın karar mekanizması tarafından dinamik olarak belirlenmelidir.
+
+---
+
+### Model Kullanım Yaklaşımları
+
+HLK, yaratıcı içerik üretiminde aşağıdaki yaklaşımlardan uygun gördüğünü kullanabilir:
+
+| Yaklaşım | Açıklama | Kullanım Örneği |
+|---|---|---|
+| **Tek Model** | Tek bir LLM/servis ile içerik üretimi | Basit, kısa süreli reklamlar |
+| **Çoklu Model** | Birden fazla modelden bağımsız çıktılar | Alternatif senaryo üretimi |
+| **Hibrit Model** | Farklı modellerden farklı içerik türleri | Strateji Model-A, senaryo Model-B |
+| **Ardışık Model** | Bir modelin çıktısı diğerine girdi | Strateji → senaryo → prompt zinciri |
+| **Paralel Model** | Aynı görev için eş zamanlı çoklu model | A/B senaryo karşılaştırması |
+
+Model seçimi, AR-002_75'te tanımlanan 15 değerlendirme kriteri kullanılarak HLK karar mekanizması tarafından yapılır.
+
+---
+
+### Çoklu Model Çıktı Yönetimi
+
+Birden fazla modelden elde edilen çıktılar, HLK tarafından:
+
+* **Karşılaştırılabilir:** Farklı modellerin çıktıları aynı kriterlerle değerlendirilir,
+* **Birleştirilebilir:** Farklı modellerin güçlü yönleri tek bir çıktıda toplanabilir,
+* **İyileştirilebilir:** Bir çıktı, başka bir model tarafından revize edilebilir,
+* **Yeniden Üretilebilir:** Kalite kriterlerini karşılamayan çıktılar yeniden üretilebilir.
+
+Tüm bu işlemler AR-002_22 (Constitutional Feedback Loop) kapsamında denetlenir.
+
+---
+
+### Yaratıcı Karar Girdileri
+
+Yaratıcı içerik üretim süreci boyunca aşağıdaki veriler, HLK'nın karar mekanizmasının temel girdileri olarak değerlendirilmelidir:
+
+| Girdi | Kaynak | Açıklama |
+|---|---|---|
+| **Kullanıcı Brief'i** | SAHNE-02 ~ SAHNE-11 | Kullanıcının tüm tercihleri |
+| **Ürün Analizi** | AR-002_13 (Arka Plan Araştırması) | Ürün özellikleri, kategorisi |
+| **Marka Analizi** | AR-002_13, AR-002_24 | Marka kimliği, tonu, tarzı |
+| **Hedef Kitle** | SAHNE-07 | Yaş grubu, demografik bilgiler |
+| **Platform** | SAHNE-02 | TikTok, Instagram, YouTube vb. |
+| **Video Süresi** | SAHNE-05 | 4-30 saniye |
+| **Reklam Hedefi** | AR-002_13 (Reklam Stratejisi Sentezi) | Dönüşüm, farkındalık, tanıtım |
+| **Araştırma Sonuçları** | AR-002_20, AR-002_23 | Bilgi açığı analizi, rakip analizi |
+| **Production Package Verileri** | AR-002_72, 16_PRODUCTION_PACKAGE_STANDARD.md | Brief, Referans Görseller, Video Parametreleri |
+| **Gerekli Diğer Veriler** | HLK karar mekanizması | Üretim bağlamına göre ek veriler |
+
+Bu girdiler, AR-002_3'te tanımlanan "kullanıcı brief'ini karar mekanizmasının merkezi olarak kabul etme" ilkesi doğrultusunda değerlendirilir.
+
+---
+
+### Nihai Karar Yetkisi
+
+Hiçbir yaratıcı servis sağlayıcısı nihai reklam stratejisini veya nihai senaryoyu tek başına belirleyemez.
+
+Servis sağlayıcılar yalnızca içerik üretir.
+
+Nihai değerlendirme, karşılaştırma, revizyon ve kabul kararı yalnızca HLK tarafından verilir (MASTER-004).
+
+Bu ilke, AR-002_12'nin yaratıcı içerik özelinde uygulanmasıdır:
+
+> AR-002_12: "HLK, dinamik ajan orkestrasyonunda hiçbir ajanı mutlak otorite olarak kabul etmez. Nihai karar, tek bir ajanın önerisine değil, HLK'nın kendi karar mekanizmasının tüm objektif değerlendirmelerine dayanır."
+
+---
+
+### İçerik Kayıt ve Sürümleme
+
+Üretilen tüm yaratıcı içerikler:
+
+* İlgili Production Package içerisinde saklanmalıdır (AR-002_72),
+* Sürüm bilgileri ile birlikte kayıt altına alınmalıdır (V1.0, V1.1, vb.),
+* Hangi model/servis tarafından üretildiği bilgisini taşımalıdır,
+* Decision History ile ilişkilendirilebilmelidir (15_KARAR_GEREKCESI_STANDARDI.md),
+* PID üzerinden sorgulanabilir olmalıdır (AR-002_57).
+
+İçerik değişiklikleri:
+
+* Yeni sürüm olarak kaydedilir (önceki sürüm korunur),
+* Değişiklik gerekçesi Decision History'ye işlenir,
+* Revizyon Geçmişi'ne eklenir (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 18).
+
+---
+
+### Temel İlke
+
+Bu mimarinin amacı belirli bir modeli kullanmak değil, her üretim görevi için en uygun yaratıcı içeriği anayasal karar mekanizması doğrultusunda oluşturmaktır.
+
+Hiçbir yapay zekâ modeli veya yaratıcı servis sağlayıcısı:
+
+* HLK'nın karar mekanizmasının üzerinde değildir (MASTER-001),
+* HLK'nın yerine karar veremez (MASTER-004),
+* Varsayılan veya kalıcı içerik üreticisi olarak tanımlanamaz (AR-002_2, AR-002_75).
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — yaratıcı içerik ANA YASA'ya tabidir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — nihai yaratıcı karar HLK'nındır |
+| **AR** | AR-002_2 | Teknoloji/Servis Bağımsızlığı — modele bağımlılık yasağı |
+| **AR** | AR-002_3 | Dinamik Ajan Öncelik Sıralaması — brief merkezli değerlendirme |
+| **AR** | AR-002_12 | Ajan Otorite Sınırı — hiçbir model mutlak otorite değildir |
+| **AR** | AR-002_13 | Arka Plan Araştırması — yaratıcı girdi kaynağı |
+| **AR** | AR-002_14 | İletişim Özerkliği — HLK hazır metin okumaz, kendi üretir |
+| **AR** | AR-002_20 | Bilgi Açığı Analizi — eksik bilgilerin tespiti |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — içerik kalite denetimi |
+| **AR** | AR-002_23 | Bilgi Açığı Görev Atama — araştırma sonuçlarının kullanımı |
+| **AR** | AR-002_57 | PID standardı — içerikler PID ile ilişkilendirilir |
+| **AR** | AR-002_72 | Production Package Runtime — içeriklerin saklanacağı kapsayıcı |
+| **AR** | AR-002_75 | Production Service Selection — yaratıcı servis seçimi |
+| **AR** | AR-002_76 | Üretim Yürütme Mimarisi — içerik Executor tarafından üretilir |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | İçerik bölümleri (Brief, Senaryo, Storyboard, Prompt Setleri) |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | İçerik kararlarının gerekçeleriyle kaydı |
+| **QR** | QR-004 | Kalite Kuralları — içerik kalite değerlendirmesi |
+| **GK** | GK-001 | Genel Kurallar — brief araştırmanın merkezidir |
+
+---
+
+### Beklenen Sonuç
+
+* Yaratıcı içerik üretimi standart hale gelir.
+* Tek modele bağımlılık ortadan kalkar.
+* Reklam stratejisi ve senaryo aynı anayasal çatı altında yönetilir.
+* Nihai yaratıcı karar HLK tarafından verilir.
+* Tüm yaratıcı içerikler Production Package içerisinde izlenebilir ve sürümlenebilir hale gelir.
+* Gelecekte yeni yapay zekâ modelleri ve yaratıcı servis sağlayıcıları anayasal değişiklik gerektirmeden sisteme dahil edilebilir.
+* Çoklu model çıktıları karşılaştırılabilir, birleştirilebilir ve iyileştirilebilir.
+* İçerik değişiklikleri sürüm geçmişi ve gerekçeleriyle kayıt altına alınır.
+* Constitution Scan Engine, yaratıcı içeriklerin Production Package'te kayıtlı olduğunu doğrulayabilir.
+
+---
+
+## AR-002_78
+
+### Başlık
+
+**Video Üretim İş Akışı Mimarisi — Video Production Workflow Architecture**
+
+### Amaç
+
+HLK tarafından onaylanan yaratıcı içeriklerin, anayasal kurallara uygun şekilde gerçek video üretimine dönüştürülmesini ve video üretim sürecinin standartlaştırılmasını sağlamak.
+
+### Kural
+
+HLK, video üretim sürecini yalnızca onaylanmış yaratıcı içerikler üzerinden başlatabilir.
+
+Video üretimi ön koşulları:
+
+* Yaratıcı içerikler HLK tarafından onaylanmış olmalıdır (AR-002_77).
+* Production Runtime aktif olmalıdır (AR-002_70).
+* PID oluşturulmuş ve geçerli olmalıdır (AR-002_71).
+* Production Package hazır olmalıdır (AR-002_72).
+* Task Package'ler oluşturulmuş olmalıdır (AR-002_74).
+* Üretim servisleri seçilmiş ve doğrulanmış olmalıdır (AR-002_75).
+
+---
+
+### Video Üretim İş Akışının Anayasal Konumu
+
+Video Üretim İş Akışı, Üretim Yürütme Mimarisi'nin (AR-002_76) video üretimi özelinde çalışan uzmanlaşmış alt katmanıdır.
+
+AR-002_76'da tanımlanan Executor ilkeleri bu mimari için de geçerlidir:
+
+* karar vermez (MASTER-004),
+* servis seçmez (AR-002_75),
+* yaratıcı içerik üretmez (AR-002_77),
+* kalite değerlendirmesi yapmaz (QR-004).
+
+Bu mimarinin görevi yalnızca video üretim sürecini yürütmektir.
+
+---
+
+### Video Üretimi Öncesi Doğrulama Adımları
+
+Video üretimi başlamadan önce HLK, aşağıdaki doğrulamaları eksiksiz tamamlamak zorundadır.
+
+**Adım 1 — Production Runtime Durumunun Doğrulanması**
+
+HLK, Production Runtime'ın video üretimi için hazır olduğunu doğrular (AR-002_70, AR-002_76 Adım 1).
+
+**Adım 2 — PID Doğrulaması**
+
+HLK, PID'nin geçerli olduğunu doğrular (AR-002_71, AR-002_57).
+
+**Adım 3 — Production Package Doğrulaması**
+
+HLK, Production Package'in video üretimi için gerekli tüm bölümlerinin hazır olduğunu doğrular (AR-002_72, 16_PRODUCTION_PACKAGE_STANDARD.md):
+
+* Brief (Bölüm 3),
+* Senaryo (Bölüm 4),
+* Prompt Setleri (Bölüm 6),
+* Video Parametreleri (Bölüm 13).
+
+**Adım 4 — İlgili Task Package'lerin Doğrulanması**
+
+HLK, video üretimi için gerekli Task Package'lerin hazır olduğunu doğrular (AR-002_74):
+
+* Her Task Package, Production Package ile ilişkilendirilmiştir,
+* Her Task Package için uygun Agent atanmıştır,
+* Agent çalışma yetkileri sınırlandırılmıştır.
+
+**Adım 5 — Onaylanmış Yaratıcı İçeriklerin Hazır Olduğunun Doğrulanması**
+
+HLK, yaratıcı içeriklerin HLK tarafından onaylanmış ve Production Package'e kaydedilmiş olduğunu doğrular (AR-002_77).
+
+Onaylanmamış yaratıcı içerik ile video üretimi başlatılamaz.
+
+**Adım 6 — Kullanılacak Üretim Servislerinin Hazır Olduğunun Doğrulanması**
+
+HLK, video üretimi için seçilen servis sağlayıcılarının operasyonel olduğunu doğrular (AR-002_75, AR-002_76 Adım 5).
+
+Bu doğrulamalar tamamlanmadan video üretimi başlatılamaz.
+
+---
+
+### Video Üretim Çalışma Sırası
+
+Video Üretim İş Akışı sırasında HLK, aşağıdaki çalışma sırasını takip eder.
+
+**Adım 1 — Üretim Paketinin Yüklenmesi**
+
+HLK, Production Package'i ve içerdiği tüm video üretim verilerini yükler.
+
+Yüklenen veriler:
+
+* Onaylanmış senaryo (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 4),
+* Storyboard (Bölüm 5),
+* Prompt Setleri (Bölüm 6),
+* Referans Görseller (Bölüm 9),
+* Video Parametreleri (Bölüm 13).
+
+**Adım 2 — Onaylanmış Yaratıcı İçeriklerin Yüklenmesi**
+
+HLK, HLK tarafından onaylanmış tüm yaratıcı içerikleri yükler (AR-002_77):
+
+* Reklam stratejisi ve yaklaşımı,
+* Onaylanmış senaryo metni,
+* Sahne akışı ve açıklamaları,
+* Hook ve CTA yapısı,
+* Konuşma ve ekran metinleri,
+* Görsel yönlendirmeler ve üretim notları.
+
+**Adım 3 — İlgili Yürütme Görevlerinin Başlatılması**
+
+HLK, video üretimi için gerekli yürütme görevlerini başlatır.
+
+Her görev:
+
+* AR-002_76 (Üretim Yürütme Mimarisi) standardına uygun olarak yürütülür,
+* İlgili Task Package üzerinden ilgili Agent'a iletilir (AR-002_74),
+* Seçilen servis sağlayıcısı kullanılarak gerçekleştirilir (AR-002_75),
+* Execution Event'leri üretilir (AR-002_73).
+
+**Adım 4 — Video Üretim Adımlarının Yönetilmesi**
+
+HLK, video üretim adımlarını sıralı veya paralel olarak yönetir.
+
+Yönetim yaklaşımı:
+
+* **Sıralı:** Her adım bir öncekinin çıktısına bağlıysa sıralı yürütülür (örn: sahne render → montaj → ses ekleme).
+* **Paralel:** Bağımsız adımlar eş zamanlı yürütülebilir (örn: farklı sahnelerin paralel render edilmesi).
+
+HLK, üretim görevinin yapısına göre en uygun yönetim yaklaşımını belirler.
+
+**Adım 5 — Ara Üretim Çıktılarının Bütünlüğünün Doğrulanması**
+
+HLK, her üretim adımının çıktısının bütünlüğünü doğrular.
+
+Doğrulama kapsamı:
+
+* Çıktı formatı beklenen formatta mı?
+* Çıktı boyutu ve süresi parametrelere uygun mu?
+* Çıktı, bir sonraki adım için kullanılabilir durumda mı?
+* Çıktıda teknik hata (bozuk dosya, eksik frame, sessiz bölüm) var mı?
+
+Bu doğrulama kalite değerlendirmesi değildir. Yalnızca teknik bütünlük kontrolüdür. Kalite değerlendirmesi QR-004 ve FEAT-010'indir.
+
+**Adım 6 — Gerektiğinde Üretim Adımlarının Yeniden Çalıştırılması**
+
+HLK, bir üretim adımı başarısız olursa ilgili adımı yeniden çalıştırabilir.
+
+Yeniden çalıştırma:
+
+* AR-002_22 (Constitutional Feedback Loop) kapsamında denetlenir,
+* AR-002_19 (Ajan Sürekliliği) uyarınca alternatif servise geçiş yapabilir,
+* AR-002_21 (Ajan Değiştirme) uyarınca yeni Agent atayabilir.
+
+**Adım 7 — Final Video Çıktısının Oluşturulması**
+
+HLK, tüm üretim adımları başarıyla tamamlandıktan sonra final video çıktısını oluşturur.
+
+Final video:
+
+* Production Package'in **Nihai Video** bölümüne yazılır (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 21),
+* PID ile ilişkilendirilir (AR-002_57),
+* Sürüm bilgisi ile kaydedilir (V1.0).
+
+**Adım 8 — Final Video Çıktısının Production Package ile İlişkilendirilmesi**
+
+HLK, final video çıktısını ilgili Production Package ile ilişkilendirir.
+
+Bu ilişkilendirme ile:
+
+* Final video, Production Package'in kalıcı kaydı haline gelir,
+* PID üzerinden tüm üretim kayıtlarıyla çapraz referanslanabilir,
+* Digital Asset Archive'e kaydedilmeye hazır hale gelir (12_DIGITAL_ASSET_ARCHIVE.md).
+
+**Adım 9 — Video Üretiminin Tamamlandığının Kayıt Altına Alınması**
+
+HLK, video üretiminin tamamlandığını Event sistemi üzerinden kayıt altına alır.
+
+Oluşturulacak Event: `EVENT_VIDEO_PRODUCTION_COMPLETED` (OLAY-024, 14_OLAY_KAYIT_MERKEZI.md).
+
+Bu Event:
+
+* AR-002_73 (Production Event Runtime) standardına uygun olarak üretilir,
+* PID alanı zorunlu olarak içerir,
+* EEC tarafından toplanır,
+* LAC üzerinden izlenebilir hale gelir.
+
+**Adım 10 — Final Video Çıktısının Quality Control Sürecine Devredilmesi**
+
+HLK, final video çıktısını Quality Control sürecine devreder.
+
+Video üretimi tamamlandıktan sonra bu mimarinin görevi sona erer. Süreç anayasal olarak Quality Control katmanına devredilir (QR-004, FEAT-010).
+
+---
+
+### Video Üretim Event Kayıtları
+
+Video üretimi sırasında oluşan durumlar, ilgili Event sistemi üzerinden kayıt altına alınmalıdır (AR-002_73):
+
+| Durum | Event Türü | Referans |
+|---|---|---|
+| Üretim başlangıcı | `EVENT_VIDEO_PRODUCTION_STARTED` (OLAY-023) | 14_OLAY_KAYIT_MERKEZI.md |
+| Ara üretim adımları | Adım tamamlanma Event'leri | AR-002_73 |
+| Kısmi başarılar | Task tamamlanma Event'leri | AR-002_74 |
+| Yeniden üretimler | Retry Event'leri | AR-002_22 |
+| Hata durumları | Başarısızlık Event'leri | AR-002_19 |
+| Servis değişiklikleri | AGENT_REPLACED Event'leri | AR-002_21 |
+| Üretim tamamlanması | `EVENT_VIDEO_PRODUCTION_COMPLETED` (OLAY-024) | 14_OLAY_KAYIT_MERKEZI.md |
+
+Tüm Event'ler PID ile ilişkilendirilir (AR-002_57) ve Production Package altında saklanır (AR-002_72).
+
+---
+
+### Ara Çıktı ve Nihai Video Yönetimi
+
+Video üretimi sırasında oluşan tüm ara çıktılar ve nihai video:
+
+* İlgili Production Package altında ilişkilendirilmelidir (AR-002_72),
+* PID üzerinden sorgulanabilir olmalıdır (AR-002_57),
+* Gerektiğinde geriye dönük olarak izlenebilmelidir,
+* Production Package arşivlendiğinde birlikte arşivlenmelidir (16_PRODUCTION_PACKAGE_STANDARD.md).
+
+Ara çıktılar, nihai video başarıyla üretildikten sonra da korunabilir. Bu, revizyon durumunda veya kalite kontrol sırasında geriye dönük analiz yapılabilmesini sağlar.
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* Video üretim sürecinin nasıl başlatılacağını, hangi adımlarla yürütüleceğini ve nasıl tamamlanacağını tanımlar,
+* Ara çıktı ve nihai video yönetimini standartlaştırır,
+* Quality Control'e devir noktasını belirler.
+
+Bu mimari;
+
+* Video üretim teknolojisini veya spesifik render yöntemini tanımlamaz — bunlar AR-002_75 kapsamında seçilen servislerin sorumluluğundadır.
+* Kalite değerlendirmesi yapmaz — bu QR-004 ve FEAT-010'indir.
+* Yaratıcı içerik üretmez — bu AR-002_77'nin sorumluluğundadır.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — video üretimi ANA YASA'ya tabidir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — video üretim kararları HLK'nındır |
+| **AR** | AR-002_19 | Ajan Sürekliliği — üretim adımı başarısızlığında eskalasyon |
+| **AR** | AR-002_21 | Ajan Değiştirme — servis değişimi |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — yeniden çalıştırma denetimi |
+| **AR** | AR-002_57 | PID standardı — tüm çıktılar PID ile ilişkilendirilir |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — üretim ortamı |
+| **AR** | AR-002_71 | PID Runtime — PID doğrulama |
+| **AR** | AR-002_72 | Production Package Runtime — çıktıların saklanacağı kapsayıcı |
+| **AR** | AR-002_73 | Production Event Runtime — üretim Event kayıtları |
+| **AR** | AR-002_74 | Task Package Runtime Integration — Task Package doğrulama |
+| **AR** | AR-002_75 | Production Service Selection — üretim servisi seçimi |
+| **AR** | AR-002_76 | Üretim Yürütme Mimarisi — görevlerin yürütülmesi |
+| **AR** | AR-002_77 | Yaratıcı İçerik Üretim Mimarisi — onaylanmış içerik girdisi |
+| **OLAY** | OLAY-023 | EVENT_VIDEO_PRODUCTION_STARTED |
+| **OLAY** | OLAY-024 | EVENT_VIDEO_PRODUCTION_COMPLETED |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | Nihai Video bölümü (Bölüm 21) |
+| **EEC** | 22_EXECUTION_EVENT_COLLECTOR.md | Event toplama |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Üretim kararlarının kaydı |
+| **QR** | QR-004 | Kalite Kuralları — QC devir noktası |
+| **FEAT** | FEAT-010 | Quality Control |
+| **FEAT** | FEAT-012 | Production Pipeline |
+| **VARLIK** | 12_DIGITAL_ASSET_ARCHIVE.md | Nihai video arşivleme |
+
+---
+
+### Beklenen Sonuç
+
+* Video üretim süreci standart hale gelir.
+* Yaratıcı içerik ile video üretimi birbirinden ayrılır.
+* Video üretimi tamamen izlenebilir hale gelir.
+* Ara üretim adımları anayasal olarak kayıt altına alınır.
+* Final video güvenli şekilde Quality Control sürecine devredilir.
+* Gelecekte farklı video üretim teknolojileri anayasal değişiklik gerektirmeden sisteme entegre edilebilir.
+* Hiçbir video üretim adımı, ön doğrulamalar tamamlanmadan başlatılamaz.
+* Tüm ara çıktılar ve nihai video, PID üzerinden Production Package'te izlenebilir.
+* Constitution Scan Engine, video üretim öncesi doğrulama adımlarını denetleyebilir.
+
+---
+
+## AR-002_79
+
+### Başlık
+
+**Üretim Sürekliliği Mimarisi — Production Continuity Architecture**
+
+### Amaç
+
+HLK'nın üretim süreci sırasında oluşabilecek teknik, operasyonel veya servis kaynaklı kesintilere rağmen, anayasal kurallar çerçevesinde üretimin güvenli, kontrollü ve izlenebilir şekilde devam ettirilmesini standartlaştırmak.
+
+### Kural
+
+HLK, üretim sürecinin sürekliliğini anayasal olarak korumakla yükümlüdür.
+
+Bu yükümlülük, AR-002_19'un Production Runtime geneline yayılmış uygulamasıdır:
+
+> AR-002_19: "HLK'nin temel ilkesi, mümkün olduğu sürece üretimi durdurmamak ve görevi tamamlamaya devam etmektir. Bir ajanın çalışamaması, tek başına görevin başarısız olduğu anlamına gelmez."
+
+---
+
+### Üretim Sürekliliği Mimarisinin Anayasal Konumu
+
+Üretim Sürekliliği Mimarisi, HLK'nın **koruma ve kurtarma** katmanıdır:
+
+* karar vermez (MASTER-004),
+* servis seçmez (AR-002_75),
+* üretim stratejisini değiştirmez (MASTER-004),
+* yaratıcı içerik üretmez (AR-002_77),
+* kalite değerlendirmesi yapmaz (QR-004).
+
+Bu mimarinin görevi yalnızca üretimin güvenli şekilde devam etmesini sağlamaktır.
+
+---
+
+### Kapsanan Operasyonel Durumlar
+
+Üretim sırasında aşağıdaki durumlar tespit edildiğinde Üretim Sürekliliği Mimarisi devreye girer:
+
+| # | Durum | Açıklama | Öncelikli Referans |
+|---|---|---|---|
+| 1 | **Zaman Aşımı (Timeout)** | Görev GC zaman limitini aştı | AR-002_7, GC |
+| 2 | **API Hatası** | Servis API'si hata döndürdü | AR-002_19, OR-004 |
+| 3 | **Servis Erişim Problemi** | Servis kullanılamaz durumda | AR-002_19, OR-004 |
+| 4 | **Kota Yetersizliği** | API kotası veya kredi tükendi | GC, OR-004 |
+| 5 | **Bağlantı Kesintisi** | Ağ bağlantısı kesildi | OR-004 |
+| 6 | **Üretim Başarısızlığı** | Görev tamamen başarısız oldu | AR-002_19, AR-002_76 |
+| 7 | **Kısmi Üretim Başarısızlığı** | Görev kısmen tamamlandı | AR-002_22, AR-002_76 |
+| 8 | **Yürütme Hatası** | Executor beklenmeyen hata verdi | AR-002_76 |
+| 9 | **Beklenmeyen Sistem Hataları** | Öngörülemeyen hata durumları | OR-004 |
+| 10 | **Gerekli Diğer Operasyonel Durumlar** | HLK'nın üretim bağlamına göre belirlediği ek durumlar | MASTER-004 |
+
+Her durum tespit edildiğinde HLK:
+
+* ilgili durumu kayıt altına almalı (AR-002_73),
+* anayasal kurallara uygun şekilde değerlendirmeli (AR-002_22),
+* uygun süreklilik aksiyonunu belirlemelidir.
+
+---
+
+### Süreklilik Aksiyonları
+
+HLK, uygun gördüğü durumlarda aşağıdaki süreklilik aksiyonlarını uygulayabilir:
+
+| Aksiyon | Açıklama | Ne Zaman Kullanılır? | Referans |
+|---|---|---|---|
+| **Yeniden Başlatma** | İşlemi baştan başlatır | Geçici hata, timeout | AR-002_22 (RETRY) |
+| **Kaldığı Noktadan Devam** | İşlemi kesinti noktasından sürdürür | Kısmi tamamlanma, bağlantı kesintisi | AR-002_76 |
+| **Yeniden Planlama** | Görevi yeniden planlar | Kaynak yetersizliği, kota | AR-002_22 (RE-EVALUATE) |
+| **Alternatif Yürütme Yolu** | Farklı bir servis/Agent ile devam eder | Servis erişim problemi, API hatası | AR-002_19, AR-002_21 |
+| **Karar Mekanizmasına Yönlendirme** | Süreci HLK Decision Engine'ine geri gönderir | Yeni karar gerektiğinde | AR-002_22, MASTER-004 |
+
+---
+
+### Süreklilik Aksiyon Seçimi
+
+HLK, süreklilik aksiyonunu seçerken aşağıdaki faktörleri değerlendirir:
+
+* **Hata Türü:** Geçici mi, kalıcı mı? (AR-002_22 Adım 2)
+* **Üretim Aşaması:** Hata hangi adımda oluştu? (AR-002_78)
+* **Alternatif Durumu:** Kullanılabilir alternatif servis/Agent var mı? (AR-002_19, AR-002_21)
+* **Kalan Kaynak:** Kredi/kota yeterli mi? (GC, OR-004)
+* **Zaman Etkisi:** Üretim takvimine etkisi ne olur?
+* **Kalite Etkisi:** Alternatif yol kaliteyi etkiler mi? (QR-004)
+* **Yeniden Deneme Sayısı:** Kaçıncı yeniden deneme? (AR-002_22: GC_MAX_RE_EVALUATION_COUNT)
+
+Bu değerlendirme, HLK'nın karar mekanizması tarafından yapılır (MASTER-004).
+
+---
+
+### Servis Seçimi Sınırı
+
+Üretim Sürekliliği Mimarisi hiçbir durumda yeni servis sağlayıcısı seçemez.
+
+Yeni servis seçimi gerektiğinde:
+
+* Süreç, Production Service Selection Architecture (AR-002_75) kapsamında HLK Karar Mekanizması tarafından yeniden değerlendirilmelidir.
+* Mevcut dinamik ajan öncelik sıralamasındaki bir sonraki uygun aday devreye alınabilir (AR-002_19, AR-002_21).
+* Ancak öncelik sıralamasında değişiklik gerekiyorsa bu karar yalnızca Decision Engine tarafından verilir (MASTER-004).
+
+Bu sınır, MASTER-004'ün doğrudan gereğidir: servis seçimi bir karardır ve karar yetkisi yalnızca HLK'nındır.
+
+---
+
+### Süreklilik İşlemlerinin Kayıt Altına Alınması
+
+Her süreklilik işlemi:
+
+1. **İlgili PID ile ilişkilendirilmelidir** (AR-002_57) — tüm süreklilik kayıtları üretim kimliği altında toplanır.
+2. **İlgili Production Package ile ilişkilendirilmelidir** (AR-002_72) — süreklilik kayıtları Production Package'in Event Logları bölümünde saklanır.
+3. **İlgili Task Package ile ilişkilendirilmelidir** (AR-002_74) — hangi görevde kesinti oluştuğu belirtilir.
+4. **İlgili Event kayıtlarını oluşturmalıdır** (AR-002_73) — her süreklilik aksiyonu bir Event üretir.
+5. **Decision History ile ilişkilendirilebilmelidir** (15_KARAR_GEREKCESI_STANDARDI.md) — süreklilik kararları gerekçeleriyle kaydedilir.
+
+---
+
+### Yeniden Deneme Sınırı
+
+Üretim Sürekliliği Mimarisi, AR-002_22'de tanımlanan yeniden değerlendirme sınırına tabidir:
+
+* Maksimum yeniden değerlendirme sayısı: **3 (üç)** — `GC_MAX_RE_EVALUATION_COUNT` (AR-002_22 Bölüm 6.3).
+* 3 başarısız yeniden değerlendirme sonrasında süreklilik girişimleri durur.
+* Operasyonel eskalasyon başlatılır (AR-002_19).
+* Yöneticiye bildirim gönderilir.
+* Oturum askıya alınır.
+
+Bu sınır, sonsuz tekrar döngülerini ve kontrolsüz kurtarma işlemlerini engeller.
+
+---
+
+### Kontrollü Sonlandırma
+
+Üretimin güvenli şekilde devam ettirilemeyeceğinin anayasal olarak tespit edilmesi durumunda HLK:
+
+* Üretim sürecini kontrollü şekilde sonlandırabilir,
+* Durumu ilgili kayıt sistemlerine işlemekle yükümlüdür:
+  * PID üzerinden Production Package'e sonlandırma kaydı,
+  * EVENT_VIDEO_PRODUCTION_FAILED Event'i (varsa ilgili OLAY tanımı),
+  * Decision History'ye sonlandırma gerekçesi,
+  * Operasyonel eskalasyon kaydı.
+
+Kontrollü sonlandırma, üretim başarısızlığı değildir. Anayasal olarak tanımlanmış, gerekçeli ve kayıt altına alınmış bir süreç sonlandırmasıdır.
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* Üretim kesintilerine karşı süreklilik mekanizmasını tanımlar,
+* Süreklilik aksiyonlarının kayıt altına alınmasını standartlaştırır,
+* Yeniden deneme sınırlarını ve kontrollü sonlandırma koşullarını belirler.
+
+Bu mimari;
+
+* Yeni karar üretmez — karar değişikliği gerektiğinde Decision Engine'i çağırır.
+* Yeni servis seçmez — servis seçimi AR-002_75'in sorumluluğundadır.
+* Kalite değerlendirmesi yapmaz — bu QR-004 ve FEAT-010'indir.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — süreklilik ANA YASA'ya tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — süreklilik işlemleri denetlenebilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — süreklilik karar vermez, HLK'ya yönlendirir |
+| **AR** | AR-002_7 | Eş Zamanlı Ajan Çalıştırma — timeout yönetimi |
+| **AR** | AR-002_19 | Ajan Sürekliliği ve Operasyonel Eskalasyon — temel dayanak |
+| **AR** | AR-002_21 | Ajan Değiştirme ve Yeniden Seçim — alternatife geçiş |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — yeniden değerlendirme ve sayaç sınırı |
+| **AR** | AR-002_57 | PID standardı — tüm süreklilik kayıtları PID ile ilişkilendirilir |
+| **AR** | AR-002_72 | Production Package Runtime — kayıtların saklanacağı kapsayıcı |
+| **AR** | AR-002_73 | Production Event Runtime — süreklilik Event kayıtları |
+| **AR** | AR-002_74 | Task Package Runtime Integration — görev seviyesinde izleme |
+| **AR** | AR-002_75 | Production Service Selection — yeni servis seçimi sınırı |
+| **AR** | AR-002_76 | Üretim Yürütme Mimarisi — Execution Result kaynağı |
+| **AR** | AR-002_78 | Video Üretim İş Akışı — üretim adımı bağlamı |
+| **OR** | OR-004 | Operasyonel Kurallar — API, kredi, kota yönetimi |
+| **GC** | GC_MAX_RE_EVALUATION_COUNT | Maksimum yeniden deneme sayısı |
+| **GC** | GC zaman limiti parametreleri | Timeout eşikleri |
+| **EEC** | 22_EXECUTION_EVENT_COLLECTOR.md | Süreklilik Event'lerinin toplanması |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Süreklilik kararlarının gerekçeleriyle kaydı |
+
+---
+
+### Beklenen Sonuç
+
+* Üretim kesintilerine karşı anayasal bir süreklilik mekanizması oluşturulur.
+* Üretim güvenli ve kontrollü şekilde devam ettirilebilir.
+* Süreklilik kararları tamamen izlenebilir hale gelir.
+* Yeni servis seçimi yalnızca HLK Karar Mekanizması tarafından yapılır.
+* Sonsuz tekrar döngüleri ve kontrolsüz kurtarma işlemleri engellenir.
+* Üretim süreci kesintilere rağmen anayasal bütünlüğünü korur.
+* Her süreklilik işlemi PID, Production Package ve Task Package ile ilişkilendirilir.
+* Süreklilik sağlanamadığında üretim kontrollü şekilde sonlandırılır ve gerekçesi kaydedilir.
+* Constitution Scan Engine, süreklilik işlemlerinin anayasal sınırlar içinde kaldığını doğrulayabilir.
+
+---
+
+## AR-002_80
+
+### Başlık
+
+**Üretim Kapanış Mimarisi — Production Closure Architecture**
+
+### Amaç
+
+HLK'nın Production Runtime sürecini anayasal kurallara uygun, eksiksiz, doğrulanabilir ve izlenebilir şekilde sonlandırmasını standartlaştırmak.
+
+### Kural
+
+HLK, bir üretim sürecini yalnızca anayasal kapanış kriterleri eksiksiz olarak sağlandığında tamamlanmış kabul edebilir.
+
+Bu ilke, MASTER-003'ün Production Runtime kapanışı özelinde uygulanmasıdır:
+
+> MASTER-003: "Bir değişiklik ancak ANA YASA Güncellendi + Kod Güncellendi + Runtime Davranışı Doğrulandı = TAMAMLANDI durumunda tamamlanmış kabul edilir."
+
+Production Runtime kapanışı da aynı ilkeye tabidir: tüm bileşenler tamamlanmadan, tüm Event'ler üretilmeden ve tüm doğrulamalar yapılmadan kapanış gerçekleştirilemez.
+
+---
+
+### Üretim Kapanış Mimarisinin Anayasal Konumu
+
+Üretim Kapanış Mimarisi, Production Runtime'ın **sonlandırma ve devir** katmanıdır:
+
+* kalite değerlendirmesi yapmaz (QR-004, FEAT-010),
+* teslim işlemini başlatmaz (AR-002_36),
+* arşivleme işlemini gerçekleştirmez (12_DIGITAL_ASSET_ARCHIVE.md),
+* kataloglama işlemini gerçekleştirmez (13_DIGITAL_ASSET_CATALOG.md),
+* yeni üretim başlatmaz (AR-002_70).
+
+Bu mimarinin görevi yalnızca Production Runtime'ın anayasal kapanışını gerçekleştirmek ve süreci bir sonraki anayasal katmana devredilmeye hazır hale getirmektir.
+
+---
+
+### Anayasal Kapanış Kriterleri
+
+Production Runtime kapatılmadan önce HLK en az aşağıdaki doğrulamaları yapmak zorundadır.
+
+| # | Kriter | Doğrulama Sorusu | Referans |
+|---|---|---|---|
+| 1 | **Production Runtime Tamamlanması** | Tüm üretim adımları başarıyla tamamlandı mı? | AR-002_70, AR-002_78 |
+| 2 | **PID Geçerliliği** | PID hâlâ geçerli ve değiştirilmemiş durumda mı? | AR-002_57, AR-002_71 |
+| 3 | **Production Package Eksiksizliği** | Tüm zorunlu bölümler dolduruldu mu? | AR-002_72, 16_PRODUCTION_PACKAGE_STANDARD.md |
+| 4 | **Task Package Tamamlanması** | Tüm Task Package'ler tamamlandı mı? | AR-002_74 |
+| 5 | **Açık Yürütme İşlemi** | Tamamlanmamış yürütme işlemi kaldı mı? | AR-002_76 |
+| 6 | **Final Video Varlığı** | Nihai video oluşturulmuş ve PP'ye kaydedilmiş mi? | AR-002_78, 16_PRODUCTION_PACKAGE_STANDARD.md Bölüm 21 |
+| 7 | **Zorunlu Üretim Çıktıları** | Tüm zorunlu çıktılar mevcut ve erişilebilir mi? | 16_PRODUCTION_PACKAGE_STANDARD.md |
+| 8 | **Açık Kritik Hata** | Çözülmemiş kritik hata bulunuyor mu? | AR-002_79, AR-002_19 |
+| 9 | **Açık Kritik Event** | Tamamlanmamış yaşam döngüsüne sahip Event var mı? | AR-002_73 |
+| 10 | **Üretimin Anayasal Bütünlüğü** | Tüm anayasal kurallara uyuldu mu? | MASTER-003, CEE |
+
+HLK, bu doğrulamaları kendi karar mekanizması ile değerlendirir (MASTER-004).
+
+---
+
+### Kapanış Çalışma Sırası
+
+Doğrulama sonucunda üretimin anayasal olarak tamamlandığına karar verilirse HLK, aşağıdaki kapanış sırasını takip eder.
+
+**Adım 1 — Production Runtime'ın Kapatılması**
+
+HLK, Production Runtime'ı kapatır.
+
+Kapatma ile:
+
+* STATE_VIDEO_PRODUCTION state'i sonlandırılır (SE-007_3),
+* Yeni yürütme işlemi başlatılamaz (AR-002_76),
+* Production Runtime kaynakları serbest bırakılır.
+
+Production Runtime kapatıldıktan sonra yeniden açılamaz. Yeni bir üretim için yeni bir STATE_VIDEO_PRODUCTION başlatılması gerekir (AR-002_70).
+
+**Adım 2 — Üretim Kapanış Event'inin Oluşturulması**
+
+HLK, Üretim Kapanış Event'ini oluşturur.
+
+Bu Event:
+
+* Production Event Runtime standardına uygundur (AR-002_73),
+* PID alanı zorunlu olarak içerir (AR-002_57),
+* EEC tarafından toplanır (22_EXECUTION_EVENT_COLLECTOR.md),
+* LAC üzerinden izlenebilir hale gelir (FEAT-015),
+* Production Package'in Event Logları bölümüne kaydedilir (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 16).
+
+**Adım 3 — Production Package Kapanış Bilgilerinin Güncellenmesi**
+
+HLK, Production Package'in kapanış bilgilerini günceller.
+
+Güncellenen alanlar:
+
+* Production Metadata (16_PRODUCTION_PACKAGE_STANDARD.md, Bölüm 2):
+  * Üretim durumu: "Tamamlandı" olarak işaretlenir,
+  * Üretim tamamlanma tarihi ve saati kaydedilir,
+* Production Package'in ilgili bölümleri son durumlarıyla korunur.
+
+**Adım 4 — Runtime Kapanış Zamanının Kayıt Altına Alınması**
+
+HLK, Runtime kapanış zamanını kayıt altına alır.
+
+Bu kayıt:
+
+* Production Metadata'ya işlenir,
+* PID ile ilişkilendirilir,
+* Toplam üretim süresinin hesaplanmasını sağlar (başlangıç → kapanış),
+* Decision History'ye eklenir (15_KARAR_GEREKCESI_STANDARDI.md).
+
+**Adım 5 — Üretim Durumunun İşaretlenmesi**
+
+HLK, üretim durumunu "Tamamlandı" olarak işaretler.
+
+Bu işaretleme:
+
+* Production Package Metadata'ya yazılır,
+* PID üzerinden sorgulanabilir,
+* STATE_SESSION_COMPLETED geçişine izin verir (SE-007_4).
+
+**Adım 6 — Sürecin Bir Sonraki Anayasal Katmana Devredilmesi**
+
+HLK, süreci bir sonraki anayasal katmana devredilmeye hazır hale getirir.
+
+Kapanış sonrası sıradaki süreçler:
+
+* **Quality Control** — Final video kalite değerlendirmesi (QR-004, FEAT-010),
+* **Delivery** — Nihai videonun kullanıcıya teslimi (AR-002_36),
+* **Archive** — Production Package'in arşivlenmesi (12_DIGITAL_ASSET_ARCHIVE.md),
+* **Catalog** — Dijital varlıkların kataloglanması (13_DIGITAL_ASSET_CATALOG.md).
+
+Bu mimari, bu süreçleri başlatmaz; yalnızca güvenli devir için hazır hale getirir.
+
+---
+
+### Kapanış Kriterleri Sağlanmadığında
+
+Anayasal kapanış kriterlerinden herhangi biri sağlanmıyorsa HLK:
+
+1. **Eksikliği kayıt altına almalıdır** — hangi kriterin sağlanmadığı, neden sağlanmadığı PID üzerinden kaydedilir.
+2. **Gerekiyorsa Üretim Sürekliliği Mimarisi'ni devreye almalıdır** (AR-002_79) — eksiklik giderilebilir nitelikteyse süreklilik aksiyonu uygulanır.
+3. **Gerekiyorsa HLK Karar Mekanizmasına geri dönmelidir** (MASTER-004, AR-002_22) — eksiklik yeni bir karar gerektiriyorsa Decision Engine'e yönlendirilir.
+
+Hiçbir üretim, anayasal kapanış işlemi tamamlanmadan tamamlanmış kabul edilemez.
+
+---
+
+### Kapanış Kayıtlarının İlişkilendirilmesi
+
+Üretim kapanışına ilişkin tüm kayıtlar aşağıdaki sistemlerle ilişkilendirilmelidir:
+
+| Kayıt Türü | İlişkilendirme | Referans |
+|---|---|---|
+| **PID** | Tüm kapanış kayıtları PID ile etiketlenir | AR-002_57 |
+| **Production Package** | Kapanış bilgileri PP Metadata'ya yazılır | AR-002_72, 16_PRODUCTION_PACKAGE_STANDARD.md |
+| **Event Kayıtları** | Kapanış Event'i PP Event Loglarına eklenir | AR-002_73 |
+| **Decision History** | Kapanış kararı gerekçesiyle kaydedilir | 15_KARAR_GEREKCESI_STANDARDI.md |
+| **EEC** | Kapanış Event'i EEC tarafından toplanır | 22_EXECUTION_EVENT_COLLECTOR.md |
+| **LAC** | Kapanış, LAC üzerinden görüntülenebilir | FEAT-015 |
+
+Tüm kapanış kayıtları geriye dönük olarak denetlenebilir olmalıdır.
+
+---
+
+### State Geçişi
+
+Üretim kapanışı tamamlandığında State Engine aşağıdaki geçişi gerçekleştirir (SE-007_4):
+
+```
+STATE_VIDEO_PRODUCTION
+→ EVENT_VIDEO_PRODUCTION_COMPLETED (OLAY-024)
+→ STATE_SESSION_COMPLETED
+```
+
+Bu geçiş, Production Runtime yaşam döngüsünün resmi olarak sonlandığını ve oturumun tamamlanma aşamasına geçtiğini gösterir.
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* Production Runtime'ın anayasal kapanış kriterlerini ve kapanış sırasını tanımlar,
+* Kapanış kayıtlarının ilişkilendirme standardını belirler,
+* Bir sonraki anayasal katmanlara güvenli devir noktasını oluşturur.
+
+Bu mimari;
+
+* Quality Control, Delivery, Archive veya Catalog süreçlerini başlatmaz — bu süreçler kendi anayasal mimarileri tarafından yönetilir.
+* Eksiklikleri gidermez — bu AR-002_79 (Üretim Sürekliliği) veya AR-002_22 (Feedback Loop) sorumluluğundadır.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — kapanış ANA YASA'ya tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — kapanış doğrulanabilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — kapanış kararı HLK'nındır |
+| **AR** | AR-002_19 | Ajan Sürekliliği — açık kritik hata kontrolü |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — gerektiğinde karar mekanizmasına dönüş |
+| **AR** | AR-002_36 | Scene Delivery — teslim sürecine devir |
+| **AR** | AR-002_57 | PID standardı — tüm kapanış kayıtları PID ile ilişkilendirilir |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — kapanışın başlangıç referansı |
+| **AR** | AR-002_71 | PID Runtime — PID geçerlilik doğrulaması |
+| **AR** | AR-002_72 | Production Package Runtime — PP kapanış güncellemesi |
+| **AR** | AR-002_73 | Production Event Runtime — kapanış Event'i |
+| **AR** | AR-002_74 | Task Package Runtime Integration — TP tamamlanma kontrolü |
+| **AR** | AR-002_76 | Üretim Yürütme Mimarisi — açık yürütme işlemi kontrolü |
+| **AR** | AR-002_78 | Video Üretim İş Akışı — final video varlığı |
+| **AR** | AR-002_79 | Üretim Sürekliliği Mimarisi — eksiklik durumunda devreye alma |
+| **SE** | SE-007_3 | STATE_VIDEO_PRODUCTION ve STATE_SESSION_COMPLETED tanımı |
+| **SE** | SE-007_4 | State geçiş kuralları — kapanış sonrası geçiş |
+| **OLAY** | OLAY-024 | EVENT_VIDEO_PRODUCTION_COMPLETED |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | Production Metadata güncellemesi |
+| **EEC** | 22_EXECUTION_EVENT_COLLECTOR.md | Kapanış Event'inin toplanması |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Kapanış kararının kaydı |
+| **FEAT** | FEAT-015 | Live Activity Center — kapanış izleme |
+| **VARLIK** | 12_DIGITAL_ASSET_ARCHIVE.md | Arşiv sürecine devir |
+| **VARLIK** | 13_DIGITAL_ASSET_CATALOG.md | Katalog sürecine devir |
+
+---
+
+### Beklenen Sonuç
+
+* Production Runtime anayasal kurallara uygun şekilde kapatılır.
+* Eksik üretimlerin tamamlanmış kabul edilmesi engellenir.
+* Üretim kapanışı tamamen doğrulanabilir ve izlenebilir hale gelir.
+* Production Package anayasal olarak kapanır.
+* Bir sonraki anayasal süreçlere (QC, Delivery, Archive, Catalog) güvenli geçiş sağlanır.
+* Üretim yaşam döngüsü anayasal olarak eksiksiz tamamlanmış olur.
+* Kapanış kriterleri sağlanmadığında üretim tamamlanmış kabul edilmez.
+* Tüm kapanış kayıtları PID üzerinden geriye dönük denetlenebilir.
+* Constitution Scan Engine, kapanış kriterlerinin tamamlandığını doğrulayabilir.

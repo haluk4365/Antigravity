@@ -7,6 +7,52 @@ HLK_01 projesine her giriş yaptığında veya yeni bir oturum başlattığında
 
 HLK projesinde **her "TEST BAŞLAT" komutu çalıştırılmadan önce** aşağıdaki işlemler zorunlu olarak uygulanacaktır.
 
+---
+
+### Referans UI ve Çalışan UI Ayrımı
+
+HLK içerisinde **Referans UI** ile **Çalışan UI** aynı kavram değildir.
+
+**Referans UI**
+
+Referans UI; Proje Yöneticisi tarafından onaylanan, ilgili form veya ekranın resmi tasarım spesifikasyonudur.
+
+Referans UI;
+
+* tasarım otoritesidir,
+* kullanıcı deneyimi standardıdır,
+* gelecekte yapılacak tüm geliştirmelerin tek görsel referansıdır.
+
+Referans UI hiçbir platformun teknik sınırlarına göre değiştirilmez.
+
+**Çalışan UI**
+
+Çalışan UI; Referans UI'nın belirli bir platform üzerinde çalışan uygulama karşılığıdır.
+
+Platform;
+
+* Telegram,
+* Web,
+* Desktop,
+* Mobil uygulama
+* veya gelecekte eklenecek başka bir istemci olabilir.
+
+Çalışan UI;
+
+* Referans UI'yı yeniden tasarlamaz,
+* Referans UI'yı değiştirmez,
+* Platformun teknik sınırları içerisinde mümkün olan en yüksek görsel, işlevsel ve kullanıcı deneyimi sadakati ile uygular.
+
+Platform tarafından desteklenmeyen bileşenler, aynı amacı yerine getiren resmi platform bileşenleri kullanılarak uygulanabilir.
+
+Bu durum anayasal sapma değildir.
+
+**Temel İlke**
+
+**Referans UI tasarım otoritesidir. Çalışan UI ise bu tasarımın platforma uyarlanmış uygulamasıdır. Platform adaptasyonu, Referans UI'nın değiştirilmesi anlamına gelmez.**
+
+---
+
 1. **FORMLAR klasörünü tara.** `HLK_01_asistan/FORMLAR/` dizini içerisinde bulunan tüm `REFERANS_*.png` dosyalarını tespit et.
 
 2. **Aynı isimde klasörü kontrol et.** Her Referans Form `.png` dosyası için **aynı `FORMLAR/` klasörü içerisinde** aynı isimde bir klasörün bulunup bulunmadığını kontrol et. (Örnek: `REFERANS_SENARYO_ONAY_FORMU.png` → `REFERANS_SENARYO_ONAY_FORMU/`)
