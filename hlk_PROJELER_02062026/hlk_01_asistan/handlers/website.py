@@ -1699,20 +1699,6 @@ async def _run_sahne13_flow(
     # PNG render kullanılmaz; Telegram resmi bileşenleriyle uygulanır
     # ════════════════════════════════════════════════════════════════
     data = _build_scenario_data(user_data)
-    # Sahneleri enrich et (test script'indeki detaylı anlatımlar)
-    story_sahneler = [
-        {"no": 1, "baslik": "Dikkat Çekici Giriş", "zaman": "0:00 – 0:02", "sure": "2 sn",
-         "aciklama": "Güneşli bir sabah, şehir merkezinde modern bir kafede oturan genç kadın, çantasından HLK Vitamin C Serum'u çıkarıyor. Işık ürünün üzerine düşüyor, ambalaj parlıyor."},
-        {"no": 2, "baslik": "Ürün Tanıtımı", "zaman": "0:02 – 0:05", "sure": "3 sn",
-         "aciklama": "Serum yakın planda. Altın damlalık şişeden çıkan portakal rengi sıvı, cilde temas ediyor. Yüksek C vitamini içeriği ekranda vurgulanıyor."},
-        {"no": 3, "baslik": "Kullanım Gösterimi", "zaman": "0:05 – 0:08", "sure": "3 sn",
-         "aciklama": "Kadın serumu parmak uçlarıyla nazikçe cildine uyguluyor. Yüzünde ferah bir gülümseme beliriyor. Ayna karşısında cildine bakıyor."},
-        {"no": 4, "baslik": "Faydalar", "zaman": "0:08 – 0:11", "sure": "3 sn",
-         "aciklama": "Ekran bölünüyor: solda serum öncesi yorgun cilt, sağda serum sonrası aydınlık ve canlı cilt. Aydınlatma, ton eşitleme, nemlendirme ikonları beliriyor."},
-        {"no": 5, "baslik": "Kapanış — CTA", "zaman": "0:11 – 0:12", "sure": "1 sn",
-         "aciklama": "HLK Cosmetics logosu ve 'Işıltını Keşfet' sloganı. Ürün fiyatı ve sipariş linki alt köşede."},
-    ]
-    data["sahneler"] = story_sahneler
 
     html = _build_senaryo_html(data)
 
@@ -1850,7 +1836,8 @@ def _build_scenario_data(user_data: dict) -> dict:
             "tarih": date.today().strftime("%d.%m.%Y"),
         },
         "hikaye": (
-            f"{platform} platformunda {fmt} formatında, {duration} saniyelik "
+            f"{brand} — {product_name} için {platform} platformunda "
+            f"{fmt} formatında, {duration} saniyelik "
             f"{style} tarzında bir ürün tanıtım videosu hazırlanacaktır. "
             f"Hedef kitle: {audience}. Seslendirme: {voice_lang}, {voice_char}."
         ),
