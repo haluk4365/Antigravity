@@ -10,6 +10,9 @@ Hardcoded değerler yalnızca Flow Diagram verisi yoksa fallback olarak kullanı
 import asyncio
 import logging
 import random
+import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
@@ -2160,14 +2163,42 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
         return
 
 
-def _build_banka_bilgileri_karti(price: float = 0, tcmb: float = 46.87, lang: str = "tr") -> str:
+TCMB_KUR_URL = "https://www.tcmb.gov.tr/kurlar/today.xml"
+TCMB_KUR_FALLBACK = 46.87  # Sadece API erisilemezse kullanilir
+
+
+def _get_tcmb_kur() -> float:
+    """TCMB'den canli USD doviz satis kurunu getirir.
+
+    Her cagrida TCMB XML servisinden guncel kuru ceker.
+    API'ye erisilemezse fallback deger dondurur.
+    """
+    try:
+        req = urllib.request.Request(TCMB_KUR_URL, headers={"User-Agent": "HLK/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            xml_data = resp.read().decode("utf-8")
+        root = ET.fromstring(xml_data)
+        for currency in root.findall("Currency"):
+            if currency.get("Kod") == "USD":
+                selling = currency.find("ForexSelling")
+                if selling is not None and selling.text:
+                    kur = float(selling.text)
+                    logger.info(f"💱 TCMB USD Kur: {kur} TL (canli)")
+                    return kur
+        logger.warning(f"💱 TCMB XML'de USD bulunamadi, fallback: {TCMB_KUR_FALLBACK}")
+        return TCMB_KUR_FALLBACK
+    except Exception as e:
+        logger.warning(f"💱 TCMB kur cekilemedi: {e}, fallback: {TCMB_KUR_FALLBACK}")
+        return TCMB_KUR_FALLBACK
+
+
+def _build_banka_bilgileri_karti(price: float = 0, tcmb: float = None, lang: str = "tr") -> str:
     """AR-002_65: HLK BANKA ÖDEME BİLGİLERİ KARTI — Fiyat + IBAN + Uyarı.
 
     FD-008_1: Kullanıcı Fiyat Teklifi onaylandıktan sonra gönderilir.
     """
-    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    satis_tl = round(price * tcmb, 2)
-
+    if tcmb is None:
+        tcmb = _get_tcmb_kur()
     lines = [
         "<code>✅Brief › ✅Senaryo › ✅Fiyat › ✅Ödeme</code>",
         f"{SEP}",
@@ -2205,7 +2236,9 @@ def _build_banka_bilgileri_karti(price: float = 0, tcmb: float = 46.87, lang: st
     return "\n".join(lines)
 
 
-def _build_odeme_bilgileri_karti(price: float = 0, tcmb: float = 46.87) -> str:
+def _build_odeme_bilgileri_karti(price: float = 0, tcmb: float = None) -> str:
+    if tcmb is None:
+        tcmb = _get_tcmb_kur()
     """AR-002_65: Ödeme Bilgileri Kartı — HLK Teklif Fiyatı + Banka + Uyarı.
 
     Bağımsız bir kart olarak kullanılabilir (test ve form entegrasyonu için).
@@ -2240,7 +2273,7 @@ def _build_user_pricing_form(user_data: dict, price: str, yonetici_fiyat: float 
     resolution = user_data.get("video_resolution", "—")
     url = user_data.get("website_url", "—")
     product_name = url.split("/")[-1] if "/" in url else "Ürün"
-    tcmb_kur = 46.87
+    tcmb_kur = _get_tcmb_kur()  # TCMB canli kur
 
     from datetime import datetime
     pid = f"PID-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
@@ -2355,7 +2388,7 @@ def _build_admin_odeme_bildirimi(user_data: dict) -> str:
 
     lang = get_lang(user_data)
     kdvli = user_data.get("_computed_kdvli", 0)
-    tcmb_kur = 46.87
+    tcmb_kur = _get_tcmb_kur()  # TCMB canli kur
     satis_tl = round(kdvli * tcmb_kur, 2)
     url = user_data.get("website_url", "—")
     product_name = url.split("/")[-1] if "/" in url else "Ürün"
