@@ -1843,13 +1843,22 @@ def _build_scenario_data(user_data: dict) -> dict:
         ),
         "sahneler": [
             {"no": 1, "gorsel": "https://via.placeholder.com/160x100.png?text=1",
-             "baslik": "Dikkat Çekici Giriş", "aciklama": "Ürünle günlük yaşam sahnesi.",
+             "baslik": "Dikkat Çekici Giriş",
+             "aciklama": (f"{brand} {product_name} ürünü günlük yaşamın içinde doğal bir anda gösterilir. "
+                          "İlk 2 saniyede izleyicinin dikkati ürüne çekilir. "
+                          "Görsel olarak etkileyici, merak uyandıran bir açılış sahnesi."),
              "zaman": "0:00 – 0:02", "sure": "2 sn"},
             {"no": 2, "gorsel": "https://via.placeholder.com/160x100.png?text=2",
-             "baslik": "Ürün Tanıtımı", "aciklama": "Ürün ve içerik vurgusu.",
+             "baslik": "Ürün Tanıtımı ve Özellikler",
+             "aciklama": (f"Ürün yakın planda detaylı gösterilir. {brand} kalitesi ve "
+                          f"{product_name}'in öne çıkan özellikleri vurgulanır. "
+                          "Kullanım alanları, faydaları ve rakiplerinden ayrışan yönleri sunulur."),
              "zaman": "0:02 – 0:05", "sure": "3 sn"},
             {"no": 3, "gorsel": "https://via.placeholder.com/160x100.png?text=3",
-             "baslik": "Kapanış", "aciklama": "Kısa kapanış ve çağrı (CTA).",
+             "baslik": "Kapanış — Harekete Geçirici Mesaj (CTA)",
+             "aciklama": (f"{brand} logosu ve ürün bilgisi ekranda belirir. "
+                          "İzleyiciyi satın almaya veya daha fazla bilgi edinmeye yönlendiren "
+                          "net ve güçlü bir çağrı mesajı. Sipariş linki veya iletişim bilgisi sunulur."),
              "zaman": "0:05 – 0:07", "sure": "2 sn"},
         ],
         "toplamSure": f"{duration} sn" if duration != "—" else "—",
