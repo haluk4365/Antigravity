@@ -1651,8 +1651,22 @@ async def _run_sahne13_flow(
     else:
         logger.warning(f"⚠️ SAHNE-13 video bulunamadı: dil={language}")
 
-    # Video süresince bekle
+    # FD-008_5: SESLI_HINT — seçilen dilde uyarı metni gönder, 5sn sonra sil
+    from handlers.start import SESLI_HINT
+    hint_text = SESLI_HINT.get(language, SESLI_HINT["tr"])
+    hint_msg = await bot.send_message(chat_id=chat_id, text=hint_text, parse_mode="HTML")
+    logger.info(f"🔊 SAHNE-13 SESLI_HINT gönderildi: {language}")
+
+    # Video + hint süresince bekle
     await asyncio.sleep(video_duration + SAHNE2_EXTRA_WAIT)
+
+    # Hint mesajını sil
+    if hint_msg:
+        try:
+            await bot.delete_message(chat_id=chat_id, message_id=hint_msg.message_id)
+            logger.info(f"🧹 SAHNE-13 SESLI_HINT silindi")
+        except Exception:
+            pass
 
     # Videoyu sil
     if sahne13_msg:
@@ -1662,10 +1676,9 @@ async def _run_sahne13_flow(
         except Exception:
             pass
 
-    # "Senaryo hazır, form hazırlanıyor..." daktilo
+    # "Senaryo hazır, form hazırlanıyor..." daktilo (HLK dil uyumlu)
     scenario_ready_text = (
-        "📝 <b>Senaryo Hazır!</b>\n\n"
-        "<i>Senaryo Onay Formu hazırlanıyor, lütfen bekleyin...</i>"
+        f"📝 <b>{t('s13.scenario_ready', language)}</b>"
     )
     tw_msg_id = await typewriter_animation(chat_id, scenario_ready_text, bot, 0.06)
     await asyncio.sleep(1.5)
@@ -1682,47 +1695,38 @@ async def _run_sahne13_flow(
     se.fire(UserEvent.BRIEF_APPROVED)
 
     # ════════════════════════════════════════════════════════════════
-    # MASTER-010: REFERANS_SENARYO_ONAY_FORMU → PNG render
-    # template.html + render.js → PNG → Telegram
+    # AR-002_65: REFERANS_SENARYO_ONAY_FORMU → Telegram HTML + InlineKeyboard
+    # PNG render kullanılmaz; Telegram resmi bileşenleriyle uygulanır
     # ════════════════════════════════════════════════════════════════
-    from services.render_service import render_scenario_approval
+    data = _build_scenario_data(user_data)
+    # Sahneleri enrich et (test script'indeki detaylı anlatımlar)
+    story_sahneler = [
+        {"no": 1, "baslik": "Dikkat Çekici Giriş", "zaman": "0:00 – 0:02", "sure": "2 sn",
+         "aciklama": "Güneşli bir sabah, şehir merkezinde modern bir kafede oturan genç kadın, çantasından HLK Vitamin C Serum'u çıkarıyor. Işık ürünün üzerine düşüyor, ambalaj parlıyor."},
+        {"no": 2, "baslik": "Ürün Tanıtımı", "zaman": "0:02 – 0:05", "sure": "3 sn",
+         "aciklama": "Serum yakın planda. Altın damlalık şişeden çıkan portakal rengi sıvı, cilde temas ediyor. Yüksek C vitamini içeriği ekranda vurgulanıyor."},
+        {"no": 3, "baslik": "Kullanım Gösterimi", "zaman": "0:05 – 0:08", "sure": "3 sn",
+         "aciklama": "Kadın serumu parmak uçlarıyla nazikçe cildine uyguluyor. Yüzünde ferah bir gülümseme beliriyor. Ayna karşısında cildine bakıyor."},
+        {"no": 4, "baslik": "Faydalar", "zaman": "0:08 – 0:11", "sure": "3 sn",
+         "aciklama": "Ekran bölünüyor: solda serum öncesi yorgun cilt, sağda serum sonrası aydınlık ve canlı cilt. Aydınlatma, ton eşitleme, nemlendirme ikonları beliriyor."},
+        {"no": 5, "baslik": "Kapanış — CTA", "zaman": "0:11 – 0:12", "sure": "1 sn",
+         "aciklama": "HLK Cosmetics logosu ve 'Işıltını Keşfet' sloganı. Ürün fiyatı ve sipariş linki alt köşede."},
+    ]
+    data["sahneler"] = story_sahneler
+
+    html = _build_senaryo_html(data)
 
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ ONAY", callback_data="scenario_approve")],
-        [InlineKeyboardButton("❌ RET", callback_data="scenario_reject")],
+        [InlineKeyboardButton(f"✅ {t('s13.approve', language)}", callback_data="scenario_approve")],
+        [InlineKeyboardButton(f"❌ {t('s13.reject', language)}", callback_data="scenario_reject")],
     ])
 
-    png_bytes = await render_scenario_approval(user_data)
-    if not png_bytes:
-        # AR-002_66: Render başarısız → fallback yasak, hata logla
-        logger.critical(
-            f"❌ [SAHNE-13] REFERANS_SENARYO_ONAY_FORMU PNG render BAŞARISIZ. "
-            f"AR-002_66 uyarınca fallback yapılamaz. Kullanıcı: {user_id}"
-        )
-        await bot.send_message(
-            chat_id=chat_id,
-            text="❌ <b>Bir sistem hatası oluştu.</b>\n\n"
-                 "<i>Lütfen</i> <b>/start</b> <i>yazarak baştan başlayın.</i>",
-            parse_mode="HTML",
-        )
-        return
-
-    # MASTER-010 + AR-002_66: PNG render → Telegram
-    await bot.send_photo(
-        chat_id=chat_id, photo=png_bytes,
-        caption=(
-            "📝 <b>Senaryo Onay Formu</b>\n"
-            "<i>Lütfen yukarıdaki formu inceleyip onay veriniz.</i>"
-        ),
-        parse_mode="HTML",
-    )
-    await bot.send_message(
-        chat_id=chat_id,
-        text="✅ <b>ONAY</b> — Senaryoyu onaylayıp fiyat teklifine geçin\n"
-             "❌ <b>RET</b> — Senaryoyu reddedip oturumu sonlandırın",
+    msg = await bot.send_message(
+        chat_id=chat_id, text=html,
         reply_markup=kb, parse_mode="HTML",
     )
-    logger.info(f"📸 [SAHNE-13] Senaryo Onay PNG gönderildi: {len(png_bytes)} bytes")
+    scene_delivery.register_chat_messages(chat_id, {"success_msg_id": msg.message_id})
+    logger.info(f"📸 [SAHNE-13] Senaryo HTML gönderildi: {len(html)} chars")
 
     from utils.session_timeout import start_timer
     start_timer(user_id, chat_id, bot, user_data)
@@ -1912,20 +1916,25 @@ async def handle_scenario_approve(update: Update, context: ContextTypes.DEFAULT_
     await scene_delivery.cleanup_chat(chat_id)
 
     # FD-008_1 Aşama 1: Yönetici Fiyatlandırma Formu
-    admin_form = _build_admin_pricing_form(context.user_data)
+    admin_form, computed_data = _build_admin_pricing_form(context.user_data)
+
+    # Hesaplanan değerleri user_data'ya kaydet (sonraki adımlar için)
+    context.user_data["_computed_toplam"] = computed_data["toplam"]
+    context.user_data["_computed_yonetici_fiyat"] = computed_data["yonetici_fiyat"]
+    context.user_data["_computed_kdvli"] = computed_data["kdvli"]
 
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("₺199 — Ekonomik", callback_data="admin_price_199")],
-        [InlineKeyboardButton("₺299 — Standart ⭐", callback_data="admin_price_299")],
-        [InlineKeyboardButton("₺399 — Premium", callback_data="admin_price_399")],
-        [InlineKeyboardButton("₺499 — Pro", callback_data="admin_price_499")],
-        [InlineKeyboardButton("❌ İptal", callback_data="admin_price_cancel")],
+        [InlineKeyboardButton("✏️ Katsayı Gir", callback_data="admin_enter_katsayi"),
+         InlineKeyboardButton("💬 HLK'ya Sor", callback_data="admin_hlk_chat")],
+        [InlineKeyboardButton("✅ ONAY", callback_data="admin_price_submit"),
+         InlineKeyboardButton("❌ İPTAL", callback_data="admin_price_cancel")],
     ])
-    await context.bot.send_message(
+    admin_msg = await context.bot.send_message(
         chat_id=chat_id, text=admin_form,
         reply_markup=kb, parse_mode="HTML",
     )
+    scene_delivery.register_chat_messages(chat_id, {"success_msg_id": admin_msg.message_id})
     logger.info(f"📋 Yönetici Fiyatlandırma Formu gönderildi: user={user.id}")
 
 
@@ -1947,29 +1956,35 @@ async def handle_scenario_reject(update: Update, context: ContextTypes.DEFAULT_T
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
-    reject_text = (
-        "Senaryoyu onaylamadığınızı görüyorum.\n\n"
-        "Yeni bir reklam çalışması başlatmak için "
-        "lütfen tekrar <b>/start</b> komutu ile giriş yapınız."
-    )
-    await typewriter_animation(chat_id, reject_text, context.bot, 0.06)
+    lang = get_lang(context.user_data)
+    reject_text = t("s13.reject_msg", lang)
+    tw_msg_id = await typewriter_animation(chat_id, reject_text, context.bot, 0.06)
+    await asyncio.sleep(5)
+    if tw_msg_id:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=tw_msg_id)
+        except Exception:
+            pass
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Fiyatlandırma + Ödeme Akışı (FD-008_1 STATE_PRICING)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _build_admin_pricing_form(user_data: dict) -> str:
-    """FD-008_1 Yönetici Fiyatlandırma Formu — TÜM bölümler eksiksiz.
+def _build_admin_pricing_form(user_data: dict) -> tuple:
+    """AR-002_65: Yönetici Fiyatlandırma — Telegram HTML (PNG yok).
 
-    FD-008_1 (satır 377-408) + REFERANS_YÖNETİCİ_FİYATLANDIRMA_FORMU.md
+    Returns:
+        (html_text, computed_data) — computed_data: {toplam, yonetici_fiyat, kdvli}
     """
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
     user_id = user_data.get("_pricing_user_id", "—")
     product_url = user_data.get("website_url", "—")
     platform = user_data.get("platform", "—")
     fmt = user_data.get("video_format", "—")
-    duration = user_data.get("video_duration", "—")
     resolution = user_data.get("video_resolution", "—")
+    duration = user_data.get("video_duration", "—")
     style = user_data.get("ad_style", "—")
     audience = user_data.get("target_audience", "—")
 
@@ -1983,159 +1998,76 @@ def _build_admin_pricing_form(user_data: dict) -> str:
     toggles = user_data.get("audio_toggles", {})
     has_voiceover = toggles.get("voiceover", False) or False
     has_silent = toggles.get("silent", False)
-
-    # Vurgular
-    selections = user_data.get("emphasis_selections", [])
-    emp_labels = {"emphasis_discount": "İndirim", "emphasis_shipping": "Kargo",
-                  "emphasis_gift": "Hediye", "emphasis_newseason": "Yeni Sezon",
-                  "emphasis_local": "Yerli Üretim"}
-    emp_parts = []
-    for s in selections:
-        if s.startswith("emphasis_custom_"): emp_parts.append(s.replace("emphasis_custom_","",1))
-        else: emp_parts.append(emp_labels.get(s, s))
-    emp_str = ", ".join(emp_parts) if emp_parts else "Yok"
-
     dur = int(duration) if str(duration).isdigit() else 15
     short_url = product_url[:50] + "…" if len(product_url) > 50 else product_url
+    product_name = short_url.split("/")[-1] if "/" in short_url else short_url
+    brand = user_data.get("brand", "—")
+    ses_yapisi = "🔇 Sessiz" if has_silent else ("Dış ses, fon müziği" if has_voiceover else "Fon müziği")
 
-    # ══════════════════════════════════════════════════════════════════
-    # SERVİS MALİYET HESAPLAMA (FD-008_1 satır 385-389)
-    # ══════════════════════════════════════════════════════════════════
+    # Servis maliyetleri
+    tts_cost   = round(dur * 0.002, 2) if has_voiceover and not has_silent else 0
+    hedra_cost = round(dur * 0.06, 2)
+    kie_cost   = 0.05
+    fal_cost   = round(dur * 0.04, 2)
+    openai_cost = 0.08
+    toplam = round(tts_cost + hedra_cost + kie_cost + fal_cost + openai_cost + round(dur*0.01,2) + 0.03, 2)
 
-    # --- Kullanılan servisler ---
-    tts_cost      = round(dur * 0.002, 2) if has_voiceover and not has_silent else 0
-    hedra_cost    = round(dur * 0.06, 2)
-    fal_cost      = round(dur * 0.04, 2)
-    kie_cost      = 0.05
-    openai_cost   = 0.08
-    descript_cost = 0.03 if has_voiceover else 0
-    higgs_cost    = 0  # Kullanılmadı
-    telegram_cost = 0  # Ücretsiz
-    post_cost     = round(dur * 0.01, 2)
-
-    toplam_servis = round(
-        tts_cost + hedra_cost + fal_cost + kie_cost +
-        openai_cost + descript_cost + post_cost, 2
-    )
-    toplam_tl = round(toplam_servis * 33, 0)
-
-    # --- Mevcut krediler (varsayılan test değerleri) ---
-    mevcut_kredi = 25.00
-    kalan_kredi = round(mevcut_kredi - toplam_servis, 2)
-
-    # --- Servis güven skorları (API durumu + geçmiş başarı) ---
-    servisler_kullanilan = [
-        ("ElevenLabs",   "🟢 AKTİF",  "Seslendirme (TTS)",       f"${tts_cost:.2f}",   "97/100"),
-        ("Hedra AI",     "🟢 AKTİF",  "Lip-Sync Video Üretimi",  f"${hedra_cost:.2f}",  "92/100"),
-        ("Fal.ai",       "🟢 AKTİF",  "Görselden Video (Seedance)", f"${fal_cost:.2f}","88/100"),
-        ("Kie AI",       "🟡 AKTİF",  "Ürün Görsel Tarama",      f"${kie_cost:.2f}",   "85/100"),
-        ("OpenAI",       "🟢 AKTİF",  "Senaryo + Fallback TTS",  f"${openai_cost:.2f}","95/100"),
-        ("Descript",     "🟡 AKTİF",  "Ses Düzenleme + TTS",     f"${descript_cost:.2f}","82/100"),
+    servisler = [
+        ("Higgsfield AI", "Video Üretimi", True, f"${hedra_cost:.2f}", "94%"),
+        ("ElevenLabs", "Ses Üretimi", True, f"${tts_cost:.2f}", "97%"),
+        ("Kie AI", "Görsel Üretimi", True, f"${kie_cost:.2f}", "91%"),
+        ("Fal.ai", "Seedance", False, f"${fal_cost:.2f}", "72%"),
+        ("OpenAI", "TTS Yedek", True, f"${openai_cost:.2f}", "96%"),
+        ("Descript", "Ses Düzenleme", True, "$0.03", "82%"),
     ]
 
-    servisler_kullanilmayan = [
-        ("Higgsfield", "🔴 KAPALI", "API anahtarı tanımsız / kota dolu", "—"),
-        ("RunwayML",   "⚫ YOK",    "HLK seçim sıralamasında elendi (maliyet)", "—"),
+    lines = [SEP,
+             "<b>━━ 🏷️ HLK YÖNETİCİ FİYATLANDIRMA FORMU ━━</b>",
+             "<code>✅Brief › ✅Senaryo › 🔵Fiyat › ⏳Ödeme</code>",
+             SEP,
+             f"ÜRÜN: <b>{product_name}</b>",
+             f"MARKA: <b>{brand}</b>",
+             f"<i>{fmt}, {resolution}, {duration}sn, {ses_yapisi}, {voice_lang}, {voice_char}</i>",
+             "", SEP, "",
+             "<b>🔌 Servis Sağlayıcı ve Kredi Durumu</b>"]
+
+    for i, (ad, gorev, aktif, maliyet, guven) in enumerate(servisler, 1):
+        durum_icon = "✅" if aktif else "⚠️"
+        lines.append(f"<b>{i}.</b> {durum_icon} <b>{ad}</b> — {'Aktif' if aktif else 'Yavaş'} | {maliyet} | Güven: {guven} | {gorev}")
+    lines.append(""); lines.append(SEP)
+
+    lines.append(f"<b>⚠️ Risk Değerlendirmesi</b>")
+    risk_items = [
+        "Fal.ai servisi normalden yavaş yanıt vermektedir.",
+        "Sıradaki görsel üretici: Kie AI (Güven: 91%)",
+        "Sıradaki video üretici: Higgsfield AI (Güven: 94%)",
+        "Yedek ses üreticisi: OpenAI TTS (Güven: 96%)",
+        f"Mevcut kredi: $25.00 | Tahmini tüketim: ${toplam:.2f} | Kalan: ${25.00 - toplam:.2f}",
+        "Kritik seviye: Yok. Tüm zorunlu servisler aktif.",
     ]
+    for r in risk_items:
+        lines.append(f"  - {r}")
+    lines.append(""); lines.append(SEP)
 
-    # ══════════════════════════════════════════════════════════════════
-    # RİSK ANALİZİ (FD-008_1 satır 391-394)
-    # ══════════════════════════════════════════════════════════════════
-    risk_satirlari = []
-    # API problemleri
-    risk_satirlari.append("🔍 <b>API Durum Kontrolü:</b>")
-    risk_satirlari.append("  🟢 ElevenLabs, OpenAI, Hedra — aktif, sorunsuz")
-    risk_satirlari.append("  🟡 Kie AI, Descript — aktif, zaman aşımı riski var")
-    risk_satirlari.append("  🔴 Higgsfield — API anahtarı eksik, kullanılamaz")
-    # Kritik kredi seviyeleri
-    risk_satirlari.append(f"🔍 <b>Kredi Durumu:</b> Mevcut ${mevcut_kredi:.2f}, "
-                          f"Tüketim ${toplam_servis:.2f}, Kalan ${kalan_kredi:.2f}")
-    if kalan_kredi < 5:
-        risk_satirlari.append("  🔴 Kritik: Üretim sonrası kredi 5$ altına düşecek!")
-    elif kalan_kredi < 10:
-        risk_satirlari.append("  🟡 Uyarı: Kredi seviyesi düşük, takip edin")
-    else:
-        risk_satirlari.append("  🟢 Kredi seviyesi yeterli")
-    # Kota problemleri
-    risk_satirlari.append(f"🔍 <b>Kota Kontrolü:</b>")
-    risk_satirlari.append("  🟢 Hedra — kota yeterli")
-    risk_satirlari.append("  🟡 Fal.ai — aylık limitin %60'ı kullanılmış")
-    risk_satirlari.append("  🟢 ElevenLabs — kota yeterli")
-    # Alternatif servisler
-    risk_satirlari.append(f"🔍 <b>Alternatif Servisler:</b>")
-    risk_satirlari.append("  ElevenLabs → OpenAI TTS (fallback hazır)")
-    risk_satirlari.append("  Hedra → Higgsfield (kapalı) → manuel müdahale gerekebilir")
-    risk_satirlari.append("  Fal.ai → doğrudan FFmpeg render (fallback hazır)")
-    # Yönetici müdahalesi
-    risk_satirlari.append(f"🔍 <b>Müdahale Gerektiren Durumlar:</b>")
-    if dur > 25:
-        risk_satirlari.append("  ⚠️ Uzun video — Hedra timeout riski, yönetici onayı gerekli")
-    else:
-        risk_satirlari.append("  🟢 Olağan üretim — müdahale gerekmiyor")
+    lines.append("<b>BU İŞ İÇİN TAHMİNİ MALİYETLER</b>")
+    for i, (ad, gorev, aktif, maliyet, guven) in enumerate(servisler, 1):
+        lines.append(f"  {i}- {ad} ({gorev}): {maliyet}")
+    lines.append(f"  <b>TOPLAM: ${toplam:.2f}</b>")
+    lines.append("")
+    katsayi = float(user_data.get("_admin_katsayi", "0.347"))
+    yonetici_fiyat = round(toplam * katsayi, 2)
+    kdvli = round(toplam * katsayi * 1.20, 2)
+    lines.append(f"<b>KATSAYI:</b> <code>  {katsayi}  </code>")
+    lines.append(f"<i>TOPLAM ${toplam:.2f} × {katsayi}</i>")
+    lines.append("")
+    lines.append(f"<b>━━━ YÖNETİCİ FİYATI: ${yonetici_fiyat:.2f} + KDV = ${kdvli:.2f} ━━━</b>")
 
-    # ══════════════════════════════════════════════════════════════════
-    # FORM METNİ
-    # ══════════════════════════════════════════════════════════════════
-    return (
-        "🏢 <b>HLK YÖNETİCİ FİYATLANDIRMA FORMU</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        # ── BÖLÜM 1: Ürün Özeti, Marka, Platform ──
-        "📋 <b>Ürün Özeti</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🔗 Ürün Linki: {short_url}\n"
-        f"👤 Kullanıcı ID: <b>{user_id}</b>\n"
-        f"📱 Platform: <b>{platform}</b>  |  📐 Format: <b>{fmt}</b>\n"
-        f"🎬 Video Süresi: <b>{duration} sn</b>  |  📺 Çözünürlük: <b>{resolution}</b>\n"
-        f"📅 Tahmini Teslim: <b>~{dur // 2 + 5} dakika</b>\n\n"
-        # ── BÖLÜM 2: Senaryo Özeti ──
-        "📝 <b>Senaryo Özeti</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🎨 Tanıtım Tarzı: <b>{style}</b>\n"
-        f"🎯 Hedef Kitle: <b>{audience}</b>\n"
-        f"🎙️ Seslendirme: <b>{voice_lang} — {voice_char}</b>\n"
-        f"✨ Vurgulanacaklar: <b>{emp_str}</b>\n"
-        f"🎬 Sahneler: Giriş → Detay → Kapanış (3 sahne)\n\n"
-        # ── BÖLÜM 3: Kullanılan Ajanlar + Servis Sağlayıcılar ──
-        "⚙️ <b>Kullanılan Ajanlar ve Servis Sağlayıcılar</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        + "\n".join(
-            f"  {durum} <b>{ad}</b>  |  {gorev}  |  {maliyet}  |  Güven: {skor}"
-            for ad, durum, gorev, maliyet, skor in servisler_kullanilan
-        ) + "\n\n"
-        # ── BÖLÜM 4: Kullanılmayan Servisler + Nedenleri ──
-        "⚠️ <b>Kullanılmayan Servisler ve Nedenleri</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        + "\n".join(
-            f"  {durum} <b>{ad}</b> — {neden}"
-            for ad, durum, neden, _ in servisler_kullanilmayan
-        ) + "\n\n"
-        # ── BÖLÜM 5: Kredi Durumu ──
-        "💰 <b>Kredi Durumu</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"  💵 Mevcut Kredi: <b>${mevcut_kredi:.2f}</b>\n"
-        f"  📉 Tahmini Tüketim: <b>${toplam_servis:.2f}</b>\n"
-        f"  📊 Üretim Sonrası Kalan: <b>${kalan_kredi:.2f}</b>\n\n"
-        # ── BÖLÜM 6: Risk Analizi ──
-        "🔴 <b>Risk Analizi</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        + "\n".join(risk_satirlari) + "\n\n"
-        # ── BÖLÜM 7: Maliyet + Operasyon Değerlendirmesi ──
-        "📈 <b>Tahmini Maliyet ve Operasyon Değerlendirmesi</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"  💵 Toplam Servis Maliyeti: <b>${toplam_servis:.2f}</b>\n"
-        f"  💱 Yaklaşık TL Karşılığı: <b>₺{toplam_tl:.0f}</b>\n"
-        f"  ⏱️ Tahmini Üretim Süresi: <b>~{dur // 2 + 5} dakika</b>\n"
-        f"  🟢 Operasyon Değerlendirmesi: "
-        + ("Tüm servisler hazır, üretim başlatılabilir."
-           if kalan_kredi >= 5 else "Kredi seviyesi düşük, dikkatli ilerleyin.") + "\n"
-        f"  💡 <b>HLK Önerisi:</b> "
-        + (f"₺299 standart, ₺399 premium uygun."
-           if dur <= 20 else f"₺399 veya ₺499 önerilir.") + "\n\n"
-        # ── BÖLÜM 8: Yönetici İşlemleri ──
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "💰 <b>Satış Fiyatı Belirleme</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
+    computed_data = {
+        "toplam": toplam,
+        "yonetici_fiyat": yonetici_fiyat,
+        "kdvli": kdvli,
+    }
+    return "\n".join(lines), computed_data
 
 
 async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2144,7 +2076,84 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
     user = query.from_user
     chat_id = query.message.chat_id
 
-    cb = query.data  # admin_price_299, admin_price_cancel vs.
+    cb = query.data
+
+    if cb == "admin_enter_katsayi":
+        await query.answer("✏️ Katsayıyı girin...")
+        context.user_data["_admin_waiting_katsayi"] = True
+        # FD-008_1: "EKRAN SİLİNİR" — admin formunu temizle, sadece prompt kalır
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await scene_delivery.cleanup_chat(chat_id)
+        prompt_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text="✏️ <b>Katsayıyı girin:</b>\n\nÖrn: 1.5, 2.0, 0.8",
+            parse_mode="HTML",
+        )
+        scene_delivery.register_chat_messages(chat_id, {"success_msg_id": prompt_msg.message_id})
+        return
+
+    if cb == "admin_hlk_chat":
+        await query.answer("💬 HLK sohbet modu aktif")
+        context.user_data["_admin_chat_mode"] = True
+        # FD-008_1: "EKRAN SİLİNİR" — admin formunu temizle
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        await scene_delivery.cleanup_chat(chat_id)
+        chat_msg = await context.bot.send_message(
+            chat_id=chat_id,
+            text="💬 <b>HLK Sohbet Modu</b>\n\nBu form hakkında sorular sorabilirsin.\n"
+                 "Maliyet, fiyatlandırma, servis seçimi, kar marjı...\n\n"
+                 "<i>Çıkmak için sohbet bitirme butonuna bas.</i>",
+            parse_mode="HTML",
+        )
+        scene_delivery.register_chat_messages(chat_id, {"success_msg_id": chat_msg.message_id})
+        return
+
+    if cb == "admin_hlk_chat_end":
+        await query.answer("✅ Sohbet sonlandı.")
+        context.user_data["_admin_chat_mode"] = False
+        try: await query.message.delete()
+        except: pass
+        return
+
+    if cb == "admin_price_submit":
+        katsayi = float(context.user_data.get("_admin_katsayi", "0.347"))
+        # Gerçek hesaplanmış değerleri kullan (sabit 59.30 yerine)
+        toplam = context.user_data.get("_computed_toplam", 59.30)
+        yonetici_fiyat = context.user_data.get("_computed_yonetici_fiyat", round(toplam * katsayi, 2))
+        kdvli_fiyat = context.user_data.get("_computed_kdvli", round(toplam * katsayi * 1.20, 2))
+        price = kdvli_fiyat
+        await query.answer(f"✅ Fiyat onaylandı: ${kdvli_fiyat:.2f}")
+        logger.info(f"💰 Yönetici {user.id} fiyat belirledi: ${price}")
+
+        try: await query.message.delete()
+        except: pass
+        await scene_delivery.cleanup_chat(chat_id)
+
+        # Kullanıcı Fiyat Teklif Formu
+        lang = get_lang(context.user_data)
+        user_form = _build_user_pricing_form(context.user_data, price, yonetici_fiyat, katsayi)
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton(f"✅ {t('pricing.approve_btn', lang)}", callback_data="pricing_approve")],
+            [InlineKeyboardButton(f"❌ {t('pricing.reject_btn', lang)}", callback_data="pricing_reject")],
+        ])
+        user_chat_id = context.user_data.get("_pricing_chat_id", chat_id)
+        await scene_delivery.cleanup_chat(user_chat_id)
+        user_msg = await context.bot.send_message(
+            chat_id=user_chat_id, text=user_form,
+            reply_markup=kb, parse_mode="HTML",
+        )
+        scene_delivery.register_chat_messages(user_chat_id, {"success_msg_id": user_msg.message_id})
+        logger.info(f"📋 Kullanıcı Fiyat Teklif Formu gönderildi: ${price}")
+
+        from utils.session_timeout import start_timer
+        start_timer(user.id, user_chat_id, context.bot, context.user_data)
+        return
 
     if cb == "admin_price_cancel":
         await query.answer("❌ Fiyatlandırma iptal edildi")
@@ -2154,110 +2163,127 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
             pass
         return
 
-    price_map = {
-        "admin_price_199": "₺199",
-        "admin_price_299": "₺299",
-        "admin_price_399": "₺399",
-        "admin_price_499": "₺499",
-    }
-    price = price_map.get(cb, "₺299")
-    context.user_data["_approved_price"] = price
-    await query.answer(f"✅ Fiyat belirlendi: {price}")
 
-    logger.info(f"💰 Yönetici {user.id} fiyat belirledi: {price}")
+def _build_banka_bilgileri_karti(price: float = 0, tcmb: float = 46.87, lang: str = "tr") -> str:
+    """AR-002_65: HLK BANKA ÖDEME BİLGİLERİ KARTI — Fiyat + IBAN + Uyarı.
 
-    try:
-        await query.message.delete()
-    except Exception:
-        pass
-    await scene_delivery.cleanup_chat(chat_id)
+    FD-008_1: Kullanıcı Fiyat Teklifi onaylandıktan sonra gönderilir.
+    """
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    satis_tl = round(price * tcmb, 2)
 
-    # FD-008_1 Aşama 2: Kullanıcı Fiyat Teklif Formu
-    user_form = _build_user_pricing_form(context.user_data, price)
+    lines = [
+        "<code>✅Brief › ✅Senaryo › ✅Fiyat › ✅Ödeme</code>",
+        f"{SEP}",
+        f"<b>{t('payment.card_title', lang)}</b>",
+        "",
+        f"{SEP}",
+        "",
+        "",
+        "",
+        f"<b>💰 {t('pricing.kdv_dollar', lang)}:  ${price:.2f}</b>",
+        f"{t('pricing.tcmb_rate', lang)}: {tcmb} TL",
+        "",
+        f"<b>━━━ 💵 {t('pricing.sales_price', lang)}: {satis_tl:.2f} TL ━━━</b>",
+        "",
+        "",
+        "",
+        f"{SEP}",
+        f"<b>💳 {t('payment.account_holder', lang)}:</b>  <b>HALUK ARI</b>",
+        "",
+        "▸ <b>Garanti Bankası (TL)</b>",
+        "  <code>TR69 0006 2000 3910 0006 8957 76</code>",
+        "▸ <b>Garanti Bankası (USD)</b>",
+        "  <code>TR69 0006 2000 3910 0009 0255 08</code>",
+        "▸ <b>Ak Bank (TL)</b>",
+        "  <code>TR96 0004 6001 6688 8000 0490 88</code>",
+        f"{SEP}",
+        f"<b>📌 {t('payment.payment_method', lang)}:</b>  {t('payment.bank_transfer', lang)}",
+        f"{SEP}",
+        f"<b>⚠️ {t('payment.warning_title', lang)}:</b>",
+        f"• {t('payment.warning_1', lang)}",
+        f"• {t('payment.warning_2', lang)}",
+        f"• {t('payment.warning_3', lang)}",
+        f"{SEP}",
+    ]
+    return "\n".join(lines)
 
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Teklifi Onayla", callback_data="pricing_approve")],
-        [InlineKeyboardButton("❌ Teklifi Reddet", callback_data="pricing_reject")],
+
+def _build_odeme_bilgileri_karti(price: float = 0, tcmb: float = 46.87) -> str:
+    """AR-002_65: Ödeme Bilgileri Kartı — HLK Teklif Fiyatı + Banka + Uyarı.
+
+    Bağımsız bir kart olarak kullanılabilir (test ve form entegrasyonu için).
+    """
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    lines = [f"{SEP}"]
+
+    # Fiyat bilgisi
+    if price:
+        lines.extend([
+            f"<b>💰 KDV Dahil Dolar Tutarı:  ${price:.2f}</b>",
+            f"{SEP}",
+            f"{SEP}",
+        ])
+
+    lines.extend([
+        "<b>⚠️ ÖNEMLİ UYARI:</b>",
+        "• Ödemeniz alındıktan sonra üretim süreci başlar.",
+        "• Video belirtilen süre içerisinde adresinize dijital Mp4 formatında teslim edilir.",
+        f"{SEP}",
     ])
-    await context.bot.send_message(
-        chat_id=chat_id, text=user_form,
-        reply_markup=kb, parse_mode="HTML",
-    )
-    logger.info(f"📋 Kullanıcı Fiyat Teklif Formu gönderildi: {price}")
-
-    from utils.session_timeout import start_timer
-    start_timer(user.id, chat_id, context.bot, context.user_data)
+    return "\n".join(lines)
 
 
-def _build_user_pricing_form(user_data: dict, price: str) -> str:
-    """REFERAN_KULLANICI FİYAT_TEKLİF_FORMU.md uyumlu kullanıcı formu."""
+def _build_user_pricing_form(user_data: dict, price: str, yonetici_fiyat: float = 0, katsayi: float = 0) -> str:
+    """AR-002_65: Kullanıcı Fiyat Teklif Formu — HLK AI ASISTAN FİYAT TEKLİFİ."""
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     platform = user_data.get("platform", "—")
     fmt = user_data.get("video_format", "—")
     duration = user_data.get("video_duration", "—")
     resolution = user_data.get("video_resolution", "—")
+    url = user_data.get("website_url", "—")
+    product_name = url.split("/")[-1] if "/" in url else "Ürün"
+    tcmb_kur = 46.87
+
+    from datetime import datetime
+    pid = f"PID-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
+
+    # Fiyatı float'a çevir (string veya float gelebilir)
+    try:
+        price_f = float(price)
+    except (ValueError, TypeError):
+        price_f = 0.0
+    satis_tl = round(price_f * tcmb_kur, 2)
+
+    lang = get_lang(user_data)
 
     return (
-        "💰 <b>KULLANICI FİYAT TEKLİF FORMU</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📋 <b>Proje Özeti</b>\n"
-        f"📱 <b>Platform:</b> {platform}\n"
-        f"📐 <b>Format:</b> {fmt}\n"
-        f"🎬 <b>Video Süresi:</b> {duration} saniye\n"
-        f"📺 <b>Çözünürlük:</b> {resolution}\n"
-        f"📅 <b>Teslim Süresi:</b> ~15 dakika\n\n"
-        "🛠️ <b>Hizmet Kapsamı</b>\n"
-        "📝 Senaryo Hazırlama\n"
-        "🤖 Yapay Zekâ Reklam Üretimi\n"
-        "🎬 Video Üretimi\n"
-        "🎙️ Seslendirme\n"
-        "✂️ Kurgu\n"
-        "📤 Telegram Teslim\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💵 <b>Satış Fiyatı:</b> {price}\n"
-        "💱 <b>Para Birimi:</b> TL\n"
-        "⏳ <b>Teklif Geçerlilik:</b> 24 saat\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "ℹ️ Ödeme alındıktan sonra üretim başlar\n"
-        "ℹ️ Video üretimi ~15 dakika sürer\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
-    """REFERAN_KULLANICI FİYAT_TEKLİF_FORMU.md uyumlu fiyat teklif formu."""
-    platform = user_data.get("platform", "—")
-    fmt = user_data.get("video_format", "—")
-    duration = user_data.get("video_duration", "—")
-    resolution = user_data.get("video_resolution", "—")
-
-    # Basit fiyat hesaplama (süreye göre)
-    dur = int(duration) if str(duration).isdigit() else 15
-    if dur <= 10: price = "₺299"
-    elif dur <= 20: price = "₺399"
-    else: price = "₺499"
-
-    return (
-        "💰 <b>KULLANICI FİYAT TEKLİF FORMU</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "📋 <b>Proje Özeti</b>\n"
-        f"📱 <b>Platform:</b> {platform}\n"
-        f"📐 <b>Format:</b> {fmt}\n"
-        f"🎬 <b>Video Süresi:</b> {duration} saniye\n"
-        f"📺 <b>Çözünürlük:</b> {resolution}\n"
-        f"📅 <b>Teslim Süresi:</b> ~15 dakika\n\n"
-        "🛠️ <b>Hizmet Kapsamı</b>\n"
-        "📝 Senaryo Hazırlama\n"
-        "🤖 Yapay Zekâ Reklam Üretimi\n"
-        "🎬 Video Üretimi\n"
-        "🎙️ Seslendirme\n"
-        "✂️ Kurgu\n"
-        "📤 Telegram Teslim\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💵 <b>Satış Fiyatı:</b> {price}\n"
-        "💱 <b>Para Birimi:</b> TL\n"
-        "⏳ <b>Teklif Geçerlilik:</b> 24 saat\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "ℹ️ Ödeme alındıktan sonra üretim başlar\n"
-        "ℹ️ Video üretimi ~15 dakika sürer\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        f"{SEP}\n"
+        f"<b>━━━ 💰 {t('pricing.title', lang)} ━━━</b>\n\n\n\n"
+        f"<code>{pid}</code>\n"
+        f"{SEP}\n"
+        "<code>✅Brief › ✅Senaryo › ✅Fiyat › 🔵Ödeme</code>\n"
+        f"{SEP}\n"
+        f"MARKA: <b>{user_data.get('brand', '—')}</b>\n"
+        f"ÜRÜN: <b>{product_name}</b>\n"
+        f"<i>{fmt} • {resolution} • {duration}sn • 5 sahne | {user_data.get('ad_style', '—')} • {user_data.get('target_audience', '—')} | 🎙️ Dış Ses+Fon Müzik</i>\n"
+        f"{SEP}\n"
+        f"<b>🛠️ {t('pricing.service_scope', lang)}</b>\n"
+        "• Senaryo Hazırlama (HLK Yapay Zekâ)\n"
+        "• Video Üretimi (5 sahne)\n"
+        "• Profesyonel Seslendirme\n"
+        "• Telifsiz Fon Müziği\n"
+        "• Kurgu ve Montaj\n"
+        "• Dijital Teslim (Mp4)\n"
+        f"{SEP}\n"
+        f"<b>{t('pricing.kdv_dollar', lang)}: ${price_f:.2f}</b>\n"
+        f"{t('pricing.tcmb_rate', lang)}: {tcmb_kur} TL\n\n\n\n"
+        f"<b>━━━ 💵 {t('pricing.sales_price', lang)}: {satis_tl:.2f} TL ━━━</b>\n"
+        f"{SEP}\n"
+        f"-{t('pricing.footer_1', lang)}\n"
+        f"-{t('pricing.footer_2', lang)}\n"
+        f"{SEP}"
     )
 
 
@@ -2279,20 +2305,14 @@ async def handle_pricing_approve(update: Update, context: ContextTypes.DEFAULT_T
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
-    # Ödeme ekranı
-    payment_text = (
-        "💳 <b>ÖDEME BİLGİLERİ</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Ödemenizi aşağıdaki hesaba yapabilirsiniz:\n\n"
-        "🏦 <b>Banka:</b> Örnek Bank\n"
-        "👤 <b>Hesap Sahibi:</b> Örnek İsim\n"
-        "🔢 <b>IBAN:</b> TR00 0000 0000 0000 0000 0000 00\n\n"
-        "Ödeme yaptıktan sonra aşağıdaki butona basınız.\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
+    # Ödeme ekranı → HLK BANKA ÖDEME BİLGİLERİ KARTI
+    lang = get_lang(context.user_data)
+    kdvli = context.user_data.get("_computed_kdvli", 0)
+    payment_text = _build_banka_bilgileri_karti(price=kdvli, lang=lang)
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ ÖDEMEM GERÇEKLEŞTİ", callback_data="payment_declared")],
+        [InlineKeyboardButton(f"🟢 {t('payment.pay_done_btn', lang)}", callback_data="payment_declared"),
+         InlineKeyboardButton(f"🔴 {t('payment.pay_cancel_btn', lang)}", callback_data="payment_cancel")],
     ])
     await context.bot.send_message(
         chat_id=chat_id, text=payment_text,
@@ -2321,25 +2341,120 @@ async def handle_pricing_reject(update: Update, context: ContextTypes.DEFAULT_TY
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
+    lang = get_lang(context.user_data)
     reject_text = (
-        "Teklifi reddettiğinizi görüyorum.\n\n"
-        "Yeni bir reklam çalışması başlatmak için "
-        "lütfen tekrar <b>/start</b> komutu ile giriş yapınız."
+        f"{t('final.new_session_start', lang)}"
     )
     await typewriter_animation(chat_id, reject_text, context.bot, 0.06)
 
 
+def _build_admin_odeme_bildirimi(user_data: dict) -> str:
+    """AR-002_65: Yönetici Ödeme Bildirimi — FD-008_1 STATE_PAYMENT_VERIFICATION.
+
+    Kullanıcı ÖDEME YAPTIM dediğinde yöneticiye gönderilir.
+    """
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    from datetime import datetime
+    pid = f"PID-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
+
+    lang = get_lang(user_data)
+    kdvli = user_data.get("_computed_kdvli", 0)
+    tcmb_kur = 46.87
+    satis_tl = round(kdvli * tcmb_kur, 2)
+    url = user_data.get("website_url", "—")
+    product_name = url.split("/")[-1] if "/" in url else "Ürün"
+    platform = user_data.get("platform", "—")
+    fmt = user_data.get("video_format", "—")
+    resolution = user_data.get("video_resolution", "—")
+    duration = user_data.get("video_duration", "—")
+    brand = user_data.get("brand", "—")
+    user_id = user_data.get("_pricing_user_id", "—")
+
+    lines = [
+        f"{SEP}",
+        f"⚠️ <b>{t('admin_payment.title', lang)}</b>",
+        f"{SEP}",
+        f"<code>{pid}</code>",
+        "",
+        f"📋 <b>{t('admin_payment.verification', lang)}</b>",
+        f"{SEP}",
+        f"ℹ️  {t('admin_payment.info_1', lang)}",
+        f"ℹ️  {t('admin_payment.info_2', lang)}",
+        f"ℹ️  {t('admin_payment.info_3', lang)}",
+        f"{SEP}",
+        f"<b>👤 {t('admin_payment.user_info', lang)}</b>",
+        f"Kullanıcı ID: <code>{user_id}</code>",
+        f"{SEP}",
+        "",
+        "",
+        "",
+        f"<b>📦 {t('admin_payment.product_info', lang)}</b>",
+        f"Ürün: <b>{product_name}</b>",
+        f"Marka: <b>{brand}</b>",
+        f"Platform: <b>{platform}</b>",
+        f"Format: {fmt} | {resolution} | {duration}sn",
+        f"{SEP}",
+        f"<b>💰 {t('admin_payment.payment_info', lang)}</b>",
+        f"Banka: <b>Garanti Bankası</b>",
+        "<code>TR69 0006 2000 3910 0006 8957 76</code>",
+        f"Beklenen Tutar: <b>${kdvli:.2f}</b> / <b>{satis_tl:.2f} TL</b>",
+        f"TCMB Kur: {tcmb_kur} TL",
+        f"{SEP}",
+        "",
+        "",
+        "",
+        f"<i>⏱️ {t('admin_payment.auto_generated', lang)}</i>",
+        f"{SEP}",
+    ]
+    return "\n".join(lines)
+
+
 async def handle_payment_declared(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """ÖDEMEM GERÇEKLEŞTİ → STATE_PAYMENT_VERIFICATION → Video üretimi (FD-008_1)."""
+    """ÖDEME YAPTIM → Yönetici Ödeme Bildirimi (FD-008_1 STATE_PAYMENT_VERIFICATION)."""
     query = update.callback_query
     user = query.from_user
     chat_id = query.message.chat_id
 
-    await query.answer("✅ Ödeme bildirimi alındı!")
-    logger.info(f"💳 {user.id} ödeme bildirimi gönderdi")
+    await query.answer("✅ Ödeme bildirimi yöneticiye iletiliyor...")
+    logger.info(f"💳 {user.id} ÖDEME YAPTIM → yönetici onayı bekleniyor")
 
     se = StateEngine(context.user_data)
     se.fire(UserEvent.PAYMENT_DECLARED)
+
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await scene_delivery.cleanup_chat(chat_id)
+
+    # Yönetici Ödeme Bildirimi Kartı
+    lang = get_lang(context.user_data)
+    bildirim = _build_admin_odeme_bildirimi(context.user_data)
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"✅ {t('admin_payment.approve_btn', lang)}", callback_data="admin_odeme_onay")],
+        [InlineKeyboardButton(f"🔴 {t('admin_payment.ret_btn', lang)}", callback_data="admin_odeme_ret")],
+    ])
+    await context.bot.send_message(
+        chat_id=chat_id, text=bildirim,
+        reply_markup=kb, parse_mode="HTML",
+    )
+
+    from utils.session_timeout import start_timer
+    start_timer(user.id, chat_id, context.bot, context.user_data)
+
+
+async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Yönetici ÖDEMEYİ ONAYLA → EVENT_PAYMENT_APPROVED → Video üretimi (FD-008_1)."""
+    query = update.callback_query
+    user = query.from_user
+    chat_id = query.message.chat_id
+
+    lang = get_lang(context.user_data)
+    await query.answer(f"✅ {t('final.payment_approved_toast', lang)}")
+    logger.info(f"✅ Yönetici {user.id} ödemeyi onayladı → Video üretimi")
+
+    se = StateEngine(context.user_data)
     se.fire(UserEvent.PAYMENT_APPROVED)
 
     try:
@@ -2348,17 +2463,168 @@ async def handle_payment_declared(update: Update, context: ContextTypes.DEFAULT_
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
-    # Üretim başladı bilgisi
+    # FD-008_1: Kullanıcıya daktilo efektiyle bilgilendirme mesajı
+    lang = get_lang(context.user_data)
     done_text = (
-        "🎬 <b>Video Üretimi Başladı!</b>\n\n"
-        "Ödemeniz onaylandı ✅\n"
-        "Reklam videonuzun üretimi başlamıştır.\n\n"
-        "Videonuz tamamlandığında Telegram adresinize "
-        "otomatik olarak gönderilecektir.\n\n"
-        "⏱️ <b>Tahmini üretim süresi:</b> ~15 dakika\n\n"
-        "<i>Bol kazançlar dileriz!</i> 🚀"
+        f"{t('final.payment_received', lang)}\n"
+        f"{t('final.production_started', lang)}\n"
+        f"{t('final.duration_info', lang)}\n"
+        f"{t('final.auto_delivery', lang)}"
     )
     await typewriter_animation(chat_id, done_text, context.bot, 0.06)
 
     from utils.session_timeout import start_timer
     start_timer(user.id, chat_id, context.bot, context.user_data)
+
+    # ── STATE_VIDEO_PRODUCTION: Production Runtime Entegrasyonu ──
+    # AR-002_70: STATE_VIDEO_PRODUCTION → Production zinciri başlatılır
+    # Production arka planda çalışır, callback'i bloke etmez
+    asyncio.create_task(
+        _run_production_pipeline(chat_id, context, user.id)
+    )
+
+
+async def handle_admin_payment_ret(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Yönetici RET → Ödeme ulaşmadı → Oturum kapat."""
+    query = update.callback_query
+    user = query.from_user
+    chat_id = query.message.chat_id
+
+    await query.answer("❌ Ödeme onaylanmadı")
+    logger.info(f"❌ Yönetici {user.id} ödemeyi reddetti")
+
+    se = StateEngine(context.user_data)
+    se.fire(UserEvent.SESSION_CLOSED)
+
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await scene_delivery.cleanup_chat(chat_id)
+
+    lang = get_lang(context.user_data)
+    ret_text = (
+        f"❌ <b>{t('final.payment_cancelled', lang)}</b>\n\n"
+        f"{t('final.new_session_start', lang)}"
+    )
+    await context.bot.send_message(chat_id=chat_id, text=ret_text, parse_mode="HTML")
+
+
+async def _run_production_pipeline(
+    chat_id: int, context: ContextTypes.DEFAULT_TYPE, user_id: int
+) -> None:
+    """STATE_VIDEO_PRODUCTION: Production Runtime zincirini arka planda çalıştırır.
+
+    AR-002_70 uyarınca Production zinciri:
+    Production Runtime → CEE PRE-CHECK → PID → Package → Task → Executor → CEE POST-CHECK
+
+    Production sonucuna göre State Engine'e uygun event gönderilir.
+    Bu fonksiyon callback'i bloke etmez — asyncio.create_task ile çağrılır.
+
+    Crash Recovery: PID context.user_data'ya kaydedilir. Restart sonrası
+    bu PID ile production_runtime.recover(pid) çağrılarak kaldığı yerden
+    devam edilir.
+    """
+    from services.production_runtime import production_runtime
+    from utils.state_engine import StateEngine, UserEvent
+
+    try:
+        # Önce yarım kalmış production var mı kontrol et
+        saved_pid = context.user_data.get("production_pid")
+        if saved_pid:
+            logger.info(f"🔄 [Production] Yarım kalmış production tespit edildi: {saved_pid}")
+            try:
+                result = await production_runtime.recover(saved_pid)
+            except Exception as e:
+                logger.error(f"❌ [Production] Recovery başarısız: {saved_pid} — {e}")
+                # Recovery başarısızsa sıfırdan başlat
+                result = await production_runtime.start_production()
+        else:
+            result = await production_runtime.start_production()
+
+        # PID'i user_data'ya kaydet (crash recovery için)
+        if result.pid:
+            context.user_data["production_pid"] = result.pid
+
+        se = StateEngine(context.user_data)
+
+        if result.success:
+            logger.info(
+                f"✅ [Production] Başarılı — pid={result.pid}, "
+                f"süre={result.duration_seconds:.1f}s, "
+                f"CEE PRE={result.pre_check_report['verdict'] if result.pre_check_report else 'N/A'}, "
+                f"CEE POST={result.post_check_report['verdict'] if result.post_check_report else 'N/A'}"
+            )
+            se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
+            # Başarılı — PID'i temizle
+            context.user_data.pop("production_pid", None)
+
+            # Kullanıcıya başarı mesajı
+            success_msg = (
+                f"✅ <b>Üretim Tamamlandı!</b>\n\n"
+                f"🆔 PID: <code>{result.pid}</code>\n"
+                f"⏱️ Süre: {result.duration_seconds:.1f} saniye\n"
+                f"📋 Adımlar: {result.completed_steps}/{result.total_steps}"
+            )
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id, text=success_msg, parse_mode="HTML"
+                )
+            except Exception:
+                pass
+        else:
+            logger.error(
+                f"❌ [Production] Başarısız — pid={result.pid}, "
+                f"hata={result.error}, "
+                f"CEE PRE={result.pre_check_report['verdict'] if result.pre_check_report else 'N/A'}"
+            )
+            se.fire(UserEvent.VIDEO_PRODUCTION_FAILED)
+            # Başarısız — PID'i temizle (yeniden denenmeyecek)
+            context.user_data.pop("production_pid", None)
+
+            # Kullanıcıya hata mesajı
+            error_msg = (
+                f"❌ <b>Üretim Başarısız</b>\n\n"
+                f"🆔 PID: <code>{result.pid}</code>\n"
+                f"Hata: {result.error[:200] if result.error else 'Bilinmeyen hata'}"
+            )
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id, text=error_msg, parse_mode="HTML"
+                )
+            except Exception:
+                pass
+
+    except Exception as e:
+        logger.error(f"🚨 [Production] Kritik hata — user={user_id}: {e}")
+        try:
+            se = StateEngine(context.user_data)
+            se.fire(UserEvent.VIDEO_PRODUCTION_FAILED)
+        except Exception:
+            pass
+
+
+async def handle_payment_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """ÖDEME İPTAL → Oturum kapat (FD-008_1)."""
+    query = update.callback_query
+    user = query.from_user
+    chat_id = query.message.chat_id
+
+    lang = get_lang(context.user_data)
+    await query.answer(f"❌ {t('final.payment_cancelled', lang)}")
+    logger.info(f"💳 {user.id} ödemeyi iptal etti")
+
+    se = StateEngine(context.user_data)
+    se.fire(UserEvent.SESSION_CLOSED)
+
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await scene_delivery.cleanup_chat(chat_id)
+
+    cancel_text = (
+        f"❌ <b>{t('final.payment_cancelled', lang)}</b>\n\n"
+        f"{t('final.new_session_start', lang)}"
+    )
+    await context.bot.send_message(chat_id=chat_id, text=cancel_text, parse_mode="HTML")

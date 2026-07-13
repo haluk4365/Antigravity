@@ -126,8 +126,8 @@ from handlers.website import handle_material_choice, handle_platform_selection, 
 from handlers.website import handle_style_selection, handle_audience_selection
 from handlers.website import handle_voice_language, handle_voice_character, handle_emphasis, handle_emphasis_done
 from handlers.website import handle_scenario_approve, handle_scenario_reject
-from handlers.website import handle_pricing_approve, handle_pricing_reject, handle_payment_declared
-from handlers.website import handle_admin_pricing_submit
+from handlers.website import handle_pricing_approve, handle_pricing_reject, handle_payment_declared, handle_payment_cancel
+from handlers.website import handle_admin_pricing_submit, handle_admin_payment_approve, handle_admin_payment_ret
 from handlers.website import handle_brief_approve, handle_brief_edit, handle_brief_edit_field
 
 # Dil destegi dogrulama (AR-002_37 / dil senkron)
@@ -372,7 +372,7 @@ def main():
     ))
     # STATE_PRICING: Yönetici Fiyatlandırma callback'leri
     app.add_handler(CallbackQueryHandler(
-        handle_admin_pricing_submit, pattern="^admin_price_"
+        handle_admin_pricing_submit, pattern="^admin_(price_|enter_|hlk_chat)"
     ))
     # STATE_PRICING: Kullanıcı Fiyat Teklif + Ödeme callback'leri
     app.add_handler(CallbackQueryHandler(
@@ -383,6 +383,16 @@ def main():
     ))
     app.add_handler(CallbackQueryHandler(
         handle_payment_declared, pattern="^payment_declared$"
+    ))
+    app.add_handler(CallbackQueryHandler(
+        handle_payment_cancel, pattern="^payment_cancel$"
+    ))
+    # STATE_PAYMENT_VERIFICATION: Yönetici Ödeme Onay callback'leri
+    app.add_handler(CallbackQueryHandler(
+        handle_admin_payment_approve, pattern="^admin_odeme_onay$"
+    ))
+    app.add_handler(CallbackQueryHandler(
+        handle_admin_payment_ret, pattern="^admin_odeme_ret$"
     ))
 
     # ── Message Handler (SE-007_3: State tabanlı yönlendirme) ──

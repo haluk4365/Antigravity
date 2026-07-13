@@ -147,6 +147,7 @@ class UserEvent(str, Enum):
     # ── Üretim Olayları (OLAY-023, OLAY-024, OLAY-031) ──
     VIDEO_PRODUCTION_STARTED = "EVENT_VIDEO_PRODUCTION_STARTED"    # OLAY-023
     VIDEO_PRODUCTION_COMPLETED = "EVENT_VIDEO_PRODUCTION_COMPLETED"  # OLAY-024
+    VIDEO_PRODUCTION_FAILED = "EVENT_VIDEO_PRODUCTION_FAILED"      # Production başarısız
     PRODUCTION_PACKAGE_CREATED = "EVENT_PRODUCTION_PACKAGE_CREATED"  # OLAY-031
 
     # ── Oturum Kapanış Olayları (OLAY-028) ──
@@ -372,6 +373,7 @@ STATE_TRANSITIONS: dict[UserState, dict[UserEvent, UserState]] = {
     # ── Video Üretimi (SE-007_4) ──
     UserState.VIDEO_PRODUCTION: {
         UserEvent.VIDEO_PRODUCTION_COMPLETED: UserState.SESSION_COMPLETED,
+        UserEvent.VIDEO_PRODUCTION_FAILED: UserState.SESSION_COMPLETED,
         UserEvent.SESSION_ENDED: UserState.SESSION_COMPLETED,
         # Geriye dönük uyumluluk:
         UserEvent.VIDEO_PRODUCTION_DONE: UserState.SESSION_COMPLETED,
