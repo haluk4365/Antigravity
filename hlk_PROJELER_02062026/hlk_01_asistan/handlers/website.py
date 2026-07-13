@@ -2164,7 +2164,7 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
 
 
 TCMB_KUR_URL = "https://www.tcmb.gov.tr/kurlar/today.xml"
-TCMB_KUR_FALLBACK = 46.87  # Sadece API erisilemezse kullanilir
+TCMB_KUR_FALLBACK = 46.9966  # 13.07.2026 — Sadece API erisilemezse kullanilir
 
 
 def _get_tcmb_kur() -> float:
