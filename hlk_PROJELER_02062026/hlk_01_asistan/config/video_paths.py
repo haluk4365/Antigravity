@@ -35,7 +35,7 @@ SAHNE2_SURE_LANG = {
 SAHNE2_FALLBACK_LANG = "TR"
 
 # ─── Zamanlama Parametreleri (GC uyumlu) ─────────────────────────────────
-SAHNE2_EXTRA_WAIT = 5        # SAHNE-2 video sonu ekstra bekleme (sn)
+SAHNE2_EXTRA_WAIT = 3        # SAHNE-2 / SAHNE-13 video sonu ekstra bekleme (sn)
 LINK_PROCESSING_WAIT = 4     # Link işleme sonrası bekleme (sn)
 BALLOON_STAGGER_DELAY = 1    # Konuşma balonları arası gecikme (sn)
 

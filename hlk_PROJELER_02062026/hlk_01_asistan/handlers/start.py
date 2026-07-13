@@ -677,6 +677,16 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
             text=hint_text,
             parse_mode="HTML",
         )
+
+        # 4 saniye sonra sesli uyarıyı kaldır (arka planda)
+        async def _remove_hint():
+            await asyncio.sleep(4)
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=hint_msg.message_id)
+                logger.info(f"🧹 SAHNE-2 SESLI_HINT 4sn sonra silindi")
+            except Exception:
+                pass
+        asyncio.create_task(_remove_hint())
     except Exception as e:
         logger.error(f"❌ SAHNE-2 gonderilemedi: {e}")
         await context.bot.send_message(
@@ -730,7 +740,7 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
     logger.info(f"⏱️ SAHNE-2 cleanup: video+uyari+balon siliniyor, link kalıyor")
     cleanup_msgs = [
         ("SAHNE-2 video", sahne2_msg),
-        ("🔊 uyarı", hint_msg),
+        ("🔊 uyarı (zaten silinmiş olabilir)", hint_msg),
         ("konuşma balonu", welcome_msg_id),
     ]
     cleanup_success_count = 0
