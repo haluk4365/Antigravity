@@ -1781,30 +1781,67 @@ def _build_scenario_form(user_data: dict) -> str:
 
 
 def _build_sahne_listesi(sahneler: list, time_ranges: list, times: list,
-                         brand: str, product_name: str) -> list:
-    """Dinamik sahne listesini olusturur."""
+                         brand: str, product_name: str, audience: str = "") -> list:
+    """Dinamik sahne listesini olusturur. Hedef kitleye gore icerik uyarlanir."""
+    # Hedef kitleye gore tonlama ve icerik farki
+    yas = ""
+    if audience:
+        yas = audience.split("(")[0].strip() if "(" in audience else audience
+
+    # Yas grubuna gore tonlama
+    if any(w in audience for w in ["0-12", "Çocuk", "Children"]):
+        ton = "eğlenceli ve renkli"
+        hitap = "çocukların"
+        cagri = "ailesiyle birlikte keşfetmeye"
+    elif any(w in audience for w in ["13-17", "Genç", "Teen"]):
+        ton = "dinamik ve enerjik"
+        hitap = "gençlerin"
+        cagri = "hemen keşfetmeye"
+    elif any(w in audience for w in ["18-24", "Genç Yetişkin", "Young"]):
+        ton = "modern ve trend"
+        hitap = "genç yetişkinlerin"
+        cagri = "şimdi satın almaya"
+    elif any(w in audience for w in ["25-34", "Yetişkin", "Adult"]):
+        ton = "profesyonel ve şık"
+        hitap = "yetişkinlerin"
+        cagri = "hemen sipariş vermeye"
+    elif any(w in audience for w in ["35-44", "Aile", "Family"]):
+        ton = "güvenilir ve samimi"
+        hitap = "ailelerin"
+        cagri = "ailesi için satın almaya"
+    elif any(w in audience for w in ["45-54", "Orta Yaş", "Middle"]):
+        ton = "kaliteli ve prestijli"
+        hitap = "seçkin kullanıcıların"
+        cagri = "kaliteyi deneyimlemeye"
+    elif any(w in audience for w in ["55-64", "Olgun", "Mature", "65", "Senior"]):
+        ton = "sakin ve güven veren"
+        hitap = "olgun kullanıcıların"
+        cagri = "güvenle satın almaya"
+    else:
+        ton = "etkileyici"
+        hitap = "izleyicilerin"
+        cagri = "satın almaya"
+
     ACL = {
         "Dikkat Çekici Giriş": (
-            f"{brand} {product_name} ürünü günlük yaşamın içinde doğal bir anda gösterilir. "
-            "İzleyicinin dikkati ilk saniyelerde ürüne çekilir. "
-            "Görsel olarak etkileyici, merak uyandıran bir açılış sahnesi."
+            f"{brand} {product_name} ürünü, {hitap} ilgisini çekecek "
+            f"{ton} bir sahnede gösterilir. İlk saniyelerde ürüne odaklanılır."
         ),
         "Ürün Tanıtımı": (
             f"Ürün yakın planda detaylı gösterilir. {brand} kalitesi ve "
-            f"{product_name}'in öne çıkan özellikleri vurgulanır."
+            f"{product_name}'in öne çıkan özellikleri, {hitap} beklentilerine uygun şekilde vurgulanır."
         ),
         "Özellikler ve Faydalar": (
-            f"{product_name} ürününün sağladığı faydalar ve rakiplerinden ayrışan yönleri "
-            "görsel karşılaştırmalar ve ikonlarla sunulur."
+            f"{product_name} ürününün {hitap} hayatına katacağı değer, "
+            f"görsel karşılaştırmalar ve ikonlarla {ton} bir dille sunulur."
         ),
         "Kullanım Gösterimi": (
-            f"{product_name} ürününün gerçek kullanım anı gösterilir. "
-            "Kullanım kolaylığı ve pratik faydaları vurgulanır."
+            f"{product_name} ürününün gerçek kullanım anı, {hitap} "
+            f"günlük yaşamından bir kesitle gösterilir. Kullanım kolaylığı vurgulanır."
         ),
         "Kapanış — CTA": (
             f"{brand} logosu ve ürün bilgisi ekranda belirir. "
-            "İzleyiciyi satın almaya veya daha fazla bilgi edinmeye yönlendiren "
-            "net ve güçlü bir çağrı mesajı. Sipariş linki veya iletişim bilgisi sunulur."
+            f"{hitap} {cagri} yönlendiren, {ton} bir kapanış mesajı."
         ),
     }
     result = []
@@ -1953,7 +1990,7 @@ def _build_scenario_data(user_data: dict) -> dict:
             f"{style} tarzında bir ürün tanıtım videosu hazırlanacaktır. "
             f"Hedef kitle: {audience}. Seslendirme: {voice_lang}, {voice_char}."
         ),
-        "sahneler": _build_sahne_listesi(sahneler, time_ranges, times, brand, product_name),
+        "sahneler": _build_sahne_listesi(sahneler, time_ranges, times, brand, product_name, audience),
         "toplamSure": f"{duration} sn" if duration != "—" else "—",
         "seslendirme": {
             "dil": voice_lang,
