@@ -1844,25 +1844,44 @@ def _build_scenario_data(user_data: dict) -> dict:
             f"{style} tarzında bir ürün tanıtım videosu hazırlanacaktır. "
             f"Hedef kitle: {audience}. Seslendirme: {voice_lang}, {voice_char}."
         ),
+        # Dinamik sahne sureleri — kullanicinin sectigi video suresine gore
+        try:
+            total_sec = int(duration) if str(duration).isdigit() else 25
+        except (ValueError, TypeError):
+            total_sec = 25
+        total_sec = max(7, total_sec)                 # Minimum 7sn senaryo
+        s1 = max(2, round(total_sec * 0.28))          # Giris ~%28
+        s2 = max(3, round(total_sec * 0.48))          # Urun Tanitimi ~%48
+        s3 = total_sec - s1 - s2                       # Kapanis CTA
+        if s3 < 2:
+            s3 = 2
+            s2 = total_sec - s1 - s3
+        if s2 < 2:
+            s2 = 2
+            s1 = total_sec - s2 - s3
+        t1_end = s1
+        t2_end = s1 + s2
+        t3_end = total_sec
+
         "sahneler": [
             {"no": 1, "gorsel": "https://via.placeholder.com/160x100.png?text=1",
              "baslik": "Dikkat Çekici Giriş",
              "aciklama": (f"{brand} {product_name} ürünü günlük yaşamın içinde doğal bir anda gösterilir. "
-                          "İlk 2 saniyede izleyicinin dikkati ürüne çekilir. "
+                          f"İlk {s1} saniyede izleyicinin dikkati ürüne çekilir. "
                           "Görsel olarak etkileyici, merak uyandıran bir açılış sahnesi."),
-             "zaman": "0:00 – 0:02", "sure": "2 sn"},
+             "zaman": f"0:00 – 0:{t1_end:02d}", "sure": f"{s1} sn"},
             {"no": 2, "gorsel": "https://via.placeholder.com/160x100.png?text=2",
              "baslik": "Ürün Tanıtımı ve Özellikler",
              "aciklama": (f"Ürün yakın planda detaylı gösterilir. {brand} kalitesi ve "
                           f"{product_name}'in öne çıkan özellikleri vurgulanır. "
                           "Kullanım alanları, faydaları ve rakiplerinden ayrışan yönleri sunulur."),
-             "zaman": "0:02 – 0:05", "sure": "3 sn"},
+             "zaman": f"0:{t1_end:02d} – 0:{t2_end:02d}", "sure": f"{s2} sn"},
             {"no": 3, "gorsel": "https://via.placeholder.com/160x100.png?text=3",
              "baslik": "Kapanış — Harekete Geçirici Mesaj (CTA)",
              "aciklama": (f"{brand} logosu ve ürün bilgisi ekranda belirir. "
                           "İzleyiciyi satın almaya veya daha fazla bilgi edinmeye yönlendiren "
                           "net ve güçlü bir çağrı mesajı. Sipariş linki veya iletişim bilgisi sunulur."),
-             "zaman": "0:05 – 0:07", "sure": "2 sn"},
+             "zaman": f"0:{t2_end:02d} – 0:{t3_end:02d}", "sure": f"{s3} sn"},
         ],
         "toplamSure": f"{duration} sn" if duration != "—" else "—",
         "seslendirme": {
