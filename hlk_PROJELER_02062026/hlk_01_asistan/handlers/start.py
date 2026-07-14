@@ -825,40 +825,8 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
 
     welcome_msg_id, link_msg_id = await _run_balloons()
 
-    # Video sonunda siyah ekran — 720x1280 siyah PNG
-    import struct, zlib, os as _os, tempfile
-    def _make_black_png(w, h):
-        """w x h boyutunda saf siyah PNG olusturur (bellekte)."""
-        def chunk(ctype, data):
-            c = ctype + data
-            return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
-        raw = b""
-        for y in range(h):
-            raw += b"\x00"  # filter byte
-            raw += b"\x00\x00\x00" * w  # RGB siyah
-        return (
-            b"\x89PNG\r\n\x1a\n" +
-            chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) +
-            chunk(b"IDAT", zlib.compress(raw)) +
-            chunk(b"IEND", b"")
-        )
-    _black_file = _os.path.join(tempfile.gettempdir(), "hlk_black_screen.png")
-    with open(_black_file, "wb") as _f:
-        _f.write(_make_black_png(720, 1280))
-    try:
-        black_msg = await context.bot.send_photo(
-            chat_id=chat_id, photo=open(_black_file, "rb"),
-        )
-        logger.info(f"⬛ SAHNE-2 siyah ekran (720x1280): msg={black_msg.message_id}")
-        await asyncio.sleep(SAHNE2_EXTRA_WAIT)
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=black_msg.message_id)
-            logger.info(f"🧹 SAHNE-2 siyah ekran silindi")
-        except Exception:
-            pass
-    except Exception as e:
-        logger.warning(f"⬛ Siyah ekran gönderilemedi, fallback sleep: {e}")
-        await asyncio.sleep(SAHNE2_EXTRA_WAIT)
+    # Video sonunda ekstra bekleme
+    await asyncio.sleep(SAHNE2_EXTRA_WAIT)
 
     # ── MASTER-003 SAHNE-2 Cleanup: yalnızca link isteği kalsın ──
     logger.info(f"⏱️ SAHNE-2 cleanup: video+uyari+balon siliniyor, link kalıyor")
