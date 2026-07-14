@@ -40,18 +40,15 @@ from config.video_paths import (
 logger = logging.getLogger(__name__)
 
 # ── HLK Admin Sohbet ────────────────────────────────────────────────────
-HLK_ADMIN_SYSTEM = """Sen HLK'nın Yönetici Fiyatlandırma Asistanısın. Bu ekran SADECE yöneticiye
-gönderilir. Kullanıcı bu ekranı GÖREMEZ.
+HLK_ADMIN_SYSTEM = """Sen HLK'nın Yönetici Asistanısın. Bu ekran SADECE yöneticiye gönderilir.
 
-KESİN KURALLAR — ihlal edilemez:
-1. SADECE yukarıdaki URETIM BAGLAMI'nda verilen gerçek verileri kullan.
-2. ASLA tahmin yürütme, varsayım yapma, sayı uydurma.
-3. TÜM fiyatlar USD'dir. TL karşılığı sadece TCMB kuruna göre hesaplanabilir.
-   USD ve TL'yi ASLA karıştırma. Her seferinde birimini BELİRT ($ veya TL).
-4. Bilmediğin KESİN bir şey sorulursa "Bu bilgi sistemde mevcut değil" de.
-5. Bu bir FİYATLANDIRMA ekranıdır. Yönetici video üretim maliyetini belirler.
-6. Kısa ve net cevap ver. Her cevap en fazla 3 cümle.
-7. Cevaplarında SOMUT rakam kullan. Belirsiz ifade kullanma."""
+KESİN KURALLAR:
+1. SADECE yukaridaki VERILERI kullan. Sistem bilgisi disinda TAHMIN YAPMA.
+2. HLK URETIM SISTEMI bolumunde yazan bilgiler haricinde cevap UYDURMA.
+3. Tum fiyatlar USD. TL karsiligi TCMB kuruyla hesaplanir. Birim BELIRT ($/TL).
+4. Bilmedigin seye "Bu bilgi sistemde mevcut degil" de.
+5. Kisa, net, en fazla 3 cumle. SOMUT rakam kullan.
+6. Yonetici bilgilenmek icin sorar — dogru ve aciklayici cevap ver."""
 
 def _build_admin_context(user_data: dict, user_msg: str) -> str:
     """Yönetici sohbeti için üretim bağlamını oluşturur."""
@@ -100,6 +97,20 @@ def _build_admin_context(user_data: dict, user_msg: str) -> str:
         f"KDV Dahil Teklif Fiyati (USD): ${kdvli}\n"
         f"TCMB USD Satis Kuru: {tcmb} TL\n"
         f"KDV Dahil TL Karsiligi: {tl_karsilik} TL\n\n"
+        f"=== HLK URETIM SISTEMI (SADECE BU BILGILERI KULLAN) ===\n"
+        f"AJAN SECIMI: HLK, urun kategorisine en uygun arastirma ajanlarini dinamik olarak secer. "
+        f"Ajan seçim kriterleri: urun kategorisine uygunluk, arastirma kalitesi, teknolojik yeterlilik, "
+        f"dogruluk, guvenilirlik, hiz, kaynak cesitliligi, guncellik ve maliyet. "
+        f"Amac en ucuz degil, en yuksek kalite/fayda oranini saglamaktir (AR-002_2).\n"
+        f"SENARYO: Arastirma ciktilari kullanilarak hedef kitleye ozel tonlamayla senaryo olusturulur. "
+        f"Sahne sayisi video suresine gore dinamik belirlenir (4-10sn→3, 11-20sn→4, 21+sn→5 sahne).\n"
+        f"SES: ElevenLabs TTS API kullanilir. Ses karakteri (Kadin/Erkek/Cocuk) secilen dile uygun uretilir. "
+        f"MASTER_REFERENCE_VOICE standardina gore tonlama ve ritim HLK tarafindan belirlenir.\n"
+        f"VIDEO URETIMI: Production Runtime uzerinden CEE PRE-CHECK → PID → Package → Executor → "
+        f"CEE POST-CHECK zinciriyle gerceklesir. Her adim anayasal denetime tabidir.\n"
+        f"FIYATLANDIRMA: Servis maliyetleri (API, ses, video uretimi) uzerine yonetici katsayisi ({katsayi}) "
+        f"uygulanarak hesaplanir. KDV dahil nihai fiyat TCMB kuruyla TL'ye cevrilir.\n"
+        f"TEKNIK: Python 3.14 + Telegram Bot API + OpenAI GPT-4o + ElevenLabs TTS + Fal.ai Seedance.\n\n"
         f"=== YONETICI SORUSU ===\n"
         f"{user_msg}"
     )
