@@ -2592,18 +2592,18 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
 
     if lang == "tr":
         done_text = (
-            f"Odemeniz onaylandi! ✅\n\n"
-            f"<b>{product_name}</b> icin video uretiminiz hemen basladi. 🎬\n"
+            f"<b>✅ Odemeniz onaylandi!</b>\n\n"
+            f"<b>{product_name}</b> icin <b><i>video uretiminiz</i></b> hemen basladi. 🎬\n"
             f"Bu islem yaklasik <b>{duration} dakika</b> kadar surecek.\n"
-            f"Videonuz hazir olur olmaz size buradan gonderecegim.\n\n"
+            f"Videonuz <b>hazir olur olmaz</b> size buradan <b>otomatik olarak</b> gonderecegim.\n\n"
             f"<i>Bol kazanclar dilerim!</i> 🚀"
         )
     else:
         done_text = (
-            f"{t('final.payment_received', lang)} ✅\n\n"
-            f"<b>{product_name}</b> — {t('final.production_started', lang)} 🎬\n"
-            f"{t('final.duration_info', lang)}: ~{duration} min.\n"
-            f"{t('final.auto_delivery', lang)}\n\n"
+            f"<b>✅ {t('final.payment_received', lang)}</b>\n\n"
+            f"<b>{product_name}</b> — <b><i>{t('final.production_started', lang)}</i></b> 🎬\n"
+            f"{t('final.duration_info', lang)}: <b>~{duration} min</b>.\n"
+            f"<b>{t('final.auto_delivery', lang)}</b>\n\n"
             f"<i>🚀</i>"
         )
     await typewriter_animation(chat_id, done_text, context.bot, 0.06)
