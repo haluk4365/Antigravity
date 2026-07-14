@@ -122,7 +122,7 @@ S04 = {
     },
     "prompt": {
         "tr": "Teşekkürler! 📺\n\nŞimdi videonuzun <b>görüntü çözünürlüğünü</b> seçelim.\n\n<b>🟦 480p</b> — <i>Ekonomik seçenek, temel kullanım</i>\n<b>🟦 720p HD ⭐</b> — <i>Önerilen, kalite ve bütçe dengesi</i>\n<b>🟦 1080p Full HD</b> — <i>Daha yüksek kalite, daha yüksek üretim maliyeti</i>\n\nHangisini tercih edersiniz?",
-        "en": "Which resolution would you like for your product video?",
+        "en": "Thanks! 📺\n\nLet's choose your <b>video resolution</b>.\n\n<b>480p</b> — <i>Budget option, basic use</i>\n<b>720p HD ⭐</b> — <i>Recommended, quality-budget balance</i>\n<b>1080p Full HD</b> — <i>Higher quality, higher cost</i>\n\nWhich do you prefer?",
         "de": "Welche Auflösung möchten Sie für Ihr Produktvideo?",
         "fr": "Quelle résolution souhaitez-vous pour votre vidéo produit?",
         "es": "¿Qué resolución quieres para tu video de producto?",
@@ -181,7 +181,7 @@ S05 = {
     },
     "prompt": {
         "tr": "Teşekkürler! ⏱️\n\nŞimdi reklam videonuzun <b>süresini</b> belirleyelim.\n\nLütfen istediğiniz video süresini <b>4 ile 30 saniye</b> arasında olacak şekilde aşağıya yazın.\n\n<i>Örnek: 15</i>",
-        "en": "Let's set the duration of your ad video. Please enter a duration between 4 and 30 seconds.",
+        "en": "Thanks! ⏱️\n\nLet's set your <b>video duration</b>.\n\nPlease enter a duration between <b>4 and 30 seconds</b>.\n\n<i>Example: 15</i>",
         "de": "Legen wir die Dauer Ihres Werbevideos fest. Bitte geben Sie eine Dauer zwischen 4 und 30 Sekunden ein.",
         "fr": "Déterminons la durée de votre vidéo publicitaire. Veuillez entrer une durée entre 4 et 30 secondes.",
         "es": "Establezcamos la duración de tu video. Ingresa una duración entre 4 y 30 segundos.",
@@ -217,7 +217,7 @@ S06 = {
     },
     "prompt": {
         "tr": "Teşekkürler! 🎬\n\nŞimdi videonuzun <b>tanıtım tarzını</b> seçelim.\n\n<b>☐ UGC Tarzı ⭐</b> — <i>Ürün kullanıcısı gibi, influencer tarzı</i>\n<b>☐ Geleneksel & Modern</b> — <i>Klasik ve modernin buluşması</i>\n<b>☐ Sanatsal / Sinematik</b> — <i>Sinematik görsellik odaklı</i>\n<b>☐ Kendim Yazacağım</b> — <i>Kendi senaryonuzu gönderin</i>\n<b>☐ HLK'ya Bırak ⭐</b> — <i>Ürüne en uygun tarzı HLK belirlesin</i>\n\n📌 <b>Tek seçim</b> yapılabilir.",
-        "en": "Which style would you like for your product video?",
+        "en": "Thanks! 🎬\n\nLet's choose your <b>video style</b>.\n\n<b>UGC Style ⭐</b> — <i>Influencer-style, natural</i>\n<b>Traditional & Modern</b> — <i>Classic meets modern</i>\n<b>Cinematic</b> — <i>Cinematic visuals</i>\n<b>I'll Write My Own</b> — <i>Send your own script</i>\n<b>HLK Decides ⭐</b> — <i>HLK picks the best style</i>\n\n📌 <b>Single choice</b> only.",
         "de": "Welchen Stil möchten Sie für Ihr Produktvideo?",
         "fr": "Quel style souhaitez-vous pour votre vidéo produit?",
         "es": "¿Qué estilo quieres para tu video de producto?",
@@ -293,7 +293,7 @@ S07 = {
     },
     "prompt": {
         "tr": "Teşekkürler! 👥\n\nŞimdi reklamınızın <b>hedef kitlesini</b> belirleyelim.\n\nÜrün tanıtım videonuzun hedef kitlesi aşağıdakilerden hangisidir?\n\n📌 <b>Tek seçim</b> yapılabilir.",
-        "en": "Who is the target audience for your product video?",
+        "en": "Thanks! 👥\n\nLet's define your <b>target audience</b>.\n\nWho is your product video for?\n\n📌 <b>Single choice</b> only.",
         "de": "Wer ist die Zielgruppe für Ihr Produktvideo?",
         "fr": "Quel est le public cible de votre vidéo produit?",
         "es": "¿Cuál es el público objetivo de tu video?",
@@ -327,7 +327,7 @@ S08 = {
     },
     "prompt": {
         "tr": "Teşekkürler! 🎙️\n\nŞimdi videonuz için <b>ses tercihlerinizi</b> belirleyelim.\n\n<b>🎙️ Dış Seslendirme</b> — <i>Profesyonel seslendirme</i>\n<b>🔊 Ortam Sesleri</b> — <i>Doğal arka plan sesleri</i>\n<b>🎵 Telifsiz Fon Müziği</b> — <i>Arka plan müziği</i>\n━━━━━━━━━━━━━━━━━━\n<b>🔇 SESSİZ</b>\n<i>(Video içerisinde hiçbir ses kullanılmaz)</i>\n━━━━━━━━━━━━━━━━━━\n📌 Birden Fazla Seçim Yapılabilir\n📌 Sessiz seçilirse diğer seçenekler devre dışı kalır",
-        "en": "What are your audio preferences for the product video?",
+        "en": "Thanks! 🎙️\n\nLet's set your <b>audio preferences</b>.\n\n<b>🎙️ Voiceover</b> — <i>Professional narration</i>\n<b>🔊 Ambient Sounds</b> — <i>Natural background</i>\n<b>🎵 Background Music</b> — <i>Royalty-free music</i>\n━━━━━━━━━━━━━━━━━━\n<b>🔇 SILENT</b>\n<i>(No audio in video)</i>\n━━━━━━━━━━━━━━━━━━\n📌 Multiple selections allowed\n📌 Silent disables all other options",
         "de": "Was sind Ihre Audio-Einstellungen für das Produktvideo?",
         "fr": "Quelles sont vos préférences audio pour la vidéo?",
         "es": "¿Cuáles son tus preferencias de audio para el video?",
@@ -368,7 +368,7 @@ S09 = {
     },
     "prompt": {
         "tr": "Teşekkürler! 🎙️\n\nŞimdi videonuz için <b>seslendirme dilini</b> seçelim.\n\nÜrün tanıtım videonuz için seslendirme dilini aşağıdakilerden birini seçerek belirleyebilirsiniz.\n\n🌍 <b>Yeryüzündeki resmi bütün dillerde</b> seslendirme yapabilirim.",
-        "en": "Please select the voiceover language for your product video.",
+        "en": "Thanks! 🎙️\n\nLet's choose your <b>voiceover language</b>.\n\nSelect from the options below.\n\n🌍 I can voice in <b>all official languages</b>.",
         "de": "Bitte wählen Sie die Voiceover-Sprache für Ihr Produktvideo.",
         "fr": "Veuillez sélectionner la langue de la voix off pour votre vidéo.",
         "es": "Selecciona el idioma de voz para tu video de producto.",
@@ -395,7 +395,7 @@ S10 = {
     },
     "prompt": {
         "tr": "Teşekkürler! 🎭\n\nŞimdi <b>ses karakterini</b> seçelim.\n\nÜrün tanıtım videonuz için dış ses seçiminizi yapın.\n<i>Ses yaşı, tonlama, enerji, vurgu ve konuşma ritmi HLK tarafından belirlenir.</i>",
-        "en": "Select your voice character. Tone, energy and rhythm are determined by HLK.",
+        "en": "Thanks! 🎭\n\nLet's choose your <b>voice character</b>.\n\nSelect the voice for your video.\n<i>Tone, energy, and rhythm are set by HLK.</i>",
         "de": "Wählen Sie Ihren Stimmcharakter. Ton, Energie und Rhythmus werden von HLK bestimmt.",
         "fr": "Sélectionnez votre personnage vocal. Le ton, l'énergie et le rythme sont déterminés par HLK.",
         "es": "Selecciona tu personaje de voz. El tono, energía y ritmo los determina HLK.",
@@ -424,7 +424,7 @@ S11 = {
     },
     "prompt": {
         "tr": "Teşekkürler! ✨\n\nVideonuzda <b>özellikle vurgulanmasını</b> istediğiniz bir şey var mı?\n\n<i>Birden fazla seçim yapabilirsiniz.</i>",
-        "en": "Is there anything you'd like us to especially highlight in your video?",
+        "en": "Thanks! ✨\n\nAnything you'd like <b>especially highlighted</b> in your video?\n\n<i>Multiple selections allowed.</i>",
         "de": "Gibt es etwas, das wir in Ihrem Video besonders hervorheben sollen?",
         "fr": "Y a-t-il quelque chose que vous souhaitez particulièrement mettre en avant?",
         "es": "¿Hay algo que quieras que destaquemos especialmente en tu video?",
@@ -556,7 +556,7 @@ S13 = {
     },
     "scenario_ready": {
         "tr": "<b>📝 Senaryonuz</b> hazırlandı, <i>form hazırlanıyor...</i>",
-        "en": "Script is ready, preparing the form...",
+        "en": "<b>📝 Your script</b> is ready, <i>preparing the form...</i>",
         "de": "Skript ist fertig, Formular wird vorbereitet...",
         "fr": "Script prêt, préparation du formulaire...",
         "es": "Guion listo, preparando formulario...",
@@ -804,7 +804,7 @@ MATERIAL = {
     },
     "prompt_has": {
         "tr": "Harika! 🎉 <b>Ürün bilgilerini</b> aldım ve analiz ediyorum.\n\nÜrününüze ait <b>tamamlayıcı materyalleriniz</b> var mı?\n\n📷 <b>Fotoğraflar</b> — <i>farklı açılardan</i>\n🎬 <b>Videolar</b> — <i>ürün kullanımı</i>\n📄 <b>Katalog</b> veya broşür\n📋 <b>Teknik dökümanlar</b>\n\nVarsa şimdi yükleyebilirsiniz. Yoksa <b>YOK</b> butonuna basarak devam edebiliriz.",
-        "en": "Do you have additional materials for your product? (Photos, videos, catalogs, etc.)",
+        "en": "Great! 🎉 I've received your <b>product info</b> and I'm analyzing it.\n\nDo you have <b>additional materials</b> for your product?\n\n📷 <b>Photos</b> — <i>different angles</i>\n🎬 <b>Videos</b> — <i>product usage</i>\n📄 <b>Catalogs</b> or brochures\n📋 <b>Technical docs</b>\n\nUpload now or press <b>NO</b> to continue.",
         "de": "Haben Sie zusätzliche Materialien? (Fotos, Videos, Kataloge usw.)",
         "fr": "Avez-vous des matériaux supplémentaires? (Photos, vidéos, catalogues, etc.)",
         "es": "¿Tienes materiales adicionales? (Fotos, videos, catálogos, etc.)",
@@ -832,7 +832,7 @@ PLATFORM = {
     },
     "prompt": {
         "tr": "Teşekkürler! 🙏\n\nŞimdi reklamınızı hangi <b>platformda</b> yayınlamak istersiniz?\n\nSize en uygun platformu seçin, <b>reklam stratejinizi</b> ona göre hazırlayalım.",
-        "en": "Which platform will your video be published on?",
+        "en": "Thanks! 🙏\n\nWhich <b>platform</b> would you like to publish your ad on?\n\nChoose the best platform and I'll prepare your <b>ad strategy</b> accordingly.",
         "de": "Auf welcher Plattform soll Ihr Video veröffentlicht werden?",
         "fr": "Sur quelle plateforme votre vidéo sera-t-elle publiée?",
         "es": "¿En qué plataforma se publicará tu video?",
