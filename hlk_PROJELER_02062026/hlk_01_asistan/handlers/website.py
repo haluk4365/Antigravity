@@ -2245,6 +2245,21 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
         context.user_data["_admin_chat_mode"] = False
         try: await query.message.delete()
         except: pass
+        # Admin fiyatlandırma formunu tekrar göster
+        admin_form, computed_data = _build_admin_pricing_form(context.user_data)
+        context.user_data["_computed_toplam"] = computed_data["toplam"]
+        context.user_data["_computed_yonetici_fiyat"] = computed_data["yonetici_fiyat"]
+        context.user_data["_computed_kdvli"] = computed_data["kdvli"]
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ Katsayı Gir", callback_data="admin_enter_katsayi"),
+             InlineKeyboardButton("💬 HLK'ya Sor", callback_data="admin_hlk_chat")],
+            [InlineKeyboardButton("✅ ONAY", callback_data="admin_price_submit"),
+             InlineKeyboardButton("❌ İPTAL", callback_data="admin_price_cancel")],
+        ])
+        await context.bot.send_message(
+            chat_id=chat_id, text=admin_form,
+            reply_markup=kb, parse_mode="HTML",
+        )
         return
 
     if cb == "admin_price_submit":
