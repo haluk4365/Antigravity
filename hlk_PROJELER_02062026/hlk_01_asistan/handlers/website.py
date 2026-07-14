@@ -1654,22 +1654,24 @@ async def _run_sahne13_flow(
     else:
         logger.warning(f"⚠️ SAHNE-13 video bulunamadı: dil={language}")
 
-    # FD-008_5: SESLI_HINT — seçilen dilde uyarı metni gönder, 5sn sonra sil
+    # FD-008_5: SESLI_HINT — seçilen dilde uyarı metni gönder, 4sn sonra otomatik sil
     from handlers.start import SESLI_HINT
     hint_text = SESLI_HINT.get(language, SESLI_HINT["tr"])
     hint_msg = await bot.send_message(chat_id=chat_id, text=hint_text, parse_mode="HTML")
     logger.info(f"🔊 SAHNE-13 SESLI_HINT gönderildi: {language}")
 
-    # Video + hint süresince bekle
-    await asyncio.sleep(video_duration + SAHNE2_EXTRA_WAIT)
-
-    # Hint mesajını sil
-    if hint_msg:
+    # 4 saniye sonra hint'i otomatik sil (arka planda)
+    async def _remove_sahne13_hint():
+        await asyncio.sleep(4)
         try:
             await bot.delete_message(chat_id=chat_id, message_id=hint_msg.message_id)
-            logger.info(f"🧹 SAHNE-13 SESLI_HINT silindi")
+            logger.info(f"🧹 SAHNE-13 SESLI_HINT 4sn sonra otomatik silindi")
         except Exception:
             pass
+    asyncio.create_task(_remove_sahne13_hint())
+
+    # Video süresince bekle
+    await asyncio.sleep(video_duration + SAHNE2_EXTRA_WAIT)
 
     # Videoyu sil
     if sahne13_msg:
