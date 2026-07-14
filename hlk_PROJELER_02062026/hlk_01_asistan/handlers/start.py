@@ -825,8 +825,31 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
 
     welcome_msg_id, link_msg_id = await _run_balloons()
 
-    # Video sonunda ekstra bekleme — konuşma tamamen bitmeden kapanmaması için
-    await asyncio.sleep(SAHNE2_EXTRA_WAIT)
+    # Video sonunda siyah ekran — konuşma tamamen bitmeden kapanmaması için
+    import base64, tempfile, os as _os
+    # 1x1 piksel siyah PNG (base64)
+    _BLACK_PNG = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/P"
+        "chI7wAAAABJRU5ErkJggg=="
+    )
+    _black_file = _os.path.join(tempfile.gettempdir(), "hlk_black.png")
+    with open(_black_file, "wb") as _f:
+        _f.write(_BLACK_PNG)
+    try:
+        black_msg = await context.bot.send_photo(
+            chat_id=chat_id, photo=open(_black_file, "rb"),
+            caption=" ",
+        )
+        logger.info(f"⬛ SAHNE-2 siyah ekran gönderildi: msg={black_msg.message_id}")
+        await asyncio.sleep(SAHNE2_EXTRA_WAIT)
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=black_msg.message_id)
+            logger.info(f"🧹 SAHNE-2 siyah ekran silindi")
+        except Exception:
+            pass
+    except Exception as e:
+        logger.warning(f"⬛ Siyah ekran gönderilemedi, fallback sleep: {e}")
+        await asyncio.sleep(SAHNE2_EXTRA_WAIT)
 
     # ── MASTER-003 SAHNE-2 Cleanup: yalnızca link isteği kalsın ──
     logger.info(f"⏱️ SAHNE-2 cleanup: video+uyari+balon siliniyor, link kalıyor")
