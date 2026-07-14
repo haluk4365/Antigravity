@@ -40,20 +40,18 @@ from config.video_paths import (
 logger = logging.getLogger(__name__)
 
 # ── HLK Admin Sohbet ────────────────────────────────────────────────────
-HLK_ADMIN_SYSTEM = """Sen HLK, profesyonel bir Yapay Zeka Reklam Asistanısın. Görevin yöneticiye
-reel ve gerçek bilgiler vermektir. Sohbet için değil, doğru yanıt için varsın.
+HLK_ADMIN_SYSTEM = """Sen HLK'nın Yönetici Fiyatlandırma Asistanısın. Bu ekran SADECE yöneticiye
+gönderilir. Kullanıcı bu ekranı GÖREMEZ.
 
-Kesinlikle uyman gereken kurallar:
-1. Her soruya MUTLAKA doğru ve gerçek bilgi ver. Tahmin yürütme, uydurma.
-2. Fiyat, maliyet, kar marjı, servis maliyetleri hakkında reel piyasa verilerini kullan.
-3. Video prodüksiyon maliyetleri, servis ücretleri, API maliyetleri hakkında güncel bilgi ver.
-4. Bilmediğin bir şey sorulursa "Bu konuda kesin bilgim yok" de, asla uydurma.
-5. Kısa, net, doğrudan cevap ver. 1-3 cümle.
-6. Türkçe konuş.
-7. Cevapların yöneticinin karar vermesine yardımcı olacak somut veriler içermelidir.
-
-Örnek konular: video prodüksiyon maliyeti, API servis ücretleri, kar marjı hesaplama,
-fiyatlandırma stratejisi, servis seçimi, üretim süresi, ekipman maliyetleri."""
+KESİN KURALLAR — ihlal edilemez:
+1. SADECE yukarıdaki URETIM BAGLAMI'nda verilen gerçek verileri kullan.
+2. ASLA tahmin yürütme, varsayım yapma, sayı uydurma.
+3. TÜM fiyatlar USD'dir. TL karşılığı sadece TCMB kuruna göre hesaplanabilir.
+   USD ve TL'yi ASLA karıştırma. Her seferinde birimini BELİRT ($ veya TL).
+4. Bilmediğin KESİN bir şey sorulursa "Bu bilgi sistemde mevcut değil" de.
+5. Bu bir FİYATLANDIRMA ekranıdır. Yönetici video üretim maliyetini belirler.
+6. Kısa ve net cevap ver. Her cevap en fazla 3 cümle.
+7. Cevaplarında SOMUT rakam kullan. Belirsiz ifade kullanma."""
 
 def _build_admin_context(user_data: dict, user_msg: str) -> str:
     """Yönetici sohbeti için üretim bağlamını oluşturur."""
@@ -68,28 +66,42 @@ def _build_admin_context(user_data: dict, user_msg: str) -> str:
     audience = user_data.get("target_audience", "—")
     voice_lang = user_data.get("voice_language", "—")
     voice_char = user_data.get("voice_character", "—")
-    katsayi = user_data.get("_admin_katsayi", "—")
+
+    # Gercek fiyat verileri
+    katsayi = user_data.get("_admin_katsayi", "1.0")
     toplam = user_data.get("_computed_toplam", "—")
     yonetici_fiyat = user_data.get("_computed_yonetici_fiyat", "—")
     kdvli = user_data.get("_computed_kdvli", "—")
 
-    toggles = user_data.get("audio_toggles", {})
-    ses_parts = []
-    if toggles.get("silent"): ses_parts.append("Sessiz")
-    if toggles.get("voiceover"): ses_parts.append("Seslendirme")
-    if toggles.get("ambient"): ses_parts.append("Ortam Sesleri")
-    if toggles.get("music"): ses_parts.append("Fon Muzigi")
-    ses_yapisi = ", ".join(ses_parts) if ses_parts else "—"
+    # TCMB kurunu al (website.py'deki fonksiyon)
+    try:
+        from handlers.website import _get_tcmb_kur
+        tcmb = _get_tcmb_kur()
+    except Exception:
+        tcmb = 47.0
+
+    try:
+        tl_karsilik = round(float(kdvli) * tcmb, 2) if kdvli != "—" else "—"
+    except (ValueError, TypeError):
+        tl_karsilik = "—"
 
     return (
-        f"===== URETIM BAGLAMI =====\n"
-        f"Urun: {brand} — {product_name}\n"
-        f"Platform: {platform} | Format: {fmt} | Cozunurluk: {resolution}\n"
-        f"Sure: {duration} sn | Tarz: {style} | Hedef Kitle: {audience}\n"
-        f"Ses: {ses_yapisi} | Seslendirme Dili: {voice_lang} | Karakter: {voice_char}\n"
-        f"Fiyat Katsayisi: {katsayi} | Toplam Servis: {toplam} | Yonetici Fiyat: {yonetici_fiyat} | KDV Dahil: {kdvli}\n"
-        f"===========================\n\n"
-        f"Yoneticinin Sorusu: {user_msg}"
+        f"Bu bir YONETICI FIYATLANDIRMA EKRANIDIR. Kullaniciya GONDERILMEZ.\n\n"
+        f"=== GUNCEL URETIM BILGILERI ===\n"
+        f"URUN: {brand} — {product_name}\n"
+        f"PLATFORM: {platform} | FORMAT: {fmt} | COZUNURLUK: {resolution}\n"
+        f"VIDEO SURESI: {duration} sn | TARZ: {style}\n"
+        f"HEDEF KITLE: {audience}\n"
+        f"SES: {voice_lang} / {voice_char}\n\n"
+        f"=== FIYATLANDIRMA VERILERI (GERCEK) ===\n"
+        f"Yonetici Katsayisi: {katsayi}\n"
+        f"Toplam Servis Bedeli (USD): ${toplam}\n"
+        f"Yonetici Belirledigi Fiyat (USD): ${yonetici_fiyat}\n"
+        f"KDV Dahil Teklif Fiyati (USD): ${kdvli}\n"
+        f"TCMB USD Satis Kuru: {tcmb} TL\n"
+        f"KDV Dahil TL Karsiligi: {tl_karsilik} TL\n\n"
+        f"=== YONETICI SORUSU ===\n"
+        f"{user_msg}"
     )
 
 
@@ -109,7 +121,7 @@ async def _hlk_admin_chat(user_msg: str, user_data: dict) -> str:
         context_msg = _build_admin_context(user_data, user_msg)
         client = openai.OpenAI(api_key=api_key)
         resp = client.chat.completions.create(
-            model="gpt-4o-mini", max_tokens=300,
+            model="gpt-4o", max_tokens=300, temperature=0.0,
             messages=[
                 {"role": "system", "content": HLK_ADMIN_SYSTEM},
                 {"role": "user", "content": context_msg},
