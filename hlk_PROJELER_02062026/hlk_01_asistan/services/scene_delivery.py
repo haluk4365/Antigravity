@@ -216,7 +216,12 @@ class SceneDeliveryModule:
                         await asyncio.sleep(delay)
                     else:
                         logger.warning(f"  ❌ deleteMessage({mid}) → 2 deneme başarısız, sonraki cleanup'ta tekrar denenecek")
-        logger.info(f"  Sonuç: {silinen}/{len(msg_ids)} mesaj silindi, {len(self._pending_cleanup_ids.get(chat_id, set()))} ID sonraki denemeye kaldı")
+        remaining = len(self._pending_cleanup_ids.get(chat_id, set()))
+        logger.info(f"  Sonuç: {silinen}/{len(msg_ids)} mesaj silindi, {remaining} ID sonraki denemeye kaldı")
+        # Hicbir mesaj silinemediyse birikmeyi onle — havuzu temizle
+        if silinen == 0 and remaining > 0:
+            logger.warning(f"  ⚠️ 0/{len(msg_ids)} silindi — havuz temizleniyor ({remaining} ID)")
+            self._pending_cleanup_ids[chat_id] = set()
         logger.info("=" * 50)
         self._chat_last_scene[chat_id] = {}
 
