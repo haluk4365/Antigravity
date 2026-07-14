@@ -1819,6 +1819,25 @@ def _build_scenario_data(user_data: dict) -> dict:
                 ses_parts.append(AUDIO_OPTIONS[k])
         ses_yapisi = ", ".join(ses_parts) if ses_parts else "—"
 
+    # Dinamik sahne sureleri — kullanicinin sectigi video suresine gore
+    try:
+        total_sec = int(duration) if str(duration).isdigit() else 25
+    except (ValueError, TypeError):
+        total_sec = 25
+    total_sec = max(7, total_sec)
+    s1 = max(2, round(total_sec * 0.28))
+    s2 = max(3, round(total_sec * 0.48))
+    s3 = total_sec - s1 - s2
+    if s3 < 2:
+        s3 = 2
+        s2 = total_sec - s1 - s3
+    if s2 < 2:
+        s2 = 2
+        s1 = total_sec - s2 - s3
+    t1_end = s1
+    t2_end = s1 + s2
+    t3_end = total_sec
+
     return {
         "adimlar": [
             {"no": 1, "baslik": "Brief", "altbaslik": "Tamamlandı", "durum": "done"},
@@ -1844,25 +1863,6 @@ def _build_scenario_data(user_data: dict) -> dict:
             f"{style} tarzında bir ürün tanıtım videosu hazırlanacaktır. "
             f"Hedef kitle: {audience}. Seslendirme: {voice_lang}, {voice_char}."
         ),
-        # Dinamik sahne sureleri — kullanicinin sectigi video suresine gore
-        try:
-            total_sec = int(duration) if str(duration).isdigit() else 25
-        except (ValueError, TypeError):
-            total_sec = 25
-        total_sec = max(7, total_sec)                 # Minimum 7sn senaryo
-        s1 = max(2, round(total_sec * 0.28))          # Giris ~%28
-        s2 = max(3, round(total_sec * 0.48))          # Urun Tanitimi ~%48
-        s3 = total_sec - s1 - s2                       # Kapanis CTA
-        if s3 < 2:
-            s3 = 2
-            s2 = total_sec - s1 - s3
-        if s2 < 2:
-            s2 = 2
-            s1 = total_sec - s2 - s3
-        t1_end = s1
-        t2_end = s1 + s2
-        t3_end = total_sec
-
         "sahneler": [
             {"no": 1, "gorsel": "https://via.placeholder.com/160x100.png?text=1",
              "baslik": "Dikkat Çekici Giriş",
