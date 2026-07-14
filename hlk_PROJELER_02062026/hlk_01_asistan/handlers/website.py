@@ -2289,6 +2289,8 @@ def _build_banka_bilgileri_karti(price: float = 0, tcmb: float = None, lang: str
     """
     if tcmb is None:
         tcmb = _get_tcmb_kur()
+    SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    satis_tl = round(price * tcmb, 2)
     lines = [
         "<code>✅Brief › ✅Senaryo › ✅Fiyat › ✅Ödeme</code>",
         f"{SEP}",
