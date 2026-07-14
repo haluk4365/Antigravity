@@ -1778,6 +1778,47 @@ def _build_scenario_form(user_data: dict) -> str:
     )
 
 
+def _build_sahne_listesi(sahneler: list, time_ranges: list, times: list,
+                         brand: str, product_name: str) -> list:
+    """Dinamik sahne listesini olusturur."""
+    ACL = {
+        "Dikkat Çekici Giriş": (
+            f"{brand} {product_name} ürünü günlük yaşamın içinde doğal bir anda gösterilir. "
+            "İzleyicinin dikkati ilk saniyelerde ürüne çekilir. "
+            "Görsel olarak etkileyici, merak uyandıran bir açılış sahnesi."
+        ),
+        "Ürün Tanıtımı": (
+            f"Ürün yakın planda detaylı gösterilir. {brand} kalitesi ve "
+            f"{product_name}'in öne çıkan özellikleri vurgulanır."
+        ),
+        "Özellikler ve Faydalar": (
+            f"{product_name} ürününün sağladığı faydalar ve rakiplerinden ayrışan yönleri "
+            "görsel karşılaştırmalar ve ikonlarla sunulur."
+        ),
+        "Kullanım Gösterimi": (
+            f"{product_name} ürününün gerçek kullanım anı gösterilir. "
+            "Kullanım kolaylığı ve pratik faydaları vurgulanır."
+        ),
+        "Kapanış — CTA": (
+            f"{brand} logosu ve ürün bilgisi ekranda belirir. "
+            "İzleyiciyi satın almaya veya daha fazla bilgi edinmeye yönlendiren "
+            "net ve güçlü bir çağrı mesajı. Sipariş linki veya iletişim bilgisi sunulur."
+        ),
+    }
+    result = []
+    for i, s in enumerate(sahneler):
+        t_start, t_end = time_ranges[i]
+        result.append({
+            "no": i + 1,
+            "gorsel": f"https://via.placeholder.com/160x100.png?text={i + 1}",
+            "baslik": s["baslik"],
+            "aciklama": ACL.get(s["baslik"], f"{s['baslik']} sahnesi."),
+            "zaman": f"0:{t_start:02d} – 0:{t_end:02d}",
+            "sure": f"{times[i]} sn",
+        })
+    return result
+
+
 def _build_scenario_data(user_data: dict) -> dict:
     """REFERANS_SENARYO_ONAY_FORMU template.html için veri yapısı.
 
@@ -1819,24 +1860,64 @@ def _build_scenario_data(user_data: dict) -> dict:
                 ses_parts.append(AUDIO_OPTIONS[k])
         ses_yapisi = ", ".join(ses_parts) if ses_parts else "—"
 
-    # Dinamik sahne sureleri — kullanicinin sectigi video suresine gore
+    # Dinamik sahne sayisi ve sureleri — video suresine gore
     try:
         total_sec = int(duration) if str(duration).isdigit() else 25
     except (ValueError, TypeError):
         total_sec = 25
     total_sec = max(7, total_sec)
-    s1 = max(2, round(total_sec * 0.28))
-    s2 = max(3, round(total_sec * 0.48))
-    s3 = total_sec - s1 - s2
-    if s3 < 2:
-        s3 = 2
-        s2 = total_sec - s1 - s3
-    if s2 < 2:
-        s2 = 2
-        s1 = total_sec - s2 - s3
-    t1_end = s1
-    t2_end = s1 + s2
-    t3_end = total_sec
+
+    if total_sec <= 10:
+        sahneler = [
+            {"baslik": "Dikkat Çekici Giriş", "pct": 0.30},
+            {"baslik": "Ürün Tanıtımı", "pct": 0.45},
+            {"baslik": "Kapanış — CTA", "pct": 0.25},
+        ]
+    elif total_sec <= 20:
+        sahneler = [
+            {"baslik": "Dikkat Çekici Giriş", "pct": 0.20},
+            {"baslik": "Ürün Tanıtımı", "pct": 0.30},
+            {"baslik": "Özellikler ve Faydalar", "pct": 0.30},
+            {"baslik": "Kapanış — CTA", "pct": 0.20},
+        ]
+    elif total_sec <= 30:
+        sahneler = [
+            {"baslik": "Dikkat Çekici Giriş", "pct": 0.18},
+            {"baslik": "Ürün Tanıtımı", "pct": 0.24},
+            {"baslik": "Kullanım Gösterimi", "pct": 0.22},
+            {"baslik": "Özellikler ve Faydalar", "pct": 0.22},
+            {"baslik": "Kapanış — CTA", "pct": 0.14},
+        ]
+    else:
+        sahneler = [
+            {"baslik": "Dikkat Çekici Giriş", "pct": 0.15},
+            {"baslik": "Ürün Tanıtımı", "pct": 0.22},
+            {"baslik": "Kullanım Gösterimi", "pct": 0.20},
+            {"baslik": "Özellikler ve Faydalar", "pct": 0.20},
+            {"baslik": "Kapanış — CTA", "pct": 0.23},
+        ]
+
+    # Sureleri hesapla
+    times = []
+    remaining = total_sec
+    for i, s in enumerate(sahneler):
+        if i == len(sahneler) - 1:
+            sec = max(2, remaining)
+        else:
+            sec = max(2, round(total_sec * s["pct"]))
+        times.append(sec)
+        remaining -= sec
+    # Son sahneye kalan saniyeleri ekle
+    total_assigned = sum(times)
+    if total_assigned != total_sec:
+        times[-1] += total_sec - total_assigned
+
+    # Zaman araliklarini olustur
+    time_ranges = []
+    start = 0
+    for t in times:
+        time_ranges.append((start, start + t))
+        start += t
 
     return {
         "adimlar": [
@@ -1863,26 +1944,7 @@ def _build_scenario_data(user_data: dict) -> dict:
             f"{style} tarzında bir ürün tanıtım videosu hazırlanacaktır. "
             f"Hedef kitle: {audience}. Seslendirme: {voice_lang}, {voice_char}."
         ),
-        "sahneler": [
-            {"no": 1, "gorsel": "https://via.placeholder.com/160x100.png?text=1",
-             "baslik": "Dikkat Çekici Giriş",
-             "aciklama": (f"{brand} {product_name} ürünü günlük yaşamın içinde doğal bir anda gösterilir. "
-                          f"İlk {s1} saniyede izleyicinin dikkati ürüne çekilir. "
-                          "Görsel olarak etkileyici, merak uyandıran bir açılış sahnesi."),
-             "zaman": f"0:00 – 0:{t1_end:02d}", "sure": f"{s1} sn"},
-            {"no": 2, "gorsel": "https://via.placeholder.com/160x100.png?text=2",
-             "baslik": "Ürün Tanıtımı ve Özellikler",
-             "aciklama": (f"Ürün yakın planda detaylı gösterilir. {brand} kalitesi ve "
-                          f"{product_name}'in öne çıkan özellikleri vurgulanır. "
-                          "Kullanım alanları, faydaları ve rakiplerinden ayrışan yönleri sunulur."),
-             "zaman": f"0:{t1_end:02d} – 0:{t2_end:02d}", "sure": f"{s2} sn"},
-            {"no": 3, "gorsel": "https://via.placeholder.com/160x100.png?text=3",
-             "baslik": "Kapanış — Harekete Geçirici Mesaj (CTA)",
-             "aciklama": (f"{brand} logosu ve ürün bilgisi ekranda belirir. "
-                          "İzleyiciyi satın almaya veya daha fazla bilgi edinmeye yönlendiren "
-                          "net ve güçlü bir çağrı mesajı. Sipariş linki veya iletişim bilgisi sunulur."),
-             "zaman": f"0:{t2_end:02d} – 0:{t3_end:02d}", "sure": f"{s3} sn"},
-        ],
+        "sahneler": _build_sahne_listesi(sahneler, time_ranges, times, brand, product_name),
         "toplamSure": f"{duration} sn" if duration != "—" else "—",
         "seslendirme": {
             "dil": voice_lang,
@@ -1894,7 +1956,7 @@ def _build_scenario_data(user_data: dict) -> dict:
             "format": fmt,
             "cozunurluk": resolution,
             "sure": f"{duration} sn" if duration != "—" else "—",
-            "sahneSayisi": 3,
+            "sahneSayisi": len(sahneler),
         },
         "footer": {
             "kod": "HLK_RUNTIME_SENARYO",
