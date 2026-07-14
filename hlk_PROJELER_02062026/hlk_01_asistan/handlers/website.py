@@ -2584,14 +2584,28 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
-    # FD-008_1: Kullanıcıya daktilo efektiyle bilgilendirme mesajı
+    # FD-008_1: Daktilo efektiyle dinamik bilgilendirme mesaji (GK-001_5)
     lang = get_lang(context.user_data)
-    done_text = (
-        f"{t('final.payment_received', lang)}\n"
-        f"{t('final.production_started', lang)}\n"
-        f"{t('final.duration_info', lang)}\n"
-        f"{t('final.auto_delivery', lang)}"
-    )
+    product_name = (context.user_data.get("website_url", "").split("/")[-1]
+                    if "/" in context.user_data.get("website_url", "") else "urununuz")
+    duration = context.user_data.get("video_duration", "10-15")
+
+    if lang == "tr":
+        done_text = (
+            f"Odemeniz onaylandi! ✅\n\n"
+            f"<b>{product_name}</b> icin video uretiminiz hemen basladi. 🎬\n"
+            f"Bu islem yaklasik <b>{duration} dakika</b> kadar surecek.\n"
+            f"Videonuz hazir olur olmaz size buradan gonderecegim.\n\n"
+            f"<i>Bol kazanclar dilerim!</i> 🚀"
+        )
+    else:
+        done_text = (
+            f"{t('final.payment_received', lang)} ✅\n\n"
+            f"<b>{product_name}</b> — {t('final.production_started', lang)} 🎬\n"
+            f"{t('final.duration_info', lang)}: ~{duration} min.\n"
+            f"{t('final.auto_delivery', lang)}\n\n"
+            f"<i>🚀</i>"
+        )
     await typewriter_animation(chat_id, done_text, context.bot, 0.06)
 
     from utils.session_timeout import start_timer
