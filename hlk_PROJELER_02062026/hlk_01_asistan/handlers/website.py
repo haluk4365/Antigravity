@@ -1861,13 +1861,20 @@ def _build_scenario_data(user_data: dict) -> dict:
         ses_yapisi = ", ".join(ses_parts) if ses_parts else "—"
 
     # Dinamik sahne sayisi ve sureleri — video suresine gore
+    # MASTER-009: Kullanicinin sectigi sure kesindir, uyulmak zorundadir
     try:
         total_sec = int(duration) if str(duration).isdigit() else 25
     except (ValueError, TypeError):
         total_sec = 25
-    total_sec = max(7, total_sec)
+    total_sec = max(4, total_sec)   # Servis saglayici minimum: 4sn
 
-    if total_sec <= 10:
+    if total_sec <= 6:
+        # 4-6 sn: 2 sahne (cok kisa videolar)
+        sahneler = [
+            {"baslik": "Dikkat Çekici Giriş", "pct": 0.40},
+            {"baslik": "Kapanış — CTA", "pct": 0.60},
+        ]
+    elif total_sec <= 10:
         sahneler = [
             {"baslik": "Dikkat Çekici Giriş", "pct": 0.30},
             {"baslik": "Ürün Tanıtımı", "pct": 0.45},
