@@ -1228,38 +1228,41 @@ async def handle_emphasis_done(update: Update, context: ContextTypes.DEFAULT_TYP
 # SAHNE-12: Brief Onay HTML Üreticisi (AR-002_65 En Yüksek Sadakat) ─────────────
 
 def _build_brief_html(user_data: dict, checks: dict) -> str:
-    """Brief Onay Formu'nu Telegram HTML olarak oluşturur (PNG kullanılmaz).
+    """Brief Onay Formu'nu Telegram HTML olarak oluşturur (AR-002_65).
 
-    AR-002_65 uyumlu: Veri bütünlüğü + işlevsel eşdeğerlik + görsel sadakat.
-    Telegram resmi bileşenleriyle (<b>, <code>, <i>, InlineKeyboardButton) uygulanır.
+    Tum etiketler ve aciklamalar secilen dile gore cevrilir.
     """
-    aciklama_map = {
-        "brief_link":       "Analiz edilen ürün sayfası",
-        "brief_material":   "Kullanıcının yüklediği materyaller",
-        "brief_platform":   "Yayınlanacak platform",
-        "brief_format":     "Seçilen video formatı",
-        "brief_resolution": "Video çözünürlüğü",
-        "brief_duration":   "Tercih edilen video süresi",
-        "brief_style":      "Reklam tanıtım tarzı",
-        "brief_audience":   "Reklam hedef kitlesi",
-        "brief_audio":      "Ses tercihleri",
-        "brief_voicelang":  "Seçilen seslendirme dili",
-        "brief_voicechar":  "Seslendirme karakteri",
-        "brief_emphasis":   "Öne çıkarılacak detaylar",
+    lang = get_lang(user_data)
+    # i18n field label mapping
+    FIELD_KEY_TO_I18N = {
+        "brief_link": "s12.field_link", "brief_material": "s12.field_material",
+        "brief_platform": "s12.field_platform", "brief_format": "s12.field_format",
+        "brief_resolution": "s12.field_resolution", "brief_duration": "s12.field_duration",
+        "brief_style": "s12.field_style", "brief_audience": "s12.field_audience",
+        "brief_audio": "s12.field_audio", "brief_voicelang": "s12.field_voicelang",
+        "brief_voicechar": "s12.field_voicechar", "brief_emphasis": "s12.field_emphasis",
+    }
+    DESC_KEY_MAP = {
+        "brief_link": "s12.desc_link", "brief_material": "s12.desc_material",
+        "brief_platform": "s12.desc_platform", "brief_format": "s12.desc_format",
+        "brief_resolution": "s12.desc_resolution", "brief_duration": "s12.desc_duration",
+        "brief_style": "s12.desc_style", "brief_audience": "s12.desc_audience",
+        "brief_audio": "s12.desc_audio", "brief_voicelang": "s12.desc_voicelang",
+        "brief_voicechar": "s12.desc_voicechar", "brief_emphasis": "s12.desc_emphasis",
     }
     maddeler = []
-    for field_key, label, scene_id, editable in BRIEF_FIELDS:
-        ikon = label.split(" ", 1)[0] if " " in label else ""
-        baslik = label.split(" ", 1)[1] if " " in label else label
+    for field_key, _label, scene_id, editable in BRIEF_FIELDS:
+        label_tr = t(FIELD_KEY_TO_I18N.get(field_key, ""), lang)
+        ikon = label_tr.split(" ", 1)[0] if " " in label_tr else ""
+        baslik = label_tr.split(" ", 1)[1] if " " in label_tr else label_tr
         maddeler.append({
             "onayli": checks.get(field_key, True),
             "ikon": ikon,
             "baslik": baslik,
-            "aciklama": aciklama_map.get(field_key, "Brief bilgisi"),
+            "aciklama": t(DESC_KEY_MAP.get(field_key, ""), lang),
             "deger": _get_brief_value(user_data, field_key),
         })
 
-    lang = get_lang(user_data)
     SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     lines = []
     lines.append(f"{SEP}")
@@ -1455,7 +1458,8 @@ async def handle_brief_approve(update: Update, context: ContextTypes.DEFAULT_TYP
     user = query.from_user
     chat_id = query.message.chat_id
 
-    await query.answer("✅ Brief onaylandı — senaryo aşamasına geçiliyor...")
+    lang = get_lang(context.user_data)
+    await query.answer(f"✅ {t('s12.approve', lang)} — {t('s13.scenario_phase', lang)}")
     logger.info(f"📋 {user.id} brief'i onayladı → SAHNE-13")
 
     se = StateEngine(context.user_data)
@@ -1481,21 +1485,31 @@ async def handle_brief_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user = query.from_user
     chat_id = query.message.chat_id
 
-    await query.answer("✏️ Düzeltme modu — değiştirmek istediğiniz alanı seçin")
+    lang = get_lang(context.user_data)
+    await query.answer(f"✏️ {t('s12.edit_title', lang)}")
     logger.info(f"📋 {user.id} brief düzeltme moduna girdi")
 
     # Düzenlenebilir alanları göster
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    # i18n field label mapping for edit buttons
+    FIELD_KEY_TO_I18N = {
+        "brief_link": "s12.field_link", "brief_material": "s12.field_material",
+        "brief_platform": "s12.field_platform", "brief_format": "s12.field_format",
+        "brief_resolution": "s12.field_resolution", "brief_duration": "s12.field_duration",
+        "brief_style": "s12.field_style", "brief_audience": "s12.field_audience",
+        "brief_audio": "s12.field_audio", "brief_voicelang": "s12.field_voicelang",
+        "brief_voicechar": "s12.field_voicechar", "brief_emphasis": "s12.field_emphasis",
+    }
     kb_rows = []
     for f in BRIEF_FIELDS:
         if len(f) > 3 and f[3]:  # editable=True
             val = _get_brief_value(context.user_data, f[0])
+            label_tr = t(FIELD_KEY_TO_I18N.get(f[0], ""), lang)
             kb_rows.append([InlineKeyboardButton(
-                f"{f[1]}: {val}",
+                f"{label_tr}: {val}",
                 callback_data=f"brief_edit_{f[0]}"
             )])
 
-    lang = get_lang(context.user_data)
     kb_rows.append([InlineKeyboardButton(f"✅ {t('s12.edit_done', lang)}", callback_data="brief_approve")])
 
     kb = InlineKeyboardMarkup(kb_rows)
