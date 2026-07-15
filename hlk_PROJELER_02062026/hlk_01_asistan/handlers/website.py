@@ -187,10 +187,12 @@ async def _process_link_background(
         se = StateEngine(user_data)
         se.fire(UserEvent.LINK_VALIDATED)
 
-        # Link doğrulandı bilgisi
-        await conversation_scene_engine.produce_scene_response(
-            user_data=user_data, chat_id=chat_id, bot=bot,
-            trigger_event="LINK_VALIDATED_INFO",
+        # Link doğrulandı bilgisi (i18n — secilen dilde)
+        lang = user_data.get("language", "tr")
+        await bot.send_message(
+            chat_id=chat_id,
+            text=t("link.validated", lang),
+            parse_mode="HTML",
         )
 
         # Arka plan araştırmasını başlat
@@ -2443,24 +2445,25 @@ def _build_user_pricing_form(user_data: dict, price: str, yonetici_fiyat: float 
 
     lang = get_lang(user_data)
 
+    sn = t('scenario.scene_unit', lang)
     return (
         f"{SEP}\n"
         f"<b>━━━ 💰 {t('pricing.title', lang)} ━━━</b>\n\n\n\n"
         f"<code>{pid}</code>\n"
         f"{SEP}\n"
-        "<code>✅Brief › ✅Senaryo › ✅Fiyat › 🔵Ödeme</code>\n"
+        f"<code>✅Brief › ✅Senaryo › ✅Fiyat › 🔵Ödeme</code>\n"
         f"{SEP}\n"
-        f"MARKA: <b>{user_data.get('brand', '—')}</b>\n"
-        f"ÜRÜN: <b>{product_name}</b>\n"
-        f"<i>{fmt} • {resolution} • {duration}sn • 5 sahne | {user_data.get('ad_style', '—')} • {user_data.get('target_audience', '—')} | 🎙️ Dış Ses+Fon Müzik</i>\n"
+        f"{t('scenario.brand', lang)}: <b>{user_data.get('brand', '—')}</b>\n"
+        f"{t('scenario.product', lang)}: <b>{product_name}</b>\n"
+        f"<i>{fmt} • {resolution} • {duration}sn • 5 {sn} | {user_data.get('ad_style', '—')} • {user_data.get('target_audience', '—')}</i>\n"
         f"{SEP}\n"
         f"<b>🛠️ {t('pricing.service_scope', lang)}</b>\n"
-        "• Senaryo Hazırlama (HLK Yapay Zekâ)\n"
-        "• Video Üretimi (5 sahne)\n"
-        "• Profesyonel Seslendirme\n"
-        "• Telifsiz Fon Müziği\n"
-        "• Kurgu ve Montaj\n"
-        "• Dijital Teslim (Mp4)\n"
+        f"• {t('pricing.item_scenario', lang)}\n"
+        f"• {t('pricing.item_video', lang)}\n"
+        f"• {t('pricing.item_voice', lang)}\n"
+        f"• {t('pricing.item_music', lang)}\n"
+        f"• {t('pricing.item_editing', lang)}\n"
+        f"• {t('pricing.item_delivery', lang)}\n"
         f"{SEP}\n"
         f"<b>{t('pricing.kdv_dollar', lang)}: ${price_f:.2f}</b>\n"
         f"{t('pricing.tcmb_rate', lang)}: {tcmb_kur} TL\n\n\n\n"
@@ -2478,7 +2481,8 @@ async def handle_pricing_approve(update: Update, context: ContextTypes.DEFAULT_T
     user = query.from_user
     chat_id = query.message.chat_id
 
-    await query.answer("✅ Fiyat teklifi onaylandı!")
+    lang = get_lang(context.user_data)
+    await query.answer(f"✅ {t('pricing.approved_toast', lang)}")
     logger.info(f"💰 {user.id} fiyat teklifini onayladı")
 
     se = StateEngine(context.user_data)
@@ -2514,7 +2518,8 @@ async def handle_pricing_reject(update: Update, context: ContextTypes.DEFAULT_TY
     user = query.from_user
     chat_id = query.message.chat_id
 
-    await query.answer("❌ Teklif reddedildi")
+    lang = get_lang(context.user_data)
+    await query.answer(f"❌ {t('pricing.rejected_toast', lang)}")
     logger.info(f"💰 {user.id} fiyat teklifini reddetti")
 
     se = StateEngine(context.user_data)
