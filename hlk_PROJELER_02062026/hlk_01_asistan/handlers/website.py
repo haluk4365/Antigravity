@@ -971,17 +971,24 @@ async def handle_voice_language(update: Update, context: ContextTypes.DEFAULT_TY
     user = query.from_user
     chat_id = query.message.chat_id
 
-    voice_lang = get_lang(context.user_data)
-    lang_map = {
+    # Kod ↔ gorunen ad eslemesi
+    VOICE_LANG_CODE = {
+        "voicelang_tr": "tr", "voicelang_en": "en", "voicelang_de": "de",
+        "voicelang_fr": "fr", "voicelang_es": "es", "voicelang_ru": "ru",
+        "voicelang_ar": "ar", "voicelang_kr": "kr",
+    }
+    VOICE_LANG_NAME = {
         "voicelang_tr": "Türkçe", "voicelang_en": "English",
         "voicelang_de": "Deutsch", "voicelang_fr": "Français",
         "voicelang_es": "Español", "voicelang_ru": "Русский",
         "voicelang_ar": "العربية", "voicelang_kr": "Kurdî",
     }
-    lang = lang_map.get(query.data, query.data)
-    await query.answer(f"{t('common.saved', voice_lang)}")
-    context.user_data["voice_language"] = lang
-    logger.info(f"🎙️ {user.id} seslendirme dili: {lang}")
+    lang_code = VOICE_LANG_CODE.get(query.data, "tr")
+    lang_name = VOICE_LANG_NAME.get(query.data, query.data)
+    ui_lang = get_lang(context.user_data)
+    await query.answer(f"{t('common.saved', ui_lang)}")
+    context.user_data["voice_language"] = lang_code  # Kod olarak sakla!
+    logger.info(f"🎙️ {user.id} seslendirme dili: {lang_code} ({lang_name})")
 
     se = StateEngine(context.user_data)
     se.fire(UserEvent.VOICE_LANGUAGE_SELECTED)
