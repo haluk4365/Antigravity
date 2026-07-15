@@ -562,13 +562,19 @@ async def handle_platform_selection(update: Update, context: ContextTypes.DEFAUL
 
 # ─── SAHNE-08: Ses Seçimi Toggle Sistemi (FD-008_1 uyumlu) ──────────────────────
 
-# Ses seçenekleri
-AUDIO_OPTIONS = {
-    "voiceover": "🎙️ Dış Seslendirme",
-    "ambient": "🔊 Ortam Sesleri",
-    "music": "🎵 Telifsiz Fon Müziği",
-    "silent": "🔇 SESSİZ",
+# Ses secenekleri — i18n anahtarlari (s08)
+AUDIO_OPTION_I18N = {
+    "voiceover": "s08.voiceover",
+    "ambient": "s08.ambient",
+    "music": "s08.music",
+    "silent": "s08.silent",
 }
+
+
+def _get_audio_label(key: str, lang: str) -> str:
+    """Ses secenegi etiketini i18n ile cevirir."""
+    from config.i18n import t
+    return t(AUDIO_OPTION_I18N.get(key, key), lang)
 
 
 def _get_audio_toggles(user_data: dict) -> dict:
@@ -583,31 +589,27 @@ def _get_audio_toggles(user_data: dict) -> dict:
     return user_data["audio_toggles"]
 
 
-def _build_audio_keyboard(toggles: dict) -> InlineKeyboardMarkup:
-    """Mevcut toggle state'ine göre dinamik klavye oluşturur.
-
-    - Silent aktifse diğer 3 seçenek ⬜ (disabled) gösterilir
-    - En az 1 seçim yapıldıysa DEVAM butonu eklenir
-    - Checked: ✅, Unchecked: ☐, Disabled: ⬜
-    """
+def _build_audio_keyboard(toggles: dict, lang: str = "tr") -> InlineKeyboardMarkup:
+    """Mevcut toggle state'ine göre dinamik klavye oluşturur (i18n uyumlu)."""
     keyboard = []
     is_silent = toggles.get("silent", False)
 
-    # İlk 3 seçenek (non-silent)
     for key in ["voiceover", "ambient", "music"]:
+        label = _get_audio_label(key, lang)
         if is_silent:
-            text = f"⬜ {AUDIO_OPTIONS[key]}"
+            text = f"⬜ {label}"
         elif toggles[key]:
-            text = f"✅ {AUDIO_OPTIONS[key]}"
+            text = f"✅ {label}"
         else:
-            text = f"☐ {AUDIO_OPTIONS[key]}"
+            text = f"☐ {label}"
         keyboard.append([InlineKeyboardButton(
             text=text,
             callback_data=f"audio_toggle_{key}"
         )])
 
-    # SESSİZ seçeneği
-    silent_text = f"{'✅' if is_silent else '☐'} {AUDIO_OPTIONS['silent']}"
+    # SESSIZ secenegi
+    silent_label = _get_audio_label("silent", lang)
+    silent_text = f"{'✅' if is_silent else '☐'} {silent_label}"
     keyboard.append([InlineKeyboardButton(
         text=silent_text,
         callback_data="audio_toggle_silent"
@@ -630,7 +632,8 @@ async def _edit_audio_keyboard(chat_id: int, message_id: int, toggles: dict, bot
     Returns: Yeni buton mesajının message_id'si.
     """
     from services.scene_delivery import scene_delivery as _sd
-    keyboard = _build_audio_keyboard(toggles)
+    lang = context.get("language", "tr")
+    keyboard = _build_audio_keyboard(toggles, lang)
     new_id = await _sd.replace_ui_component(chat_id, message_id, "▾", keyboard)
     context["audio_scene_msg_id"] = new_id
     return new_id
