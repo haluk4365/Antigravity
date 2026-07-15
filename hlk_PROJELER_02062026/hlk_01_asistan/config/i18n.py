@@ -844,6 +844,154 @@ PLATFORM = {
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Senaryo Onay Formu
+# ═══════════════════════════════════════════════════════════════════════════════
+SCENARIO = {
+    "title": {
+        "tr": "SENARYO ONAY FORMU",
+        "en": "SCENARIO APPROVAL FORM",
+        "de": "SZENARIO-GENEHMIGUNGSFORMULAR",
+        "fr": "FORMULAIRE D'APPROBATION DU SCÉNARIO",
+        "es": "FORMULARIO DE APROBACIÓN DE GUION",
+        "ar": "نموذج الموافقة على السيناريو",
+        "ru": "ФОРМА УТВЕРЖДЕНИЯ СЦЕНАРИЯ",
+        "kr": "FORMA PESENDKIRINA SÊNARYOYÊ",
+    },
+    "step": {
+        "tr": "✅1.Brief  ›  🔵2.Senaryo  ›  ⏳3.Fiyat Teklifi",
+        "en": "✅1.Brief  ›  🔵2.Scenario  ›  ⏳3.Price Offer",
+        "de": "✅1.Brief  ›  🔵2.Szenario  ›  ⏳3.Preisangebot",
+        "fr": "✅1.Brief  ›  🔵2.Scénario  ›  ⏳3.Offre de Prix",
+        "es": "✅1.Brief  ›  🔵2.Guion  ›  ⏳3.Oferta de Precio",
+        "ar": "✅1.موجز  ›  🔵2.سيناريو  ›  ⏳3.عرض السعر",
+        "ru": "✅1.Бриф  ›  🔵2.Сценарий  ›  ⏳3.Цена",
+        "kr": "✅1.Kurte  ›  🔵2.Senaryo  ›  ⏳3.Teklîfa Bihayê",
+    },
+    "brand": {"tr": "MARKA", "en": "BRAND", "de": "MARKE", "fr": "MARQUE", "es": "MARCA", "ar": "العلامة", "ru": "БРЕНД", "kr": "MARKE"},
+    "product": {"tr": "ÜRÜN", "en": "PRODUCT", "de": "PRODUKT", "fr": "PRODUIT", "es": "PRODUCTO", "ar": "المنتج", "ru": "ПРОДУКТ", "kr": "BERHEM"},
+    "story_title": {
+        "tr": "📖 Tanıtım Hikayesi",
+        "en": "📖 Storyline",
+        "de": "📖 Handlung",
+        "fr": "📖 Scénario",
+        "es": "📖 Historia",
+        "ar": "📖 القصة",
+        "ru": "📖 Сюжет",
+        "kr": "📖 Çîrok",
+    },
+    "scene_plan": {
+        "tr": "🎞️ Sahne Planı",
+        "en": "🎞️ Scene Plan",
+        "de": "🎞️ Szenenplan",
+        "fr": "🎞️ Plan des Scènes",
+        "es": "🎞️ Plan de Escenas",
+        "ar": "🎞️ خطة المشاهد",
+        "ru": "🎞️ План Сцен",
+        "kr": "🎞️ Plana Dîmenan",
+    },
+    "scene_unit": {
+        "tr": "sahne", "en": "scenes", "de": "Szenen", "fr": "scènes", "es": "escenas", "ar": "مشاهد", "ru": "сцен", "kr": "dîmen",
+    },
+    # Scene titles (dinamik sahneler)
+    "scene_intro": {
+        "tr": "Dikkat Çekici Giriş", "en": "Attention-Grabbing Opening", "de": "Aufmerksamkeitsstarker Einstieg",
+        "fr": "Ouverture Captivante", "es": "Apertura Llamativa", "ar": "افتتاحية جاذبة", "ru": "Захватывающее Вступление", "kr": "Vekirina Balkêş",
+    },
+    "scene_product": {
+        "tr": "Ürün Tanıtımı", "en": "Product Showcase", "de": "Produktvorstellung",
+        "fr": "Présentation du Produit", "es": "Presentación del Producto", "ar": "عرض المنتج", "ru": "Презентация Продукта", "kr": "Danasîna Berhemê",
+    },
+    "scene_features": {
+        "tr": "Özellikler ve Faydalar", "en": "Features & Benefits", "de": "Eigenschaften & Vorteile",
+        "fr": "Caractéristiques & Avantages", "es": "Características y Beneficios", "ar": "الميزات والفوائد", "ru": "Особенности и Преимущества", "kr": "Taybetmendî & Feyde",
+    },
+    "scene_usage": {
+        "tr": "Kullanım Gösterimi", "en": "Usage Demonstration", "de": "Anwendungsdemonstration",
+        "fr": "Démonstration d'Utilisation", "es": "Demostración de Uso", "ar": "عرض الاستخدام", "ru": "Демонстрация Использования", "kr": "Nîşandana Bikaranînê",
+    },
+    "scene_cta": {
+        "tr": "Kapanış — CTA", "en": "Closing — CTA", "de": "Abschluss — CTA",
+        "fr": "Clôture — CTA", "es": "Cierre — CTA", "ar": "الختام — دعوة للإجراء", "ru": "Закрытие — CTA", "kr": "Dawî — CTA",
+    },
+    # Tone/audience/CTA by age group
+    "tone_kids": {"tr": "eğlenceli ve renkli", "en": "fun and colorful", "de": "lustig und bunt", "fr": "amusant et coloré", "es": "divertido y colorido", "ar": "ممتع وملون", "ru": "весёлый и яркий", "kr": "kêfxweş û rengîn"},
+    "aud_kids": {"tr": "çocukların", "en": "children's", "de": "der Kinder", "fr": "des enfants", "es": "de los niños", "ar": "الأطفال", "ru": "детей", "kr": "zarokan"},
+    "cta_kids": {"tr": "ailesiyle birlikte keşfetmeye", "en": "to explore with their family", "de": "mit der Familie zu entdecken", "fr": "à explorer en famille", "es": "a explorar en familia", "ar": "للاستكشاف مع العائلة", "ru": "исследовать с семьёй", "kr": "bi malbata xwe re keşf bikin"},
+    "tone_teen": {"tr": "dinamik ve enerjik", "en": "dynamic and energetic", "de": "dynamisch und energiegeladen", "fr": "dynamique et énergique", "es": "dinámico y enérgico", "ar": "ديناميكي وحيوي", "ru": "динамичный и энергичный", "kr": "dînamîk û enerjîk"},
+    "aud_teen": {"tr": "gençlerin", "en": "teens'", "de": "der Jugendlichen", "fr": "des adolescents", "es": "de los adolescentes", "ar": "المراهقين", "ru": "подростков", "kr": "ciwanan"},
+    "cta_teen": {"tr": "hemen keşfetmeye", "en": "to discover now", "de": "jetzt zu entdecken", "fr": "à découvrir maintenant", "es": "a descubrir ahora", "ar": "للاكتشاف الآن", "ru": "открыть сейчас", "kr": "niha keşf bikin"},
+    "tone_young": {"tr": "modern ve trend", "en": "modern and trendy", "de": "modern und trendy", "fr": "moderne et tendance", "es": "moderno y de moda", "ar": "عصري ورائج", "ru": "современный и модный", "kr": "modern û trend"},
+    "aud_young": {"tr": "genç yetişkinlerin", "en": "young adults'", "de": "junger Erwachsener", "fr": "des jeunes adultes", "es": "de los jóvenes adultos", "ar": "الشباب", "ru": "молодых взрослых", "kr": "ciwanên mezin"},
+    "cta_young": {"tr": "şimdi satın almaya", "en": "to buy now", "de": "jetzt zu kaufen", "fr": "à acheter maintenant", "es": "a comprar ahora", "ar": "للشراء الآن", "ru": "купить сейчас", "kr": "niha bikire"},
+    "tone_adult": {"tr": "profesyonel ve şık", "en": "professional and sleek", "de": "professionell und elegant", "fr": "professionnel et élégant", "es": "profesional y elegante", "ar": "احترافي وأنيق", "ru": "профессиональный и стильный", "kr": "profesyonel û şık"},
+    "aud_adult": {"tr": "yetişkinlerin", "en": "adults'", "de": "der Erwachsenen", "fr": "des adultes", "es": "de los adultos", "ar": "البالغين", "ru": "взрослых", "kr": "mezinan"},
+    "cta_adult": {"tr": "hemen sipariş vermeye", "en": "to order now", "de": "jetzt zu bestellen", "fr": "à commander maintenant", "es": "a pedir ahora", "ar": "للطلب الآن", "ru": "заказать сейчас", "kr": "niha siparîş bide"},
+    "tone_family": {"tr": "güvenilir ve samimi", "en": "trustworthy and warm", "de": "vertrauenswürdig und herzlich", "fr": "fiable et chaleureux", "es": "confiable y cálido", "ar": "موثوق ودافئ", "ru": "надёжный и тёплый", "kr": "pêbawer û germ"},
+    "aud_family": {"tr": "ailelerin", "en": "families'", "de": "der Familien", "fr": "des familles", "es": "de las familias", "ar": "العائلات", "ru": "семей", "kr": "malbatan"},
+    "cta_family": {"tr": "ailesi için satın almaya", "en": "to buy for their family", "de": "für die Familie zu kaufen", "fr": "à acheter pour leur famille", "es": "a comprar para su familia", "ar": "للشراء لعائلاتهم", "ru": "купить для семьи", "kr": "ji bo malbata xwe bikire"},
+    "tone_midage": {"tr": "kaliteli ve prestijli", "en": "quality and prestigious", "de": "hochwertig und prestigeträchtig", "fr": "de qualité et prestigieux", "es": "de calidad y prestigioso", "ar": "عالي الجودة ومرموق", "ru": "качественный и престижный", "kr": "qalîte û prestîj"},
+    "aud_midage": {"tr": "seçkin kullanıcıların", "en": "discerning users'", "de": "anspruchsvoller Nutzer", "fr": "des utilisateurs exigeants", "es": "de los usuarios exigentes", "ar": "المستخدمين المميزين", "ru": "искушённых пользователей", "kr": "bikarhênerên bijare"},
+    "cta_midage": {"tr": "kaliteyi deneyimlemeye", "en": "to experience quality", "de": "Qualität zu erleben", "fr": "à découvrir la qualité", "es": "a experimentar calidad", "ar": "لتجربة الجودة", "ru": "испытать качество", "kr": "qalîteyê biceribîne"},
+    "tone_senior": {"tr": "sakin ve güven veren", "en": "calm and reassuring", "de": "ruhig und beruhigend", "fr": "calme et rassurant", "es": "tranquilo y tranquilizador", "ar": "هادئ ومطمئن", "ru": "спокойный и обнадёживающий", "kr": "aram û dilniya"},
+    "aud_senior": {"tr": "olgun kullanıcıların", "en": "mature users'", "de": "reifer Nutzer", "fr": "des utilisateurs matures", "es": "de los usuarios maduros", "ar": "المستخدمين الناضجين", "ru": "зрелых пользователей", "kr": "bikarhênerên gihîştî"},
+    "cta_senior": {"tr": "güvenle satın almaya", "en": "to buy with confidence", "de": "mit Vertrauen zu kaufen", "fr": "à acheter en toute confiance", "es": "a comprar con confianza", "ar": "للشراء بثقة", "ru": "купить с уверенностью", "kr": "bi pêbawerî bikire"},
+    "tone_default": {"tr": "etkileyici", "en": "impressive", "de": "beeindruckend", "fr": "impressionnant", "es": "impresionante", "ar": "مؤثر", "ru": "впечатляющий", "kr": "bandor"},
+    "aud_default": {"tr": "izleyicilerin", "en": "viewers'", "de": "der Zuschauer", "fr": "des spectateurs", "es": "de los espectadores", "ar": "المشاهدين", "ru": "зрителей", "kr": "temaşevanan"},
+    "cta_default": {"tr": "satın almaya", "en": "to purchase", "de": "zu kaufen", "fr": "à acheter", "es": "a comprar", "ar": "للشراء", "ru": "купить", "kr": "bikire"},
+    # Scene descriptions (with {brand}, {product_name}, {hitap}, {ton}, {cagri} placeholders)
+    "desc_intro": {
+        "tr": "{brand} {product_name} ürünü, {hitap} ilgisini çekecek {ton} bir sahnede gösterilir. İlk saniyelerde ürüne odaklanılır.",
+        "en": "{brand} {product_name} is shown in a {ton} scene that captures {hitap} attention. The focus is on the product from the first seconds.",
+        "de": "{brand} {product_name} wird in einer {ton} Szene gezeigt, die {hitap} Aufmerksamkeit erregt. Der Fokus liegt von Beginn an auf dem Produkt.",
+        "fr": "{brand} {product_name} est présenté dans une scène {ton} qui capte l'attention {hitap}. L'accent est mis sur le produit dès les premières secondes.",
+        "es": "{brand} {product_name} se muestra en una escena {ton} que capta la atención {hitap}. El enfoque está en el producto desde el primer segundo.",
+        "ar": "يتم عرض {brand} {product_name} في مشهد {ton} يجذب انتباه {hitap}. التركيز على المنتج من الثواني الأولى.",
+        "ru": "{brand} {product_name} показан в {ton} сцене, привлекающей внимание {hitap}. Фокус на продукте с первых секунд.",
+        "kr": "{brand} {product_name} di dîmenek {ton} de tê nîşandan ku bala {hitap} dikişîne. Ji saniyeyên pêşîn ve bal li ser berhemê ye.",
+    },
+    "desc_product": {
+        "tr": "Ürün yakın planda detaylı gösterilir. {brand} kalitesi ve {product_name}'in öne çıkan özellikleri, {hitap} beklentilerine uygun şekilde vurgulanır.",
+        "en": "The product is shown in detailed close-up. {brand} quality and {product_name}'s key features are highlighted to match {hitap} expectations.",
+        "de": "Das Produkt wird in Nahaufnahme gezeigt. {brand} Qualität und die Hauptmerkmale von {product_name} werden entsprechend {hitap} Erwartungen hervorgehoben.",
+        "fr": "Le produit est montré en gros plan détaillé. La qualité {brand} et les caractéristiques de {product_name} sont mises en avant pour répondre aux attentes {hitap}.",
+        "es": "El producto se muestra en primer plano detallado. La calidad {brand} y las características de {product_name} se destacan según las expectativas {hitap}.",
+        "ar": "يتم عرض المنتج عن قرب بتفصيل. جودة {brand} وميزات {product_name} الرئيسية تُبرز لتتناسب مع توقعات {hitap}.",
+        "ru": "Продукт показан крупным планом. Качество {brand} и особенности {product_name} подчёркнуты в соответствии с ожиданиями {hitap}.",
+        "kr": "Berhem di nêzîk de bi hûrgilî tê nîşandan. Qalîteya {brand} û taybetmendiyên {product_name} li gorî hêviyên {hitap} têne diyar kirin.",
+    },
+    "desc_features": {
+        "tr": "{product_name} ürününün {hitap} hayatına katacağı değer, görsel karşılaştırmalar ve ikonlarla {ton} bir dille sunulur.",
+        "en": "The value {product_name} adds to {hitap} life is presented with visual comparisons and icons in a {ton} manner.",
+        "de": "Der Mehrwert von {product_name} für {hitap} wird mit visuellen Vergleichen und Symbolen {ton} präsentiert.",
+        "fr": "La valeur que {product_name} apporte à la vie {hitap} est présentée avec des comparaisons visuelles et des icônes de manière {ton}.",
+        "es": "El valor que {product_name} aporta a la vida {hitap} se presenta con comparaciones visuales e iconos de manera {ton}.",
+        "ar": "يتم تقديم القيمة التي يضيفها {product_name} لحياة {hitap} بمقارنات بصرية وأيقونات بأسلوب {ton}.",
+        "ru": "Ценность {product_name} для {hitap} представлена с визуальными сравнениями и иконками в {ton} стиле.",
+        "kr": "Nirxa ku {product_name} dide jiyana {hitap} bi berawirdiyên dîtbarî û îkonan bi awayekî {ton} tê pêşkêş kirin.",
+    },
+    "desc_usage": {
+        "tr": "{product_name} ürününün gerçek kullanım anı, {hitap} günlük yaşamından bir kesitle gösterilir. Kullanım kolaylığı vurgulanır.",
+        "en": "A real usage moment of {product_name} is shown with a glimpse into {hitap} daily life. Ease of use is emphasized.",
+        "de": "Ein echter Anwendungsmoment von {product_name} wird mit einem Einblick in den Alltag {hitap} gezeigt. Die einfache Anwendung wird betont.",
+        "fr": "Un moment d'utilisation réel de {product_name} est montré avec un aperçu de la vie quotidienne {hitap}. La facilité d'utilisation est soulignée.",
+        "es": "Se muestra un momento de uso real de {product_name} con un vistazo a la vida diaria {hitap}. Se enfatiza la facilidad de uso.",
+        "ar": "يتم عرض لحظة استخدام حقيقي لـ {product_name} مع لمحة من حياة {hitap} اليومية. يتم التأكيد على سهولة الاستخدام.",
+        "ru": "Реальный момент использования {product_name} показан с кадрами из повседневной жизни {hitap}. Подчёркивается простота использования.",
+        "kr": "Dema bikaranîna rast a {product_name} bi dîmenek ji jiyana rojane ya {hitap} tê nîşandan. Hêsaniya bikaranînê tê diyar kirin.",
+    },
+    "desc_cta": {
+        "tr": "{brand} logosu ve ürün bilgisi ekranda belirir. {hitap} {cagri} yönlendiren, {ton} bir kapanış mesajı.",
+        "en": "{brand} logo and product info appear. A {ton} closing message directing {hitap} {cagri}.",
+        "de": "{brand} Logo und Produktinfo erscheinen. Eine {ton} Abschlussbotschaft, die {hitap} {cagri} lenkt.",
+        "fr": "Le logo {brand} et les infos produit apparaissent. Un message de clôture {ton} dirigeant {hitap} {cagri}.",
+        "es": "El logo {brand} y la información del producto aparecen. Un mensaje de cierre {ton} que dirige {hitap} {cagri}.",
+        "ar": "يظهر شعار {brand} ومعلومات المنتج. رسالة ختامية {ton} توجه {hitap} {cagri}.",
+        "ru": "Логотип {brand} и информация о продукте появляются. {ton} завершающее сообщение, направляющее {hitap} {cagri}.",
+        "kr": "Logoya {brand} û agahiyên berhemê xuya dibin. Peyamek dawî ya {ton} ku {hitap} {cagri}.",
+    },
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # t() — Ana çeviri fonksiyonu
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -854,6 +1002,7 @@ _SECTIONS = {
     "s11": S11, "s12": S12, "s13": S13,
     "common": COMMON, "pricing": PRICING, "payment": PAYMENT,
     "admin_payment": ADMIN_PAYMENT, "material": MATERIAL, "platform": PLATFORM, "final": FINAL,
+    "scenario": SCENARIO,
 }
 
 

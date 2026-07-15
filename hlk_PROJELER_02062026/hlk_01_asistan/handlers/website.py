@@ -1587,20 +1587,22 @@ async def handle_brief_edit_field(update: Update, context: ContextTypes.DEFAULT_
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _build_senaryo_html(data: dict) -> str:
-    """Senaryo Onay Formu'nu Telegram HTML olarak oluşturur (AR-002_65)."""
+    """Senaryo Onay Formu'nu Telegram HTML olarak oluşturur (AR-002_65). Tum metinler secilen dile gore cevrilir."""
+    from config.i18n import t
+    lang = data.get("lang", "tr")
     SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     u = data["urun"]
     lines = [SEP,
-             "<b>━━━━ 🎬 SENARYO ONAY FORMU ━━━━</b>",
-             "<code>✅1.Brief  ›  🔵2.Senaryo  ›  ⏳3.Fiyat Teklifi</code>",
+             f"<b>━━━━ 🎬 {t('scenario.title', lang)} ━━━━</b>",
+             f"<code>{t('scenario.step', lang)}</code>",
              SEP, "",
-             f"MARKA: <b>{u['marka']}</b>",
-             f"ÜRÜN: <b>{u['ad']}</b>",
+             f"{t('scenario.brand', lang)}: <b>{u['marka']}</b>",
+             f"{t('scenario.product', lang)}: <b>{u['ad']}</b>",
              "", SEP, "",
-             "<b>📖 Tanıtım Hikayesi</b>",
+             f"<b>{t('scenario.story_title', lang)}</b>",
              f"<i>{data['hikaye']}</i>",
              "", SEP, "",
-             f"<b>🎞️ Sahne Planı ({data['toplamSure']})</b>"]
+             f"<b>{t('scenario.scene_plan', lang)} ({data['toplamSure']})</b>"]
 
     sahneler = data.get("sahneler", [])
     for s in sahneler:
@@ -1611,8 +1613,9 @@ def _build_senaryo_html(data: dict) -> str:
 
     ses = data["seslendirme"]
     uret = data["uretim"]
+    scene_unit = t('scenario.scene_unit', lang)
     lines.append(f"<b>🎙️ {ses['dil']} | {ses['karakter']} | {ses['yapi']}</b>")
-    lines.append(f"<b>🎬 {uret['platform']} • {uret['format']} • {uret['cozunurluk']} • {uret['sure']} • {uret['sahneSayisi']} sahne</b>")
+    lines.append(f"<b>🎬 {uret['platform']} • {uret['format']} • {uret['cozunurluk']} • {uret['sure']} • {uret['sahneSayisi']} {scene_unit}</b>")
     lines.append(""); lines.append(SEP)
 
     return "\n".join(lines)
@@ -1781,77 +1784,67 @@ def _build_scenario_form(user_data: dict) -> str:
 
 
 def _build_sahne_listesi(sahneler: list, time_ranges: list, times: list,
-                         brand: str, product_name: str, audience: str = "") -> list:
-    """Dinamik sahne listesini olusturur. Hedef kitleye gore icerik uyarlanir."""
-    # Hedef kitleye gore tonlama ve icerik farki
-    yas = ""
-    if audience:
-        yas = audience.split("(")[0].strip() if "(" in audience else audience
+                         brand: str, product_name: str, audience: str = "",
+                         lang: str = "tr") -> list:
+    """Dinamik sahne listesini olusturur. Hedef kitleye ve dile gore icerik uyarlanir."""
+    from config.i18n import t
 
-    # Yas grubuna gore tonlama
-    if any(w in audience for w in ["0-12", "Çocuk", "Children"]):
-        ton = "eğlenceli ve renkli"
-        hitap = "çocukların"
-        cagri = "ailesiyle birlikte keşfetmeye"
-    elif any(w in audience for w in ["13-17", "Genç", "Teen"]):
-        ton = "dinamik ve enerjik"
-        hitap = "gençlerin"
-        cagri = "hemen keşfetmeye"
-    elif any(w in audience for w in ["18-24", "Genç Yetişkin", "Young"]):
-        ton = "modern ve trend"
-        hitap = "genç yetişkinlerin"
-        cagri = "şimdi satın almaya"
-    elif any(w in audience for w in ["25-34", "Yetişkin", "Adult"]):
-        ton = "profesyonel ve şık"
-        hitap = "yetişkinlerin"
-        cagri = "hemen sipariş vermeye"
-    elif any(w in audience for w in ["35-44", "Aile", "Family"]):
-        ton = "güvenilir ve samimi"
-        hitap = "ailelerin"
-        cagri = "ailesi için satın almaya"
-    elif any(w in audience for w in ["45-54", "Orta Yaş", "Middle"]):
-        ton = "kaliteli ve prestijli"
-        hitap = "seçkin kullanıcıların"
-        cagri = "kaliteyi deneyimlemeye"
-    elif any(w in audience for w in ["55-64", "Olgun", "Mature", "65", "Senior"]):
-        ton = "sakin ve güven veren"
-        hitap = "olgun kullanıcıların"
-        cagri = "güvenle satın almaya"
-    else:
-        ton = "etkileyici"
-        hitap = "izleyicilerin"
-        cagri = "satın almaya"
-
-    ACL = {
-        "Dikkat Çekici Giriş": (
-            f"{brand} {product_name} ürünü, {hitap} ilgisini çekecek "
-            f"{ton} bir sahnede gösterilir. İlk saniyelerde ürüne odaklanılır."
-        ),
-        "Ürün Tanıtımı": (
-            f"Ürün yakın planda detaylı gösterilir. {brand} kalitesi ve "
-            f"{product_name}'in öne çıkan özellikleri, {hitap} beklentilerine uygun şekilde vurgulanır."
-        ),
-        "Özellikler ve Faydalar": (
-            f"{product_name} ürününün {hitap} hayatına katacağı değer, "
-            f"görsel karşılaştırmalar ve ikonlarla {ton} bir dille sunulur."
-        ),
-        "Kullanım Gösterimi": (
-            f"{product_name} ürününün gerçek kullanım anı, {hitap} "
-            f"günlük yaşamından bir kesitle gösterilir. Kullanım kolaylığı vurgulanır."
-        ),
-        "Kapanış — CTA": (
-            f"{brand} logosu ve ürün bilgisi ekranda belirir. "
-            f"{hitap} {cagri} yönlendiren, {ton} bir kapanış mesajı."
-        ),
+    # i18n scene title mapping — Turkce basliklari i18n key'lerine esle
+    TITLE_KEY = {
+        "Dikkat Çekici Giriş": "scenario.scene_intro",
+        "Ürün Tanıtımı": "scenario.scene_product",
+        "Özellikler ve Faydalar": "scenario.scene_features",
+        "Kullanım Gösterimi": "scenario.scene_usage",
+        "Kapanış — CTA": "scenario.scene_cta",
     }
+
+    # Hedef kitleye gore tonlama ve icerik farki
+    if any(w in audience for w in ["0-12", "Çocuk", "Children"]):
+        ton_key, hitap_key, cagri_key = "scenario.tone_kids", "scenario.aud_kids", "scenario.cta_kids"
+    elif any(w in audience for w in ["13-17", "Genç", "Teen"]):
+        ton_key, hitap_key, cagri_key = "scenario.tone_teen", "scenario.aud_teen", "scenario.cta_teen"
+    elif any(w in audience for w in ["18-24", "Genç Yetişkin", "Young"]):
+        ton_key, hitap_key, cagri_key = "scenario.tone_young", "scenario.aud_young", "scenario.cta_young"
+    elif any(w in audience for w in ["25-34", "Yetişkin", "Adult"]):
+        ton_key, hitap_key, cagri_key = "scenario.tone_adult", "scenario.aud_adult", "scenario.cta_adult"
+    elif any(w in audience for w in ["35-44", "Aile", "Family"]):
+        ton_key, hitap_key, cagri_key = "scenario.tone_family", "scenario.aud_family", "scenario.cta_family"
+    elif any(w in audience for w in ["45-54", "Orta Yaş", "Middle"]):
+        ton_key, hitap_key, cagri_key = "scenario.tone_midage", "scenario.aud_midage", "scenario.cta_midage"
+    elif any(w in audience for w in ["55-64", "Olgun", "Mature", "65", "Senior"]):
+        ton_key, hitap_key, cagri_key = "scenario.tone_senior", "scenario.aud_senior", "scenario.cta_senior"
+    else:
+        ton_key, hitap_key, cagri_key = "scenario.tone_default", "scenario.aud_default", "scenario.cta_default"
+
+    ton = t(ton_key, lang)
+    hitap = t(hitap_key, lang)
+    cagri = t(cagri_key, lang)
+
+    ACL = {}
+    for tr_title, i18n_key in TITLE_KEY.items():
+        translated_title = t(i18n_key, lang)
+        if tr_title == "Dikkat Çekici Giriş":
+            ACL[translated_title] = t("scenario.desc_intro", lang).format(brand=brand, product_name=product_name, hitap=hitap, ton=ton)
+        elif tr_title == "Ürün Tanıtımı":
+            ACL[translated_title] = t("scenario.desc_product", lang).format(brand=brand, product_name=product_name, hitap=hitap)
+        elif tr_title == "Özellikler ve Faydalar":
+            ACL[translated_title] = t("scenario.desc_features", lang).format(product_name=product_name, hitap=hitap, ton=ton)
+        elif tr_title == "Kullanım Gösterimi":
+            ACL[translated_title] = t("scenario.desc_usage", lang).format(product_name=product_name, hitap=hitap)
+        elif tr_title == "Kapanış — CTA":
+            ACL[translated_title] = t("scenario.desc_cta", lang).format(brand=brand, hitap=hitap, cagri=cagri, ton=ton)
+
     result = []
     for i, s in enumerate(sahneler):
         t_start, t_end = time_ranges[i]
+        # Translate scene title
+        tr_title = s["baslik"]
+        translated_title = t(TITLE_KEY.get(tr_title, ""), lang) if tr_title in TITLE_KEY else tr_title
         result.append({
             "no": i + 1,
             "gorsel": f"https://via.placeholder.com/160x100.png?text={i + 1}",
-            "baslik": s["baslik"],
-            "aciklama": ACL.get(s["baslik"], f"{s['baslik']} sahnesi."),
+            "baslik": translated_title,
+            "aciklama": ACL.get(translated_title, f"{translated_title}."),
             "zaman": f"0:{t_start:02d} – 0:{t_end:02d}",
             "sure": f"{times[i]} sn",
         })
@@ -1862,8 +1855,10 @@ def _build_scenario_data(user_data: dict) -> dict:
     """REFERANS_SENARYO_ONAY_FORMU template.html için veri yapısı.
 
     MASTER-010: template.html'in beklediği DATA_JSON yapısını üretir.
+    Tum metinler secilen dile gore cevrilir (AR-002_30).
     """
     from datetime import date
+    lang = user_data.get("language", "tr")
 
     platform = user_data.get("platform", "—")
     fmt = user_data.get("video_format", "—")
@@ -1966,6 +1961,7 @@ def _build_scenario_data(user_data: dict) -> dict:
         start += t
 
     return {
+        "lang": lang,
         "adimlar": [
             {"no": 1, "baslik": "Brief", "altbaslik": "Tamamlandı", "durum": "done"},
             {"no": 2, "baslik": "Senaryo", "altbaslik": "İncelemede", "durum": "active"},
@@ -1990,7 +1986,7 @@ def _build_scenario_data(user_data: dict) -> dict:
             f"{style} tarzında bir ürün tanıtım videosu hazırlanacaktır. "
             f"Hedef kitle: {audience}. Seslendirme: {voice_lang}, {voice_char}."
         ),
-        "sahneler": _build_sahne_listesi(sahneler, time_ranges, times, brand, product_name, audience),
+        "sahneler": _build_sahne_listesi(sahneler, time_ranges, times, brand, product_name, audience, lang),
         "toplamSure": f"{duration} sn" if duration != "—" else "—",
         "seslendirme": {
             "dil": voice_lang,
