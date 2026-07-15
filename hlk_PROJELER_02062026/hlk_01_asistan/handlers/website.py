@@ -141,10 +141,10 @@ async def handle_website_link(update: Update, context: ContextTypes.DEFAULT_TYPE
             logger.info(f"🔒 {user.id} oturumu kapatıldı (5 başarısız link)")
             return
 
+        lang = get_lang(context.user_data)
         await update.message.reply_text(
-            f"❌ <b>Geçersiz link formatı.</b>\n\n"
-            f"Lütfen geçerli bir URL gönderin.\n"
-            f"<i>Kalan deneme: {remaining}/5</i>",
+            f"{t('link.invalid', lang)}\n"
+            f"<i>{t('common.remaining', lang)}: {remaining}/5</i>",
             parse_mode="HTML",
         )
         return
@@ -157,10 +157,11 @@ async def handle_website_link(update: Update, context: ContextTypes.DEFAULT_TYPE
     se.fire(UserEvent.PRODUCT_LINK_RECEIVED)
 
     # Hemen "link alındı" yanıtı ver — kullanıcı beklemesin
+    lang = get_lang(context.user_data)
     await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
     link_ack_id = await scene_delivery.send_and_track(
         chat_id=chat_id,
-        text="🔗 <b>Linkiniz alındı!</b>\n\nÜrün analizi başlatılıyor, lütfen bekleyin...",
+        text=t("link.received", lang),
     )
     context.user_data["_link_ack_msg_id"] = link_ack_id
 
@@ -264,10 +265,10 @@ async def _process_link_background(
     except Exception as e:
         logger.error(f"❌ Link arka plan işleme hatası: {str(e)}", exc_info=True)
         try:
+            lang = user_data.get("language", "tr")
             await bot.send_message(
                 chat_id=chat_id,
-                text="❌ <b>Link işlenirken bir hata oluştu.</b>\n\n"
-                     "Lütfen <b>/start</b> yazarak tekrar deneyin.",
+                text=t("link.error", lang),
                 parse_mode="HTML",
             )
         except Exception:
@@ -1168,9 +1169,10 @@ async def _handle_custom_emphasis_text(update: Update, context: ContextTypes.DEF
             pass
 
     # Onay mesajı (geçici, otomatik temizlenir)
+    lang = get_lang(context.user_data)
     ack_msg_id = await scene_delivery.send_and_track(
         chat_id=chat_id,
-        text=f"✅ <b>Özel vurgu eklendi:</b> {text}",
+        text=f"✅ <b>{t('s11.custom', lang)}:</b> {text}",
     )
 
     # SAHNE-11 klavyesini güncelle

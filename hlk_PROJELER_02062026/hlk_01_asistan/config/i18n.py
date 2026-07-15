@@ -11,6 +11,32 @@ from typing import Optional
 FALLBACK = "tr"
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Ortak Mesajlar
+# ═══════════════════════════════════════════════════════════════════════════════
+COMMON = {
+    "remaining": {
+        "tr": "Kalan deneme",
+        "en": "Remaining attempts",
+        "de": "Verbleibende Versuche",
+        "fr": "Tentatives restantes",
+        "es": "Intentos restantes",
+        "ar": "المحاولات المتبقية",
+        "ru": "Осталось попыток",
+        "kr": "Hewldanên mayî",
+    },
+    "saved": {
+        "tr": "Kaydedildi",
+        "en": "Saved",
+        "de": "Gespeichert",
+        "fr": "Enregistré",
+        "es": "Guardado",
+        "ar": "تم الحفظ",
+        "ru": "Сохранено",
+        "kr": "Tomar kirî",
+    },
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SAHNE-03: Video Format Seçimi
 # ═══════════════════════════════════════════════════════════════════════════════
 S03 = {
@@ -853,6 +879,52 @@ MATERIAL = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════════
+# Link / Araştırma Mesajları
+# ═══════════════════════════════════════════════════════════════════════════════
+LINK = {
+    "received": {
+        "tr": "🔗 <b>Linkiniz alındı!</b>\n\nÜrün analizi başlatılıyor, lütfen bekleyin...",
+        "en": "🔗 <b>Link received!</b>\n\nProduct analysis is starting, please wait...",
+        "de": "🔗 <b>Link erhalten!</b>\n\nDie Produktanalyse beginnt, bitte warten...",
+        "fr": "🔗 <b>Lien reçu !</b>\n\nL'analyse du produit commence, veuillez patienter...",
+        "es": "🔗 <b>¡Enlace recibido!</b>\n\nEl análisis del producto está comenzando, espere...",
+        "ar": "🔗 <b>تم استلام الرابط!</b>\n\nتحليل المنتج يبدأ، يرجى الانتظار...",
+        "ru": "🔗 <b>Ссылка получена!</b>\n\nНачинается анализ продукта, пожалуйста, подождите...",
+        "kr": "🔗 <b>Girêdan hat wergirtin!</b>\n\nAnalîza berhemê dest pê dike, ji kerema xwe bisekine...",
+    },
+    "validated": {
+        "tr": "✅ <b>Link doğrulandı!</b>\n\nÜrün araştırması başlıyor...",
+        "en": "✅ <b>Link validated!</b>\n\nProduct research is starting...",
+        "de": "✅ <b>Link bestätigt!</b>\n\nDie Produktrecherche beginnt...",
+        "fr": "✅ <b>Lien validé !</b>\n\nLa recherche produit commence...",
+        "es": "✅ <b>¡Enlace validado!</b>\n\nLa investigación del producto comienza...",
+        "ar": "✅ <b>تم التحقق من الرابط!</b>\n\nبحث المنتج يبدأ...",
+        "ru": "✅ <b>Ссылка подтверждена!</b>\n\nНачинается исследование продукта...",
+        "kr": "✅ <b>Girêdan hat pejirandin!</b>\n\nLêkolîna berhemê dest pê dike...",
+    },
+    "invalid": {
+        "tr": "❌ Bu link doğrulanamadı. Lütfen geçerli bir ürün linki gönderin.",
+        "en": "❌ This link could not be validated. Please send a valid product link.",
+        "de": "❌ Dieser Link konnte nicht bestätigt werden. Bitte senden Sie einen gültigen Produktlink.",
+        "fr": "❌ Ce lien n'a pas pu être validé. Veuillez envoyer un lien produit valide.",
+        "es": "❌ Este enlace no pudo ser validado. Envíe un enlace de producto válido.",
+        "ar": "❌ تعذر التحقق من هذا الرابط. يرجى إرسال رابط منتج صالح.",
+        "ru": "❌ Эта ссылка не может быть подтверждена. Пожалуйста, отправьте действительную ссылку.",
+        "kr": "❌ Ev girêdan nehat pejirandin. Ji kerema xwe girêdanek berhemê ya derbasdar bişîne.",
+    },
+    "error": {
+        "tr": "❌ <b>Link işlenirken bir hata oluştu.</b>\n\nLütfen <b>/start</b> yazarak tekrar deneyin.",
+        "en": "❌ <b>An error occurred while processing the link.</b>\n\nPlease type <b>/start</b> and try again.",
+        "de": "❌ <b>Fehler bei der Linkverarbeitung.</b>\n\nBitte geben Sie <b>/start</b> ein und versuchen Sie es erneut.",
+        "fr": "❌ <b>Erreur lors du traitement du lien.</b>\n\nVeuillez taper <b>/start</b> et réessayer.",
+        "es": "❌ <b>Error al procesar el enlace.</b>\n\nEscriba <b>/start</b> e intente de nuevo.",
+        "ar": "❌ <b>حدث خطأ أثناء معالجة الرابط.</b>\n\nيرجى كتابة <b>/start</b> والمحاولة مرة أخرى.",
+        "ru": "❌ <b>Ошибка при обработке ссылки.</b>\n\nПожалуйста, введите <b>/start</b> и попробуйте снова.",
+        "kr": "❌ <b>Di dema hilberandina girêdanê de çewtî çêbû.</b>\n\nJi kerema xwe <b>/start</b> binivîse û dîsa biceribîne.",
+    },
+}
+
 # Platform Seçimi
 # ═══════════════════════════════════════════════════════════════════════════════
 PLATFORM = {
@@ -1038,7 +1110,7 @@ _SECTIONS = {
     "s11": S11, "s12": S12, "s13": S13,
     "common": COMMON, "pricing": PRICING, "payment": PAYMENT,
     "admin_payment": ADMIN_PAYMENT, "material": MATERIAL, "platform": PLATFORM, "final": FINAL,
-    "scenario": SCENARIO,
+    "scenario": SCENARIO, "link": LINK, "common": COMMON,
 }
 
 
