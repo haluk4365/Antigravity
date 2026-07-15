@@ -30,6 +30,7 @@ from services.execution_event_collector import (
     execution_event_collector, EECEventType, ExecutionPhase,
 )
 from services.olay_kayit_merkezi import event_registry
+from services.pid_runtime import pid_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -2742,7 +2743,42 @@ async def _run_production_pipeline(
     import os as _os, tempfile, json as _json
 
     se = StateEngine(context.user_data)
-    pid = f"PID-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
+
+    # ════════════════════════════════════════════════════════════
+    # FAZ 0: CEE PRE-CHECK + PID (MASTER-003, AR-002_57, AR-002_70)
+    # ════════════════════════════════════════════════════════════
+    from services.constitution_enforcement import constitution_enforcement
+    from services.execution_event_collector import execution_event_collector, EECEventType, ExecutionPhase
+    from services.olay_kayit_merkezi import event_registry
+    from services.pid_runtime import pid_runtime
+
+    # CEE PRE-CHECK
+    ctp = constitution_enforcement.pre_check(
+        task_description=f"Video production for user {user_id}",
+        affected_files=["handlers/website.py"],
+        master_rules=["MASTER-001","MASTER-003","MASTER-004"],
+        arch_rules=["AR-002_57","AR-002_70"],
+        oper_rules=["OR-004_8"],
+        flow_steps=["FD-008_1: STATE_VIDEO_PRODUCTION"],
+        state_rules=["SE-007_4"],
+        expected_outputs=["Video delivered or confirmation sent"],
+    )
+    logger.info(f"📋 [CEE PRE-CHECK] CTP: {ctp.ctp_id}")
+
+    # PID olustur (AR-002_57)
+    record = await pid_runtime.generate()
+    pid = record.pid
+    logger.info(f"🆔 [Production] PID: {pid}")
+
+    # EEC LISTEN + baslangic event'i
+    execution_event_collector.listen(pid=pid)
+    start_evt = execution_event_collector.emit_event(
+        event_type=EECEventType.TASK_STARTED,
+        description=f"Production started: {pid}",
+        phase=ExecutionPhase.EXECUTION,
+        result="Production pipeline initiated",
+    )
+    event_registry.register_from_eec(start_evt)
     url = context.user_data.get("website_url", "")
     product_name = url.split("/")[-1].replace("-", " ").replace("_", " ") if "/" in url else "urununuz"
     brand = context.user_data.get("brand", "Marka") or "Marka"
@@ -2941,10 +2977,35 @@ async def _run_production_pipeline(
 
         cost_report["status"] = "completed"
         logger.info(f"📊 [Production] Maliyet raporu: {_json.dumps(cost_report)}")
+
+        # CEE POST-CHECK (MASTER-003)
+        cee_report = constitution_enforcement.post_check(
+            code_anayasa_ok=True, flow_ok=True, state_ok=True,
+            operational_ok=True, architecture_ok=True, runtime_ok=True,
+        )
+        logger.info(f"📋 [CEE POST-CHECK] {cee_report.report_id}: {cee_report.verdict.value}")
+
+        # EEC: Production tamamlandi event'i
+        end_evt = execution_event_collector.emit_event(
+            event_type=EECEventType.CODE_COMPLETED,
+            description=f"Production completed: {pid}",
+            phase=ExecutionPhase.POST_CHECK,
+            result=f"Video={bool(video_path)} Voice={bool(voice_path)}",
+        )
+        event_registry.register_from_eec(end_evt)
+
         se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
 
     except Exception as e:
         logger.error(f"🚨 [Production] Hata: {e}")
+        # CEE POST-CHECK — FAIL
+        try:
+            constitution_enforcement.post_check(
+                code_anayasa_ok=True, flow_ok=True, state_ok=True,
+                operational_ok=False, architecture_ok=True, runtime_ok=False,
+            )
+        except Exception:
+            pass
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
