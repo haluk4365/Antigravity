@@ -2756,62 +2756,81 @@ async def _run_production_pipeline(
 
     try:
         # ================================================================
-        # ADIM 1: GORSEL URETIMI (Fal.ai > Kie AI > dummy)
+        # ADIM 1: GORSEL URETIMI (Fal.ai > Kie AI)
         # ================================================================
         logger.info(f"🎨 [Production/1] Gorsel uretimi...")
-        try:
-            import requests as _r
-            fal_key = _os.getenv("FAL_KEY", "")
-            if fal_key:
+        import requests as _r
+        # FAL_KEY .env'den al — format: UUID:hash
+        fal_key = _os.getenv("FAL_KEY", "")
+        logger.info(f"🎨 [Production/1] FAL_KEY mevcut: {bool(fal_key)}")
+        if fal_key:
+            try:
+                logger.info(f"🎨 [Production/1] Fal.ai deneniyor...")
                 resp = _r.post("https://queue.fal.run/fal-ai/fast-sdxl",
                     headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
                     json={"prompt": f"professional product photo of {brand} {product_name}, studio lighting, white background, high quality"},
                     timeout=30)
+                logger.info(f"🎨 [Production/1] Fal.ai response: {resp.status_code}")
                 if resp.status_code == 200:
                     data = resp.json()
                     req_id = data.get("request_id")
-                    # Poll for completion
-                    for _ in range(6):
-                        await asyncio.sleep(3)
-                        st = _r.get(f"https://queue.fal.run/fal-ai/fast-sdxl/requests/{req_id}/status",
-                            headers={"Authorization": f"Key {fal_key}"}, timeout=10)
-                        if st.status_code == 200 and st.json().get("status") == "COMPLETED":
-                            img_url = st.json().get("response", {}).get("images", [{}])[0].get("url", "")
-                            if img_url:
-                                img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
-                                _r.urlretrieve(img_url, img_path)
-                                logger.info(f"✅ [Production] Fal.ai gorsel: {img_path}")
-                                cost_report["services"]["fal.ai"] = "ok"
-                            break
-        except Exception as e:
-            logger.warning(f"⚠️ [Production] Fal.ai basarisiz: {e}")
+                    if req_id:
+                        for _ in range(8):
+                            await asyncio.sleep(3)
+                            st = _r.get(f"https://queue.fal.run/fal-ai/fast-sdxl/requests/{req_id}/status",
+                                headers={"Authorization": f"Key {fal_key}"}, timeout=10)
+                            if st.status_code == 200:
+                                st_data = st.json()
+                                if st_data.get("status") == "COMPLETED":
+                                    images = st_data.get("response", {}).get("images", [])
+                                    if images:
+                                        img_url = images[0].get("url", "")
+                                        if img_url:
+                                            img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
+                                            _r.urlretrieve(img_url, img_path)
+                                            logger.info(f"✅ [Production] Fal.ai gorsel: {img_path}")
+                                            cost_report["services"]["fal.ai"] = "ok"
+                                    break
+            except Exception as e:
+                logger.warning(f"⚠️ [Production] Fal.ai basarisiz: {e}")
 
         # Fal basarisizsa Kie AI dene
         if not img_path:
             try:
                 kie_key = _os.getenv("KIE_AI_API_KEY", "")
+                logger.info(f"🎨 [Production/1] Kie AI deneniyor (key: {bool(kie_key)})...")
                 if kie_key:
                     resp = _r.post("https://api.kie.ai/api/v1/jobs/createTask",
                         headers={"Authorization": f"Bearer {kie_key}", "Content-Type": "application/json"},
                         json={"model": "z-image", "prompt": f"{brand} {product_name} product photo, clean background"},
                         timeout=30)
+                    logger.info(f"🎨 [Production/1] Kie createTask: {resp.status_code}")
                     if resp.status_code == 200:
-                        task_id = resp.json().get("data", {}).get("taskId", "")
+                        data = resp.json()
+                        # Kie AI response: {"code":200, "data": {"taskId": "..."}}
+                        task_id = data.get("data", {})
+                        if isinstance(task_id, dict):
+                            task_id = task_id.get("taskId", "")
+                        elif isinstance(task_id, str):
+                            task_id = task_id
                         if task_id:
-                            for _ in range(8):
+                            for _ in range(10):
                                 await asyncio.sleep(3)
                                 st = _r.get(f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
                                     headers={"Authorization": f"Bearer {kie_key}"}, timeout=10)
                                 if st.status_code == 200:
-                                    st_data = st.json().get("data", {})
-                                    if st_data.get("status") == "completed":
-                                        img_url = st_data.get("result_url") or st_data.get("image_url", "")
-                                        if img_url:
+                                    st_data = st.json()
+                                    # Response: {"code":200, "data": {"status": "completed", "result_url": "..."}}
+                                    inner = st_data.get("data", {})
+                                    if isinstance(inner, dict):
+                                        status = inner.get("status", "")
+                                        img_url = inner.get("result_url") or inner.get("image_url") or inner.get("output_url", "")
+                                        if status in ("completed", "success") and img_url:
                                             img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
                                             _r.urlretrieve(img_url, img_path)
                                             logger.info(f"✅ [Production] Kie AI gorsel: {img_path}")
                                             cost_report["services"]["kie.ai"] = "ok"
-                                        break
+                                            break
             except Exception as e:
                 logger.warning(f"⚠️ [Production] Kie AI basarisiz: {e}")
 
@@ -2895,7 +2914,7 @@ async def _run_production_pipeline(
                 logger.warning(f"⚠️ [Production] Higgsfield basarisiz: {e}")
 
         # ================================================================
-        # ADIM 4: TESLIM
+        # ADIM 4: TESLIM (sadece metin — ses/video oynaticisi gosterilmez)
         # ================================================================
         if video_path and _os.path.exists(video_path):
             with open(video_path, "rb") as vf:
@@ -2906,19 +2925,16 @@ async def _run_production_pipeline(
                     parse_mode="HTML",
                 )
             logger.info(f"✅ [Production] VIDEO GONDERILDI: {pid}")
-        elif voice_path:
-            with open(voice_path, "rb") as af:
-                await context.bot.send_voice(
-                    chat_id=chat_id, voice=af,
-                    caption=f"🎙️ <b>{brand} — {product_name}</b>\n📋 PID: <code>{pid}</code>",
-                    parse_mode="HTML",
-                )
-            logger.info(f"✅ [Production] SES GONDERILDI: {pid}")
         else:
+            # Ses/video oynaticisi GONDERILMEZ — sadece bilgilendirme metni
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"🎬 <b>Üretim Tamamlandi!</b>\n\n📋 PID: <code>{pid}</code>\n"
-                     f"Video hazirlaniyor, en kisa surede gonderilecektir.",
+                text=f"🎬 <b>Uretim Tamamlandi!</b>\n\n"
+                     f"📋 PID: <code>{pid}</code>\n"
+                     f"Urun: <b>{brand} — {product_name}</b>\n"
+                     f"Video suresi: {duration} sn | Ses: {voice_lang.upper()}\n\n"
+                     f"Videonuz hazirlaniyor, en kisa surede gonderilecektir.\n"
+                     f"<i>HLK AI Reklam Asistani</i>",
                 parse_mode="HTML",
             )
             logger.info(f"✅ [Production] BILGILENDIRME: {pid}")
@@ -2932,8 +2948,11 @@ async def _run_production_pipeline(
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"🎬 <b>Uretim Tamamlandi!</b>\n\n📋 PID: <code>{pid}</code>\n"
-                     f"Video hazirlaniyor, en kisa surede gonderilecektir.",
+                text=f"🎬 <b>Uretim Tamamlandi!</b>\n\n"
+                     f"📋 PID: <code>{pid}</code>\n"
+                     f"Urun: <b>{brand} — {product_name}</b>\n\n"
+                     f"Videonuz hazirlaniyor, en kisa surede gonderilecektir.\n"
+                     f"<i>HLK AI Reklam Asistani</i>",
                 parse_mode="HTML",
             )
         except Exception:
