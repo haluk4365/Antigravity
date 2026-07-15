@@ -678,7 +678,9 @@ async def handle_audio_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
         toggles[option] = not toggles[option]
         durum = "seçildi" if toggles[option] else "kaldırıldı"
-        await query.answer(f"{AUDIO_OPTIONS[option]} {durum}")
+        label = _get_audio_label(option, lang)
+        durum_tr = "seçildi" if toggles[option] else "kaldırıldı"
+        await query.answer(f"{label} {durum_tr}")
 
     context.user_data["audio_toggles"] = toggles
 
@@ -704,22 +706,23 @@ async def handle_audio_devam(update: Update, context: ContextTypes.DEFAULT_TYPE)
     toggles = _get_audio_toggles(context.user_data)
     is_silent = toggles.get("silent", False)
 
-    # Seçilenleri belirle
-    selected = [AUDIO_OPTIONS[k] for k, v in toggles.items() if v]
+    # Seçilenleri belirle (i18n uyumlu)
+    lang = get_lang(context.user_data)
+    selected = [_get_audio_label(k, lang) for k, v in toggles.items() if v]
 
     if is_silent:
-        context.user_data["audio_option"] = "🔇 Sessiz"
+        context.user_data["audio_option"] = _get_audio_label("silent", lang)
         context.user_data["audio_silent"] = True
         context.user_data["audio_next_scene"] = "SAHNE-11"
-        logger.info(f"🎙️ {user.id} audio DEVAM: 🔇 SESSİZ → SAHNE-11")
-        await query.answer("🔇 Sessiz video → SAHNE-11")
+        logger.info(f"🎙️ {user.id} audio DEVAM: SESSIZ → SAHNE-11")
+        await query.answer(f"{_get_audio_label('silent', lang)} → SAHNE-11")
     else:
         context.user_data["audio_option"] = ", ".join(selected)
         context.user_data["audio_silent"] = False
         context.user_data["audio_selections"] = selected
         context.user_data["audio_next_scene"] = "SAHNE-09"
         logger.info(f"🎙️ {user.id} audio DEVAM: {', '.join(selected)} → SAHNE-09")
-        await query.answer(f"Seçilenler: {', '.join(selected)} → SAHNE-09")
+        await query.answer(f"{', '.join(selected)} → SAHNE-09")
 
     # State Engine geçişi
     se = StateEngine(context.user_data)
@@ -1364,8 +1367,8 @@ def _get_brief_value(user_data: dict, field_key: str) -> str:
     elif field_key == "brief_audio":
         toggles = user_data.get("audio_toggles", {})
         if toggles.get("silent"):
-            return "🔇 Sessiz"
-        active = [AUDIO_OPTIONS.get(k, k) for k, v in toggles.items() if v]
+            return _get_audio_label("silent", "tr")
+        active = [_get_audio_label(k, "tr") for k, v in toggles.items() if v]
         return ", ".join(active) if active else "—"
     elif field_key == "brief_voicelang":
         lang_code = user_data.get("voice_language", "")
@@ -1903,16 +1906,12 @@ def _build_scenario_data(user_data: dict) -> dict:
     # Ses yapısı
     toggles = user_data.get("audio_toggles", {})
     if toggles.get("silent"):
-        ses_yapisi = "🔇 Sessiz"
+        ses_yapisi = _get_audio_label("silent", lang)
     else:
         ses_parts = []
-        AUDIO_OPTIONS = {
-            "voiceover": "🎙️ Dış Seslendirme", "ambient": "🔊 Ortam Sesleri",
-            "music": "🎵 Fon Müziği",
-        }
-        for k in AUDIO_OPTIONS:
+        for k in ["voiceover", "ambient", "music"]:
             if toggles.get(k):
-                ses_parts.append(AUDIO_OPTIONS[k])
+                ses_parts.append(_get_audio_label(k, lang))
         ses_yapisi = ", ".join(ses_parts) if ses_parts else "—"
 
     # Dinamik sahne sayisi ve sureleri — video suresine gore
