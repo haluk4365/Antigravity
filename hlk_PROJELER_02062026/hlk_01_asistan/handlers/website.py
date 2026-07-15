@@ -2736,9 +2736,9 @@ async def _run_production_pipeline(
 
     se = StateEngine(context.user_data)
     pid = f"PID-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
-    product_name = (context.user_data.get("website_url", "").split("/")[-1]
-                    if "/" in context.user_data.get("website_url", "") else "urununuz")
-    brand = context.user_data.get("brand", "Urun")
+    url = context.user_data.get("website_url", "")
+    product_name = url.split("/")[-1].replace("-", " ").replace("_", " ") if "/" in url else "urununuz"
+    brand = context.user_data.get("brand", "Marka") or "Marka"
     duration = int(context.user_data.get("video_duration", 15))
     voice_lang = context.user_data.get("voice_language", "tr")
     logger.info(f"🎬 [Production] Basliyor: {pid} | {brand} — {product_name} | {duration}sn | {voice_lang}")
@@ -2808,16 +2808,10 @@ async def _run_production_pipeline(
             except Exception as e:
                 logger.warning(f"⚠️ [Production] Kie AI basarisiz: {e}")
 
-        # Hicbiri olmadiysa dummy image
+        # Hicbiri olmadiysa gorsel OLMADAN devam et (dummy kullanma!)
         if not img_path:
-            try:
-                from PIL import Image as PILImage
-                img = PILImage.new("RGB", (720, 1280), color=(15, 25, 45))
-                img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
-                img.save(img_path)
-                cost_report["services"]["image"] = "dummy"
-            except:
-                pass
+            logger.warning("⚠️ [Production] Gorsel uretilemedi — sesli teslim yapilacak")
+            cost_report["services"]["image"] = "failed"
 
         # ================================================================
         # ADIM 2: SES URETIMI (ElevenLabs)
@@ -2825,10 +2819,16 @@ async def _run_production_pipeline(
         logger.info(f"🎙️ [Production/2] Ses uretimi...")
         try:
             from services.voice_generator import ahu_voice_generator
-            voice_text = (
-                f"{brand} {product_name} urununu kesfedin. "
-                f"Kalite ve uygun fiyat bir arada. Hemen siparis verin!"
-            )
+            if voice_lang == "tr":
+                voice_text = (
+                    f"{brand} {product_name} urununu simdi kesfedin. "
+                    f"Kalite ve uygun fiyat bir arada. Hemen siparis vermek icin tiklayin."
+                )
+            else:
+                voice_text = (
+                    f"Discover {brand} {product_name} now. "
+                    f"Quality and affordable price together. Order now!"
+                )
             voice_path = ahu_voice_generator.generate(voice_text, language=voice_lang)
             if voice_path:
                 logger.info(f"✅ [Production] ElevenLabs ses: {voice_path}")

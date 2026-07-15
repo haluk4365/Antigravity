@@ -37,7 +37,7 @@ class HedraGenerator:
             resp = requests.post(
                 f"{BASE_URL}/assets",
                 headers=headers,
-                json={"filename": fname, "mime_type": mime_type},
+                json={"name": fname, "type": mime_type},
                 timeout=30,
             )
             if resp.status_code not in (200, 201):
