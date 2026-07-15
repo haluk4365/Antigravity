@@ -10,7 +10,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://api.hedra.com"
+BASE_URL = "https://api.hedra.com/web-app/public"
 
 
 class HedraGenerator:
@@ -27,48 +27,58 @@ class HedraGenerator:
             "Accept": "application/json",
         }
 
-    def upload_image(self, image_path: str) -> str | None:
-        """Görsel yükle, URL döndür."""
+    def _upload_asset(self, file_path: str, mime_type: str) -> str | None:
+        """Dosya yükle (iki adimli: asset olustur + upload), asset_id dondur."""
         try:
-            with open(image_path, "rb") as f:
-                resp = requests.post(
-                    f"{BASE_URL}/web-app/v1/images",
-                    headers=self._headers(),
+            headers = self._headers()
+            headers["Content-Type"] = "application/json"
+            # Adim 1: Asset kaydi olustur
+            fname = os.path.basename(file_path)
+            resp = requests.post(
+                f"{BASE_URL}/assets",
+                headers=headers,
+                json={"filename": fname, "mime_type": mime_type},
+                timeout=30,
+            )
+            if resp.status_code not in (200, 201):
+                logger.error("Hedra asset create %s: %s", resp.status_code, resp.text[:200])
+                return None
+            asset = resp.json()
+            asset_id = asset.get("id") or asset.get("asset_id")
+            if not asset_id:
+                return None
+            # Adim 2: Dosyayi yukle
+            with open(file_path, "rb") as f:
+                up_resp = requests.post(
+                    f"{BASE_URL}/assets/{asset_id}/upload",
+                    headers={"X-API-Key": self._api_key},
                     files={"file": f},
                     timeout=60,
                 )
-            if resp.status_code == 200:
-                data = resp.json()
-                return data.get("url") or data.get("image_url")
-            logger.error("Hedra image upload %s: %s", resp.status_code, resp.text[:200])
+            if up_resp.status_code in (200, 201, 204):
+                logger.info("Hedra asset uploaded: %s", asset_id)
+                return asset_id
+            logger.error("Hedra asset upload %s: %s", up_resp.status_code, up_resp.text[:200])
         except Exception as e:
-            logger.error("Hedra image upload hata: %s", e)
+            logger.error("Hedra upload hata: %s", e)
         return None
+
+    def upload_image(self, image_path: str) -> str | None:
+        """Görsel yükle, asset URL döndür."""
+        return self._upload_asset(image_path, "image/png")
 
     def upload_audio(self, audio_path: str) -> str | None:
-        """Ses yükle, URL döndür."""
-        try:
-            with open(audio_path, "rb") as f:
-                resp = requests.post(
-                    f"{BASE_URL}/web-app/v1/audios",
-                    headers=self._headers(),
-                    files={"file": f},
-                    timeout=60,
-                )
-            if resp.status_code == 200:
-                data = resp.json()
-                return data.get("url") or data.get("audio_url")
-            logger.error("Hedra audio upload %s: %s", resp.status_code, resp.text[:200])
-        except Exception as e:
-            logger.error("Hedra audio upload hata: %s", e)
-        return None
+        """Ses yükle, asset URL döndür."""
+        return self._upload_asset(audio_path, "audio/mpeg")
 
     def generate(self, image_url: str, audio_url: str, model_id: str = "omnia") -> str | None:
-        """Video üretim isteği gönder, job_id döndür."""
+        """Video üretim isteği gönder, generation_id döndür."""
         payload = {
-            "image_url": image_url,
-            "audio_url": audio_url,
-            "model_id": model_id,
+            "model": model_id,
+            "input": {
+                "image_asset_id": image_url,
+                "audio_asset_id": audio_url,
+            },
             "aspect_ratio": "9:16",
             "resolution": "720p",
         }
@@ -76,26 +86,26 @@ class HedraGenerator:
         headers["Content-Type"] = "application/json"
         try:
             resp = requests.post(
-                f"{BASE_URL}/web-app/v1/videos/generate",
+                f"{BASE_URL}/generations",
                 headers=headers,
                 json=payload,
                 timeout=120,
             )
-            if resp.status_code == 200:
+            if resp.status_code in (200, 201):
                 data = resp.json()
-                return data.get("job_id") or data.get("video_id")
+                return data.get("id") or data.get("generation_id")
             logger.error("Hedra generate %s: %s", resp.status_code, resp.text[:200])
         except Exception as e:
             logger.error("Hedra generate hata: %s", e)
         return None
 
-    def wait_for_completion(self, job_id: str, max_wait: int = 300) -> str | None:
+    def wait_for_completion(self, generation_id: str, max_wait: int = 300) -> str | None:
         """Video hazır olana kadar polling yap, video_url döndür."""
         start = time.time()
         while time.time() - start < max_wait:
             try:
                 resp = requests.get(
-                    f"{BASE_URL}/web-app/v1/jobs/{job_id}",
+                    f"{BASE_URL}/generations/{generation_id}/status",
                     headers=self._headers(),
                     timeout=30,
                 )
@@ -103,17 +113,17 @@ class HedraGenerator:
                     data = resp.json()
                     status = data.get("status") or data.get("state", "")
                     if status == "completed":
-                        return data.get("video_url") or data.get("output_url")
+                        return data.get("video_url") or data.get("output_url") or data.get("url")
                     elif status == "failed":
-                        logger.error("Hedra job başarısız: %s", data.get("error", ""))
+                        logger.error("Hedra generation basarisiz: %s", data.get("error", ""))
                         return None
                 elif resp.status_code == 404:
-                    logger.error("Hedra job bulunamadı: %s", job_id)
+                    logger.error("Hedra generation bulunamadi: %s", generation_id)
                     return None
             except Exception as e:
                 logger.error("Hedra status kontrol hata: %s", e)
             time.sleep(5)
-        logger.error("Hedra timeout — %ss içinde tamamlanamadı", max_wait)
+        logger.error("Hedra timeout — %ss icinde tamamlanamadi", max_wait)
         return None
 
     def download_video(self, video_url: str, output_path: str) -> bool:
