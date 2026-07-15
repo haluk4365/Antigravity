@@ -2732,82 +2732,192 @@ async def _run_production_pipeline(
     devam edilir.
     """
     from utils.state_engine import StateEngine, UserEvent
-    import os as _os
+    import os as _os, tempfile, json as _json
 
     se = StateEngine(context.user_data)
     pid = f"PID-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
-    logger.info(f"🎬 [Production] Basliyor: {pid}")
+    product_name = (context.user_data.get("website_url", "").split("/")[-1]
+                    if "/" in context.user_data.get("website_url", "") else "urununuz")
+    brand = context.user_data.get("brand", "Urun")
+    duration = int(context.user_data.get("video_duration", 15))
+    voice_lang = context.user_data.get("voice_language", "tr")
+    logger.info(f"🎬 [Production] Basliyor: {pid} | {brand} — {product_name} | {duration}sn | {voice_lang}")
+
+    voice_path = None; video_path = None; img_path = None
+    cost_report = {"pid": pid, "services": {}}
+    tmp = tempfile.gettempdir()
 
     try:
-        # === ADIM 1: Ses üretimi (ElevenLabs) ===
-        from services.voice_generator import ahu_voice_generator
-        voice_lang = context.user_data.get("voice_language", "tr")
-        product_name = (context.user_data.get("website_url", "").split("/")[-1]
-                        if "/" in context.user_data.get("website_url", "") else "urununuz")
-        brand = context.user_data.get("brand", "Urun")
-        voice_text = (
-            f"{brand} {product_name} ürününü keşfedin. "
-            f"Kalite ve uygun fiyat bir arada. Hemen sipariş verin!"
-        )
-        voice_path = ahu_voice_generator.generate(voice_text, language=voice_lang)
-        if voice_path:
-            logger.info(f"✅ [Production] Ses üretildi: {voice_path}")
-
-        # === ADIM 2: Video üretimi dene (Hedra lip-sync) ===
-        video_path = None
+        # ================================================================
+        # ADIM 1: GORSEL URETIMI (Fal.ai > Kie AI > dummy)
+        # ================================================================
+        logger.info(f"🎨 [Production/1] Gorsel uretimi...")
         try:
-            from services.hedra_generator import HedraGenerator
-            from PIL import Image
-            import tempfile
-            hedra = HedraGenerator()
-            img = Image.new("RGB", (720, 1280), color=(25, 25, 35))
-            img_path = _os.path.join(tempfile.gettempdir(), f"hlk_prod_{user_id}.png")
-            img.save(img_path)
-            # Hedra lip-sync: görsel + ses → video
-            video_path = _os.path.join(tempfile.gettempdir(), f"hlk_video_{user_id}.mp4")
-            ok = await asyncio.to_thread(
-                hedra.create_lipsync_video, img_path, str(voice_path), video_path
-            )
-            if ok:
-                logger.info(f"✅ [Production] Hedra lip-sync video: {video_path}")
-            else:
-                video_path = None
+            import requests as _r
+            fal_key = _os.getenv("FAL_KEY", "")
+            if fal_key:
+                resp = _r.post("https://queue.fal.run/fal-ai/fast-sdxl",
+                    headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
+                    json={"prompt": f"professional product photo of {brand} {product_name}, studio lighting, white background, high quality"},
+                    timeout=30)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    req_id = data.get("request_id")
+                    # Poll for completion
+                    for _ in range(6):
+                        await asyncio.sleep(3)
+                        st = _r.get(f"https://queue.fal.run/fal-ai/fast-sdxl/requests/{req_id}/status",
+                            headers={"Authorization": f"Key {fal_key}"}, timeout=10)
+                        if st.status_code == 200 and st.json().get("status") == "COMPLETED":
+                            img_url = st.json().get("response", {}).get("images", [{}])[0].get("url", "")
+                            if img_url:
+                                img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
+                                _r.urlretrieve(img_url, img_path)
+                                logger.info(f"✅ [Production] Fal.ai gorsel: {img_path}")
+                                cost_report["services"]["fal.ai"] = "ok"
+                            break
         except Exception as e:
-            logger.warning(f"⚠️ [Production] Hedra video basarisiz (devam): {e}")
-            video_path = None
+            logger.warning(f"⚠️ [Production] Fal.ai basarisiz: {e}")
 
-        # === ADIM 3: Sonucu kullaniciya gonder ===
+        # Fal basarisizsa Kie AI dene
+        if not img_path:
+            try:
+                kie_key = _os.getenv("KIE_AI_API_KEY", "")
+                if kie_key:
+                    resp = _r.post("https://api.kie.ai/api/v1/jobs/createTask",
+                        headers={"Authorization": f"Bearer {kie_key}", "Content-Type": "application/json"},
+                        json={"model": "z-image", "prompt": f"{brand} {product_name} product photo, clean background"},
+                        timeout=30)
+                    if resp.status_code == 200:
+                        task_id = resp.json().get("data", {}).get("taskId", "")
+                        if task_id:
+                            for _ in range(8):
+                                await asyncio.sleep(3)
+                                st = _r.get(f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
+                                    headers={"Authorization": f"Bearer {kie_key}"}, timeout=10)
+                                if st.status_code == 200:
+                                    st_data = st.json().get("data", {})
+                                    if st_data.get("status") == "completed":
+                                        img_url = st_data.get("result_url") or st_data.get("image_url", "")
+                                        if img_url:
+                                            img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
+                                            _r.urlretrieve(img_url, img_path)
+                                            logger.info(f"✅ [Production] Kie AI gorsel: {img_path}")
+                                            cost_report["services"]["kie.ai"] = "ok"
+                                        break
+            except Exception as e:
+                logger.warning(f"⚠️ [Production] Kie AI basarisiz: {e}")
+
+        # Hicbiri olmadiysa dummy image
+        if not img_path:
+            try:
+                from PIL import Image as PILImage
+                img = PILImage.new("RGB", (720, 1280), color=(15, 25, 45))
+                img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
+                img.save(img_path)
+                cost_report["services"]["image"] = "dummy"
+            except:
+                pass
+
+        # ================================================================
+        # ADIM 2: SES URETIMI (ElevenLabs)
+        # ================================================================
+        logger.info(f"🎙️ [Production/2] Ses uretimi...")
+        try:
+            from services.voice_generator import ahu_voice_generator
+            voice_text = (
+                f"{brand} {product_name} urununu kesfedin. "
+                f"Kalite ve uygun fiyat bir arada. Hemen siparis verin!"
+            )
+            voice_path = ahu_voice_generator.generate(voice_text, language=voice_lang)
+            if voice_path:
+                logger.info(f"✅ [Production] ElevenLabs ses: {voice_path}")
+                cost_report["services"]["elevenlabs"] = "ok"
+        except Exception as e:
+            logger.warning(f"⚠️ [Production] ElevenLabs basarisiz: {e}")
+
+        # ================================================================
+        # ADIM 3: VIDEO URETIMI (Hedra > Higgsfield)
+        # ================================================================
+        logger.info(f"🎬 [Production/3] Video uretimi...")
+        if voice_path and img_path:
+            # --- Hedra (birincil) ---
+            try:
+                from services.hedra_generator import HedraGenerator
+                hedra = HedraGenerator()
+                video_path = _os.path.join(tmp, f"hlk_video_{user_id}.mp4")
+                ok = await asyncio.to_thread(hedra.create_lipsync_video, img_path, str(voice_path), video_path)
+                if ok:
+                    logger.info(f"✅ [Production] Hedra video: {video_path}")
+                    cost_report["services"]["hedra"] = "ok"
+            except Exception as e:
+                logger.warning(f"⚠️ [Production] Hedra basarisiz: {e}")
+
+        # --- Higgsfield (yedek) ---
+        if not video_path and img_path:
+            try:
+                hf_key_id = _os.getenv("HIGGSFIELD_KEY_ID", "")
+                hf_key_secret = _os.getenv("HIGGSFIELD_KEY_SECRET", "")
+                if hf_key_id and hf_key_secret:
+                    # Upload image
+                    with open(img_path, "rb") as f:
+                        up_resp = _r.post("https://platform.higgsfield.ai/v1/files/upload",
+                            headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}"},
+                            files={"file": f}, timeout=30)
+                    if up_resp.status_code == 200:
+                        file_url = up_resp.json().get("url", "")
+                        gen_resp = _r.post("https://platform.higgsfield.ai/higgsfield-ai/seedance/standard",
+                            headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}", "Content-Type": "application/json"},
+                            json={"image_url": file_url, "duration": duration},
+                            timeout=30)
+                        if gen_resp.status_code == 200:
+                            req_id = gen_resp.json().get("request_id", "")
+                            for _ in range(10):
+                                await asyncio.sleep(5)
+                                st = _r.get(f"https://platform.higgsfield.ai/requests/{req_id}/status",
+                                    headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}"}, timeout=10)
+                                if st.status_code == 200 and st.json().get("status") == "completed":
+                                    vid_url = st.json().get("output_url", "")
+                                    if vid_url:
+                                        video_path = _os.path.join(tmp, f"hlk_video_{user_id}.mp4")
+                                        _r.urlretrieve(vid_url, video_path)
+                                        logger.info(f"✅ [Production] Higgsfield video: {video_path}")
+                                        cost_report["services"]["higgsfield"] = "ok"
+                                    break
+            except Exception as e:
+                logger.warning(f"⚠️ [Production] Higgsfield basarisiz: {e}")
+
+        # ================================================================
+        # ADIM 4: TESLIM
+        # ================================================================
         if video_path and _os.path.exists(video_path):
             with open(video_path, "rb") as vf:
                 await context.bot.send_video(
                     chat_id=chat_id, video=vf,
                     caption=f"🎬 <b>{brand} — {product_name}</b>\n\n"
-                            f"Videonuz hazir! Begenirseniz siparis verebilirsiniz.\n"
-                            f"📋 PID: <code>{pid}</code>",
+                            f"Videonuz hazir! 📋 PID: <code>{pid}</code>",
                     parse_mode="HTML",
                 )
-            logger.info(f"✅ [Production] Video gonderildi: {pid}")
+            logger.info(f"✅ [Production] VIDEO GONDERILDI: {pid}")
         elif voice_path:
-            # Video olmazsa en azindan ses dosyasini gonder
             with open(voice_path, "rb") as af:
                 await context.bot.send_voice(
                     chat_id=chat_id, voice=af,
-                    caption=f"🎙️ <b>{brand} — {product_name}</b>\n\n"
-                            f"Seslendirme hazir! 📋 PID: <code>{pid}</code>",
+                    caption=f"🎙️ <b>{brand} — {product_name}</b>\n📋 PID: <code>{pid}</code>",
                     parse_mode="HTML",
                 )
-            logger.info(f"✅ [Production] Ses gonderildi: {pid}")
+            logger.info(f"✅ [Production] SES GONDERILDI: {pid}")
         else:
-            # Hicbiri olmadi — bilgilendirme mesaji
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"🎬 <b>Üretim Tamamlandı!</b>\n\n"
-                     f"📋 PID: <code>{pid}</code>\n"
-                     f"Videonuz hazırlanıyor, en kısa sürede gönderilecektir.",
+                text=f"🎬 <b>Üretim Tamamlandi!</b>\n\n📋 PID: <code>{pid}</code>\n"
+                     f"Video hazirlaniyor, en kisa surede gonderilecektir.",
                 parse_mode="HTML",
             )
-            logger.info(f"✅ [Production] Bilgilendirme gonderildi: {pid}")
+            logger.info(f"✅ [Production] BILGILENDIRME: {pid}")
 
+        cost_report["status"] = "completed"
+        logger.info(f"📊 [Production] Maliyet raporu: {_json.dumps(cost_report)}")
         se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
 
     except Exception as e:
@@ -2815,9 +2925,8 @@ async def _run_production_pipeline(
         try:
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"🎬 <b>Üretim Tamamlandı!</b>\n\n"
-                     f"📋 PID: <code>{pid}</code>\n"
-                     f"Videonuz hazırlanıyor, en kısa sürede gönderilecektir.",
+                text=f"🎬 <b>Uretim Tamamlandi!</b>\n\n📋 PID: <code>{pid}</code>\n"
+                     f"Video hazirlaniyor, en kisa surede gonderilecektir.",
                 parse_mode="HTML",
             )
         except Exception:
