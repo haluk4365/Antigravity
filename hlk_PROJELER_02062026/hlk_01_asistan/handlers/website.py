@@ -187,12 +187,12 @@ async def _process_link_background(
         se = StateEngine(user_data)
         se.fire(UserEvent.LINK_VALIDATED)
 
-        # Link doğrulandı bilgisi (i18n — secilen dilde)
+        # Link doğrulandı bilgisi (i18n — secilen dilde, cleanup icin track edilir)
         lang = user_data.get("language", "tr")
-        await bot.send_message(
+        from services.scene_delivery import scene_delivery as _sd
+        await _sd.send_and_track(
             chat_id=chat_id,
             text=t("link.validated", lang),
-            parse_mode="HTML",
         )
 
         # Arka plan araştırmasını başlat
