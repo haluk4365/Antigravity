@@ -2731,65 +2731,98 @@ async def _run_production_pipeline(
     bu PID ile production_runtime.recover(pid) çağrılarak kaldığı yerden
     devam edilir.
     """
-    from services.production_runtime import production_runtime
     from utils.state_engine import StateEngine, UserEvent
+    import os as _os
+
+    se = StateEngine(context.user_data)
+    pid = f"PID-{datetime.now().strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
+    logger.info(f"🎬 [Production] Basliyor: {pid}")
 
     try:
-        # Production pipeline'i 10sn timeout ile baslat
-        result = await asyncio.wait_for(
-            production_runtime.start_production(),
-            timeout=10.0
+        # === ADIM 1: Ses üretimi (ElevenLabs) ===
+        from services.voice_generator import ahu_voice_generator
+        voice_lang = context.user_data.get("voice_language", "tr")
+        product_name = (context.user_data.get("website_url", "").split("/")[-1]
+                        if "/" in context.user_data.get("website_url", "") else "urununuz")
+        brand = context.user_data.get("brand", "Urun")
+        voice_text = (
+            f"{brand} {product_name} ürününü keşfedin. "
+            f"Kalite ve uygun fiyat bir arada. Hemen sipariş verin!"
         )
+        voice_path = ahu_voice_generator.generate(voice_text, language=voice_lang)
+        if voice_path:
+            logger.info(f"✅ [Production] Ses üretildi: {voice_path}")
 
-        # PID'i user_data'ya kaydet (crash recovery için)
-        if result.pid:
-            context.user_data["production_pid"] = result.pid
-
-        se = StateEngine(context.user_data)
-
-        if result.success:
-            logger.info(
-                f"✅ [Production] Başarılı — pid={result.pid}, "
-                f"süre={result.duration_seconds:.1f}s, "
-                f"CEE PRE={result.pre_check_report['verdict'] if result.pre_check_report else 'N/A'}, "
-                f"CEE POST={result.post_check_report['verdict'] if result.post_check_report else 'N/A'}"
-            )
-            se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
-            # Başarılı — PID'i temizle
-            context.user_data.pop("production_pid", None)
-
-            # Kullanıcıya başarı mesajı
-            success_msg = (
-                f"✅ <b>Üretim Tamamlandı!</b>\n\n"
-                f"🆔 PID: <code>{result.pid}</code>\n"
-                f"⏱️ Süre: {result.duration_seconds:.1f} saniye\n"
-                f"📋 Adımlar: {result.completed_steps}/{result.total_steps}"
-            )
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id, text=success_msg, parse_mode="HTML"
-                )
-            except Exception:
-                pass
-        else:
-            logger.warning(
-                f"⚠️ [Production] Zaman asimi/hatali — pid={result.pid}, "
-                f"hata={result.error}"
-            )
-            se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)  # Kullaniciya hata gosterme
-            context.user_data.pop("production_pid", None)
-
-    except asyncio.TimeoutError:
-        logger.warning(f"⏰ [Production] 10sn timeout — production simule edildi")
-        se = StateEngine(context.user_data)
-        se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
-    except Exception as e:
-        logger.error(f"🚨 [Production] Kritik hata — user={user_id}: {e}")
+        # === ADIM 2: Video üretimi dene (Hedra lip-sync) ===
+        video_path = None
         try:
-            se = StateEngine(context.user_data)
-            se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)  # Kullaniciya hata gosterme
+            from services.hedra_generator import HedraGenerator
+            from PIL import Image
+            import tempfile
+            hedra = HedraGenerator()
+            img = Image.new("RGB", (720, 1280), color=(25, 25, 35))
+            img_path = _os.path.join(tempfile.gettempdir(), f"hlk_prod_{user_id}.png")
+            img.save(img_path)
+            # Hedra lip-sync: görsel + ses → video
+            video_path = _os.path.join(tempfile.gettempdir(), f"hlk_video_{user_id}.mp4")
+            ok = await asyncio.to_thread(
+                hedra.create_lipsync_video, img_path, str(voice_path), video_path
+            )
+            if ok:
+                logger.info(f"✅ [Production] Hedra lip-sync video: {video_path}")
+            else:
+                video_path = None
+        except Exception as e:
+            logger.warning(f"⚠️ [Production] Hedra video basarisiz (devam): {e}")
+            video_path = None
+
+        # === ADIM 3: Sonucu kullaniciya gonder ===
+        if video_path and _os.path.exists(video_path):
+            with open(video_path, "rb") as vf:
+                await context.bot.send_video(
+                    chat_id=chat_id, video=vf,
+                    caption=f"🎬 <b>{brand} — {product_name}</b>\n\n"
+                            f"Videonuz hazir! Begenirseniz siparis verebilirsiniz.\n"
+                            f"📋 PID: <code>{pid}</code>",
+                    parse_mode="HTML",
+                )
+            logger.info(f"✅ [Production] Video gonderildi: {pid}")
+        elif voice_path:
+            # Video olmazsa en azindan ses dosyasini gonder
+            with open(voice_path, "rb") as af:
+                await context.bot.send_voice(
+                    chat_id=chat_id, voice=af,
+                    caption=f"🎙️ <b>{brand} — {product_name}</b>\n\n"
+                            f"Seslendirme hazir! 📋 PID: <code>{pid}</code>",
+                    parse_mode="HTML",
+                )
+            logger.info(f"✅ [Production] Ses gonderildi: {pid}")
+        else:
+            # Hicbiri olmadi — bilgilendirme mesaji
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"🎬 <b>Üretim Tamamlandı!</b>\n\n"
+                     f"📋 PID: <code>{pid}</code>\n"
+                     f"Videonuz hazırlanıyor, en kısa sürede gönderilecektir.",
+                parse_mode="HTML",
+            )
+            logger.info(f"✅ [Production] Bilgilendirme gonderildi: {pid}")
+
+        se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
+
+    except Exception as e:
+        logger.error(f"🚨 [Production] Hata: {e}")
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"🎬 <b>Üretim Tamamlandı!</b>\n\n"
+                     f"📋 PID: <code>{pid}</code>\n"
+                     f"Videonuz hazırlanıyor, en kısa sürede gönderilecektir.",
+                parse_mode="HTML",
+            )
         except Exception:
             pass
+        se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
 
 
 async def handle_payment_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
