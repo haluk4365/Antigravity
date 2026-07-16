@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAHNE-12 Brief Onay Formu — Telegram Test Görüntüsü</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a2e; display: flex; justify-content: center; align-items: center;
+    min-height: 100vh; padding: 20px;
+  }
+  .phone-frame {
+    width: 420px; background: #0f0f1a; border-radius: 24px;
+    overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  .phone-header {
+    background: #1c1c2e; padding: 14px 18px; display: flex;
+    align-items: center; gap: 10px; border-bottom: 1px solid #2a2a3e;
+  }
+  .phone-header .avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 800; font-size: 16px;
+  }
+  .phone-header .name { color: #fff; font-weight: 600; font-size: 15px; }
+  .phone-header .status { color: #888; font-size: 12px; }
+  .chat-area {
+    background: #0f0f1a; padding: 16px 12px; min-height: 500px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .msg {
+    max-width: 95%; align-self: flex-start;
+    background: #1c1c2e; color: #e4e4e7; border-radius: 0 14px 14px 14px;
+    padding: 12px 16px; font-size: 14px; line-height: 1.55;
+    position: relative;
+  }
+  .msg b { color: #fff; }
+  .msg code {
+    display: block; color: #a5b4fc; font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12.5px; background: rgba(99,102,241,.08);
+    padding: 4px 8px; margin: 2px 0; border-radius: 6px;
+  }
+  .msg i { color: #a1a1aa; }
+  .msg .sep { color: #3f3f5c; letter-spacing: 2px; margin: 4px 0; display: block; }
+  .tg-buttons {
+    display: flex; flex-direction: column; gap: 6px; margin-top: 8px;
+  }
+  .tg-btn {
+    display: flex; align-items: center; justify-content: center;
+    padding: 10px 16px; border-radius: 10px; font-size: 14px;
+    font-weight: 500; cursor: pointer; border: none; width: 100%;
+    transition: opacity .15s;
+  }
+  .tg-btn:hover { opacity: .85; }
+  .tg-btn-approve { background: #22c55e; color: #fff; }
+  .tg-btn-edit    { background: #3b82f6; color: #fff; }
+  .timestamp {
+    font-size: 11px; color: #666; margin-top: 4px;
+    align-self: flex-end;
+  }
+
+  /* Düzeltme modu paneli */
+  .edit-panel {
+    border: 1px solid #3b82f6; border-radius: 14px;
+    background: rgba(59,130,246,.08); padding: 14px;
+  }
+  .edit-panel h3 { color: #93c5fd; font-size: 14px; margin-bottom: 10px; }
+  .edit-panel .edit-btn {
+    display: block; width: 100%; text-align: left;
+    padding: 8px 12px; margin: 3px 0; border-radius: 8px;
+    background: rgba(255,255,255,.04); color: #e4e4e7;
+    border: 1px solid transparent; cursor: pointer; font-size: 13px;
+  }
+  .edit-panel .edit-btn:hover { border-color: #3b82f6; background: rgba(59,130,246,.12); }
+  .edit-panel .edit-done {
+    margin-top: 8px; background: #22c55e; color: #fff;
+    text-align: center; padding: 10px; border-radius: 8px;
+    font-weight: 600; cursor: pointer;
+  }
+
+  .view-switcher {
+    display: flex; gap: 8px; margin-bottom: 16px; justify-content: center;
+  }
+  .view-switcher button {
+    padding: 8px 20px; border-radius: 20px; border: 1px solid #333;
+    background: transparent; color: #888; cursor: pointer; font-size: 13px;
+  }
+  .view-switcher button.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+
+  .label { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div style="display:flex;flex-direction:column;align-items:center;gap:12px;">
+  <div class="view-switcher">
+    <button id="btn-brief" class="active" onclick="showView('brief')">📋 Brief Onay Tablosu</button>
+    <button id="btn-edit" onclick="showView('edit')">✏️ Düzeltme Modu</button>
+  </div>
+  <div class="phone-frame">
+    <div class="phone-header">
+      <div class="avatar">HLK</div>
+      <div><div class="name">HLK AI Reklam Asistanı</div><div class="status">bot · çevrimiçi</div></div>
+    </div>
+    <div class="chat-area" id="chat-area">
+      <!-- JS ile doldurulacak -->
+    </div>
+  </div>
+  <div style="color:#666;font-size:11px;text-align:center;max-width:420px;">
+    Telegram test simülasyonu — <code>_build_brief_html()</code> çıktısı birebir gösterilmektedir.<br>
+    SAHNE-12 · REFERANS_Brief_Onay_Formu · AR-002_65 uyumlu
+  </div>
+</div>
+
+<script>
+const DATA = {
+  maddeler: [
+    { onayli: true, ikon: "🔗", baslik: "Ürün Linki", aciklama: "Analiz edilen ürün sayfası", deger: "hepsiburada.com/hlk-vitamin-c-se..." },
+    { onayli: true, ikon: "📦", baslik: "Ek Materyal", aciklama: "Kullanıcının yüklediği materyaller", deger: "3 adet" },
+    { onayli: true, ikon: "📱", baslik: "Platform", aciklama: "Yayınlanacak platform", deger: "Instagram" },
+    { onayli: true, ikon: "📐", baslik: "Video Formatı", aciklama: "Seçilen video formatı", deger: "9:16 Dikey" },
+    { onayli: true, ikon: "📺", baslik: "Çözünürlük", aciklama: "Video çözünürlüğü", deger: "1080p Full HD" },
+    { onayli: true, ikon: "⏱️", baslik: "Video Süresi", aciklama: "Tercih edilen video süresi", deger: "12 saniye" },
+    { onayli: true, ikon: "🎬", baslik: "Tanıtım Tarzı", aciklama: "Reklam tanıtım tarzı", deger: "UGC Tarzı" },
+    { onayli: true, ikon: "👥", baslik: "Hedef Kitle", aciklama: "Reklam hedef kitlesi", deger: "18-34 Yaş" },
+    { onayli: true, ikon: "🎙️", baslik: "Ses Tercihleri", aciklama: "Ses tercihleri", deger: "Dış Seslendirme, Fon Müziği" },
+    { onayli: true, ikon: "🌍", baslik: "Seslendirme Dili", aciklama: "Seçilen seslendirme dili", deger: "🇹🇷 Türkçe" },
+    { onayli: true, ikon: "🎭", baslik: "Ses Karakteri", aciklama: "Seslendirme karakteri", deger: "Kadın Ses" },
+    { onayli: true, ikon: "✨", baslik: "Vurgulanacaklar", aciklama: "Öne çıkarılacak detaylar", deger: "Ücretsiz Kargo, Yerli Üretim" }
+  ]
+};
+
+const SEP = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
+function buildBriefHtml(data) {
+  const maddeler = data.maddeler;
+  let lines = [
+    `<span class="sep">${SEP}</span>`,
+    `<b>📋 BRIEF ONAY FORMU</b>`,
+    `<code>🔵1.Brief  ›  ⏳2.Senaryo  ›  ⏳3.Fiyat Teklifi</code>`,
+    `<span class="sep">${SEP}</span>`,
+    `<b>📋 BRIEF ÖZETİ</b>`,
+    `<i>Şimdiye kadar verdiğiniz tüm bilgiler aşağıda özetlenmiştir.</i>`,
+    ``
+  ];
+  for (let i = 0; i < maddeler.length; i += 2) {
+    const left = maddeler[i];
+    const isFirst = i < 2;
+    const tikL = isFirst ? "" : ((left.onayli ? "✅" : "☐") + " ");
+    const sol = `${tikL}${left.ikon} <b>${left.baslik}:</b> <b>${left.deger}</b>`;
+
+    if (i + 1 < maddeler.length) {
+      const right = maddeler[i + 1];
+      const ri = i + 1;
+      const tikR = ri < 2 ? "" : ((right.onayli ? "✅" : "☐") + " ");
+      const sag = `${tikR}${right.ikon} <b>${right.baslik}:</b> <b>${right.deger}</b>`;
+      if (isFirst) { lines.push(sol); lines.push(sag); }
+      else { lines.push(`<code>${sol}</code>`); lines.push(`<code>${sag}</code>`); }
+    } else {
+      lines.push(isFirst ? sol : `<code>${sol}</code>`);
+    }
+    lines.push(``);
+  }
+  return lines.join("\n");
+}
+
+const BRIEF_FIELDS = [
+  ["brief_link",      "🔗 Ürün Linki",       null,                     false],
+  ["brief_material",  "📦 Ek Materyal",       null,                     false],
+  ["brief_platform",  "📱 Platform",          "scene_platform_selection", true],
+  ["brief_format",    "📐 Video Formatı",     "SAHNE-03",              true],
+  ["brief_resolution","📺 Çözünürlük",        "SAHNE-04",              true],
+  ["brief_duration",  "⏱️ Video Süresi",      "SAHNE-05",              true],
+  ["brief_style",     "🎬 Tanıtım Tarzı",     "SAHNE-06",              true],
+  ["brief_audience",  "👥 Hedef Kitle",        "SAHNE-07",              true],
+  ["brief_audio",     "🎙️ Ses Tercihleri",     "SAHNE-08",              true],
+  ["brief_voicelang", "🌍 Seslendirme Dili",   "SAHNE-09",              true],
+  ["brief_voicechar", "🎭 Ses Karakteri",       "SAHNE-10",              true],
+  ["brief_emphasis",  "✨ Vurgulanacaklar",     "SAHNE-11",              true],
+];
+
+function buildEditPanel() {
+  let html = '<div class="edit-panel"><h3>✏️ Brief Düzeltme Modu</h3>';
+  html += '<p style="color:#a1a1aa;font-size:12px;margin-bottom:8px;">Değiştirmek istediğiniz alana tıklayın.</p>';
+  for (const f of BRIEF_FIELDS) {
+    if (f[3]) {
+      const item = DATA.maddeler.find(m => m.ikon === f[1].split(" ")[0]);
+      const val = item ? item.deger : "—";
+      html += `<div class="edit-btn">${f[1]}: <b>${val}</b></div>`;
+    }
+  }
+  html += '<div class="edit-done">✅ DÜZENLEME TAMAM</div></div>';
+  return html;
+}
+
+function showView(view) {
+  const area = document.getElementById('chat-area');
+  document.getElementById('btn-brief').classList.toggle('active', view === 'brief');
+  document.getElementById('btn-edit').classList.toggle('active', view === 'edit');
+
+  if (view === 'brief') {
+    const html = buildBriefHtml(DATA);
+    area.innerHTML = `
+      <div class="msg">${html.replace(/\n/g, '<br>')}</div>
+      <div class="tg-buttons">
+        <div class="tg-btn tg-btn-approve">✅ ONAYLA</div>
+        <div class="tg-btn tg-btn-edit">✏️ DÜZELT</div>
+      </div>
+      <div class="timestamp">Şimdi · HLK AI Reklam Asistanı</div>
+    `;
+  } else {
+    area.innerHTML = `
+      <div class="msg">${buildEditPanel()}</div>
+      <div class="timestamp">Şimdi · HLK AI Reklam Asistanı</div>
+    `;
+  }
+}
+
+showView('brief');
+</script>
+</body>
+</html>
