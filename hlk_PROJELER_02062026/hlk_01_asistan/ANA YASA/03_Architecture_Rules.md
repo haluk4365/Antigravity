@@ -6976,3 +6976,172 @@ Bu mimari;
 * Kapanış kriterleri sağlanmadığında üretim tamamlanmış kabul edilmez.
 * Tüm kapanış kayıtları PID üzerinden geriye dönük denetlenebilir.
 * Constitution Scan Engine, kapanış kriterlerinin tamamlandığını doğrulayabilir.
+
+---
+
+## AR-002_81
+
+### Başlık
+
+**HLK Runtime Karar Otoritesi ve Karar Talep Protokolü — HLK Runtime Decision Authority & Decision Request Protocol**
+
+### Amaç
+
+MASTER-013'te tanımlanan "HLK Runtime tek karar otoritesidir" prensibinin Runtime mimarisindeki resmi uygulamasını tanımlamak; yürütme katmanlarının karar üretmesini mimari seviyede engellemek ve karar gerektiren tüm durumlar için zorunlu Karar Talep Protokolü'nü standartlaştırmak.
+
+### Kural
+
+HLK_01_asistan projesinde, kullanıcının sistemi başlatan ilk tetikleyici komutu (örneğin /start) verildiği andan oturum tamamen kapanıncaya kadar tek karar otoritesi HLK Runtime'dır (MASTER-013).
+
+Bu süre boyunca;
+
+* Tüm modüller HLK Runtime'ın hiyerarşik kontrolü altında çalışır.
+* Hiçbir modül, executor, runtime, pipeline, provider veya AI modeli HLK Runtime adına karar veremez.
+* Decision Engine (MASTER-004, FEAT-002), Feedback Loop (AR-002_22), Selection Architecture (AR-002_49), CEE (AR-002_60) ve Escalation Engine; HLK Runtime'ın hiyerarşik kontrolü altında çalışan karar destek bileşenleridir. Bu bileşenler HLK Runtime'dan bağımsız karar yayınlayamaz.
+
+---
+
+### Karar Talep Protokolü (Decision Request Protocol)
+
+Karar gerektiren bir durum oluştuğunda aşağıdaki çalışma sırası zorunludur:
+
+**Adım 1 — Yürütmenin Durdurulması**
+
+Yürütme katmanı, karar gerektiren noktada teknik yürütmeyi durdurur. Tereddüt halinde karar üretmek yasaktır; tereddüt de karar gerektiren durum kabul edilir.
+
+**Adım 2 — Karar Talebinin (Decision Request) Oluşturulması ve İletilmesi**
+
+Yürütme katmanı bir Karar Talebi oluşturur ve HLK Runtime'a iletir.
+
+Karar Talebi en az aşağıdaki alanları içerir:
+
+| Alan (Türkçe) | Alan (Teknik) | Açıklama |
+|---|---|---|
+| Talep Kimliği | request_id | Benzersiz karar talebi kimliği |
+| Üretim Kimliği | pid | İlgili PID (AR-002_57) |
+| Karar Kategorisi | category | Aşağıdaki Karar Kategorileri tablosundan |
+| Talep Eden Katman | requester | Karar talebini üreten yürütme katmanı |
+| Teknik Kanıt / Bağlam | context | Kararın dayanacağı ham teknik veriler (yorum içermez) |
+
+Karar Talebi karar, öneri veya varsayım İÇEREMEZ; yalnızca ham teknik kanıt taşır.
+
+**Adım 3 — HLK Runtime Kararının Üretilmesi**
+
+HLK Runtime, kararını anayasal kurallara göre üretir. Gerektiğinde Decision Engine (yeniden değerlendirme — AR-002_22), Selection Architecture (seçim — AR-002_75) ve Escalation Engine (eskalasyon — AR-002_19) bileşenlerini kendi hiyerarşik kontrolü altında çalıştırır.
+
+Üretilen Runtime Kararı en az aşağıdaki alanları içerir:
+
+| Alan (Türkçe) | Alan (Teknik) | Açıklama |
+|---|---|---|
+| Karar Kimliği | decision_id | Benzersiz karar kimliği |
+| Talep Kimliği | request_id | Karara esas talep |
+| Karar | verdict | HLK Runtime'ın verdiği karar |
+| Karar Parametreleri | params | Yürütmenin uygulayacağı parametreler |
+| Karar Gerekçesi | rationale | 15_KARAR_GEREKCESI_STANDARDI.md uyumlu gerekçe |
+
+**Adım 4 — Yürütmenin Karara Göre Devam Etmesi**
+
+Yürütme katmanı, HLK Runtime kararını eksiksiz ve değiştirmeden uygular. Kararın uygulanması Event üretimi ile kayıt altına alınır (AR-002_73, EEC).
+
+Her Karar Talebi ve Runtime Kararı; PID ile ilişkilendirilir (AR-002_57), Decision History'ye kaydedilir (15_KARAR_GEREKCESI_STANDARDI.md) ve Event sistemi üzerinden izlenebilir olur (AR-002_73, 22_EXECUTION_EVENT_COLLECTOR.md).
+
+---
+
+### Karar Kategorileri
+
+Aşağıdaki durumların tamamı karar gerektiren durumdur ve yalnızca HLK Runtime tarafından karara bağlanır:
+
+| # | Kategori | Açıklama | İlgili Referans |
+|---|---|---|---|
+| 1 | **PROVIDER_RESULT** | Provider çıktısının kabul veya reddi | AR-002_75, AR-002_76 |
+| 2 | **PROVIDER_SWITCH** | Sıradaki provider adayına geçiş | AR-002_19, AR-002_21, AR-002_75 |
+| 3 | **EXECUTION_FAILURE** | Başarısızlık/timeout sonrası retry, yeniden değerlendirme veya eskalasyon | AR-002_22, AR-002_79 |
+| 4 | **CREATIVE_CONTENT** | Yaratıcı içerik (seslendirme metni vb.) belirlenmesi | AR-002_77 |
+| 5 | **DELIVERY** | Teslim şekli ve kullanıcıya gönderilecek süreç mesajı içeriği | AR-002_36, FD-008_1, OR-004_11 |
+| 6 | **COMPLETION** | Üretimin tamamlanmış kabul edilmesi | AR-002_80 |
+| 7 | **USER_NOTIFICATION** | Süreç kararı içeren her türlü kullanıcı bilgilendirmesi | GK-001_5, OR-004_11 |
+| 8 | **AMBIGUITY** | Tereddüt — yürütme katmanının karara bağlayamadığı her durum | MASTER-013 |
+
+Bu tablo sınırlayıcı değildir; karar niteliği taşıyan her yeni durum bu protokole tabidir.
+
+---
+
+### Production Pipeline Karar Yasağı
+
+production_pipeline.py hiçbir koşulda karar üretmeyecektir.
+
+production_pipeline.py'nin görevi yalnızca;
+
+* teknik yürütme,
+* provider ile haberleşme,
+* sonuç toplama,
+* Event üretme,
+* HLK Runtime tarafından verilen kararları eksiksiz uygulamaktır.
+
+production_pipeline.py;
+
+* PASS / FAIL,
+* timeout,
+* retry,
+* provider kabul/red,
+* provider değiştirme,
+* kullanıcı bilgilendirmesi,
+* completion
+
+kararı üretemez.
+
+Bu yasak; Production Executor (AR-002_76), Production Runtime (AR-002_70) ve diğer tüm yürütme katmanları için de geçerlidir. Yürütme katmanları karar gerektiren her durumda Karar Talep Protokolü'nü uygular.
+
+---
+
+### Sayısal Değer Yasağı
+
+Yürütme katmanlarında kullanılan hiçbir sayısal değer (timeout, poll sayısı, bekleme aralığı, deneme sayısı vb.) kod içerisine hardcoded yazılamaz.
+
+Tüm sayısal değerler yalnızca Global Configuration parametrelerinden okunur (01_Global_Configuration.md, GC İlkesi). Bu kapsamda tanımlı GC parametreleri:
+
+`GC_PRODUCTION_TIMEOUT`, `GC_PRODUCTION_STEP_TIMEOUT`, `GC_EXECUTOR_MAX_RETRY`, `GC_EXECUTOR_TASK_TIMEOUT`, `GC_EXECUTOR_RETRY_DELAY`, `GC_RUNTIME_HEARTBEAT_INTERVAL`, `GC_PROVIDER_HTTP_TIMEOUT`, `GC_PROVIDER_STATUS_TIMEOUT`, `GC_PROVIDER_POLL_COUNT`, `GC_IMAGE_POLL_INTERVAL`, `GC_VIDEO_POLL_INTERVAL`, `GC_MAX_RE_EVALUATION_COUNT`.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — protokol ANA YASA'ya tabidir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — HLK tek karar vericidir |
+| **MASTER** | MASTER-007 | Görev Ayrımı — AI Geliştirici/Executor uygulayıcıdır |
+| **MASTER** | MASTER-013 | HLK Karar Otoritesi ve Üretim Yürütücüsü Rol Ayrımı |
+| **AR** | AR-002_19 | Ajan Sürekliliği — eskalasyon çerçevesi |
+| **AR** | AR-002_21 | Ajan Değiştirme — provider değişim çerçevesi |
+| **AR** | AR-002_22 | Constitutional Feedback Loop — yeniden değerlendirme zinciri |
+| **AR** | AR-002_36 | Scene Delivery — teslim kararlarının çerçevesi |
+| **AR** | AR-002_57 | PID standardı — tüm karar kayıtları PID ile ilişkilendirilir |
+| **AR** | AR-002_70 | STATE_VIDEO_PRODUCTION Runtime — yürütme ortamı |
+| **AR** | AR-002_75 | Production Service Selection — provider seçim otoritesi |
+| **AR** | AR-002_76 | Production Execution Architecture — Executor sınırları |
+| **AR** | AR-002_77 | Creative Content Production — yaratıcı içerik kararları |
+| **AR** | AR-002_79 | Production Continuity — süreklilik aksiyon çerçevesi |
+| **AR** | AR-002_80 | Production Closure — completion kararı çerçevesi |
+| **GK** | GK-001_5 | Kullanıcı mesajlarının sistem kurallarına göre üretilmesi |
+| **OR** | OR-004_11 | Flow Diagram Zorunlu Konuşma Akışı |
+| **OR** | OR-004_12 | Üretim Sırasında Karar Talebi Operasyon Kuralı |
+| **MR** | MR-0005_7 | Modül Karar Bağımlılığı Kuralı |
+| **GC** | 01_Global_Configuration.md | Sayısal değerlerin tek yetkili kaynağı |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Karar gerekçelerinin kayıt standardı |
+| **EEC** | 22_EXECUTION_EVENT_COLLECTOR.md | Karar Event'lerinin toplanması |
+| **WF** | WF-017 | Runtime Decision Request workflow'u |
+
+---
+
+### Beklenen Sonuç
+
+* HLK Runtime, oturum boyunca tek karar otoritesi olarak çalışır.
+* Yürütme katmanları (production_pipeline.py dahil) hiçbir karar üretmez.
+* Karar gerektiren her durum; durdur → talep et → karar → devam et akışıyla çözülür.
+* Tereddüt durumları karar üretilmeden HLK Runtime'a iletilir.
+* Tüm kararlar PID, Decision History ve Event sistemi ile izlenebilir olur.
+* Kullanıcıya gönderilen süreç mesajları yalnızca HLK Runtime kararı ile üretilir.
+* Yürütme katmanlarındaki tüm sayısal değerler GC parametrelerinden okunur.
+* Constitution Scan Engine, karar üretiminin yalnızca HLK Runtime'da gerçekleştiğini denetleyebilir.
+* Bu protokol; Workflow, Production, Research, Agent, Selection, Delivery, Quality Control, Constitution Enforcement, Feedback Loop ve gelecekte eklenecek tüm modüller için geçerlidir.

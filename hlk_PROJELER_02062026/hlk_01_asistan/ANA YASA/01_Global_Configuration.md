@@ -23,6 +23,19 @@ Proje genelinde geçerli yapılandırma kuralları.
 | `GC_SAHNE2_EXTRA_WAIT` | 5 saniye | SAHNE-2 video sonu ekstra bekleme süresi |
 | `GC_LINK_PROCESSING_WAIT` | 4 saniye | Link işleme sonrası bekleme süresi |
 | `GC_BALLOON_STAGGER_DELAY` | 1 saniye | Konuşma balonları arası gecikme |
+| `GC_MAX_RE_EVALUATION_COUNT` | 3 | Feedback Loop maksimum yeniden değerlendirme sayısı (AR-002_22 §6.3) |
+| `GC_PRODUCTION_TIMEOUT` | 3600 saniye | Production Runtime toplam üretim zaman aşımı (AR-002_70) |
+| `GC_PRODUCTION_STEP_TIMEOUT` | 300 saniye | Production Runtime adım zaman aşımı — PID/Package oluşturma (AR-002_70) |
+| `GC_EXECUTOR_MAX_RETRY` | 3 | Production Executor görev başına maksimum deneme sayısı (AR-002_76) |
+| `GC_EXECUTOR_TASK_TIMEOUT` | 300 saniye | Production Executor tek görev zaman aşımı (AR-002_76) |
+| `GC_EXECUTOR_RETRY_DELAY` | 0.5 saniye | Production Executor yeniden deneme öncesi bekleme süresi (AR-002_76) |
+| `GC_EXECUTOR_STATE_DIR` | `data` | Production Executor durum dosyaları dizini (AR-002_76) |
+| `GC_RUNTIME_HEARTBEAT_INTERVAL` | 60 saniye | Runtime aktiflik kanıt sinyali (heartbeat) aralığı (MASTER-011) |
+| `GC_PROVIDER_HTTP_TIMEOUT` | 30 saniye | Provider API istek zaman aşımı (AR-002_81) |
+| `GC_PROVIDER_STATUS_TIMEOUT` | 10 saniye | Provider durum sorgusu zaman aşımı (AR-002_81) |
+| `GC_PROVIDER_POLL_COUNT` | 10 | Provider sonuç bekleme maksimum durum sorgusu sayısı (AR-002_81) |
+| `GC_IMAGE_POLL_INTERVAL` | 3 saniye | Görsel üretim durum sorgusu aralığı (AR-002_81) |
+| `GC_VIDEO_POLL_INTERVAL` | 5 saniye | Video üretim durum sorgusu aralığı (AR-002_81) |
 
 ---
 

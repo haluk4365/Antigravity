@@ -210,3 +210,19 @@ Execution Event Collector (EEC) tarafından yürütülen Executor işlemlerinin 
 
 AKTİF
 
+---
+
+## WF-017
+
+### Workflow
+
+Runtime Decision Request
+
+### Açıklama
+
+Yürütme katmanlarında karar gerektiren bir durum oluştuğunda uygulanan zorunlu karar talep akışını temsil eder (MASTER-013, AR-002_81, OR-004_12). Yürütme durdurulur → Karar talebi HLK Runtime'a iletilir → HLK Runtime kararını verir → Yürütme bu karara göre devam eder. Tereddüt halinde karar üretmek yasaktır; tereddüt bu workflow'u tetikler. Tüm karar talepleri ve kararlar PID, Decision History ve Event sistemi ile ilişkilendirilir.
+
+### Durum
+
+AKTİF
+

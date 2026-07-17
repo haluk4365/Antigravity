@@ -2671,29 +2671,41 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
-    # FD-008_1: Daktilo efektiyle dinamik bilgilendirme mesaji (GK-001_5)
+    # MASTER-013 / AR-002_81 / OR-004_12: Üretim başlangıç bildirimi bir SÜREÇ
+    # mesajıdır. İçeriği, zamanı, gönderim izni ve iletim parametreleri yalnızca
+    # HLK Runtime USER_NOTIFICATION kararı ile belirlenir (FD-008_1, GK-001_5).
+    # Handler karar VERMEZ; ham teknik kanıtı iletir ve kararı uygular.
     lang = get_lang(context.user_data)
     product_name = (context.user_data.get("website_url", "").split("/")[-1]
                     if "/" in context.user_data.get("website_url", "") else "urununuz")
     duration = context.user_data.get("video_duration", "10-15")
 
-    if lang == "tr":
-        done_text = (
-            f"<b>✅ Odemeniz onaylandi!</b>\n\n"
-            f"<b>{product_name}</b> icin <b><i>video uretiminiz</i></b> hemen basladi. 🎬\n"
-            f"Bu islem yaklasik <b>{duration} dakika</b> kadar surecek.\n"
-            f"Videonuz <b>hazir olur olmaz</b> size buradan <b>otomatik olarak</b> gonderecegim.\n\n"
-            f"<i>Bol kazanclar dilerim!</i> 🚀"
-        )
-    else:
-        done_text = (
-            f"<b>✅ {t('final.payment_received', lang)}</b>\n\n"
-            f"<b>{product_name}</b> — <b><i>{t('final.production_started', lang)}</i></b> 🎬\n"
-            f"{t('final.duration_info', lang)}: <b>~{duration} min</b>.\n"
-            f"<b>{t('final.auto_delivery', lang)}</b>\n\n"
-            f"<i>🚀</i>"
-        )
-    await typewriter_animation(chat_id, done_text, context.bot, 0.06)
+    from services.hlk_runtime import (
+        hlk_runtime as _hr,
+        DecisionRequest as _NotifyReq,
+        DecisionCategory as _NotifyCat,
+    )
+    _start_notify = _hr.request_decision(_NotifyReq(
+        pid="",  # PID henüz oluşturulmadı (AR-002_71: PID üretim başlayınca)
+        category=_NotifyCat.USER_NOTIFICATION.value,
+        requester="website.handle_admin_payment_approve",
+        context={
+            "kind": "production_start",
+            "lang": lang,
+            "product_name": product_name,
+            "duration": duration,
+        },
+    ))
+    if _start_notify.verdict == "NOTIFY":
+        _n_text = _start_notify.params.get("text", "")
+        _n_delay = _start_notify.params.get("typewriter_delay")
+        if _start_notify.params.get("delivery") == "typewriter" and _n_delay is not None:
+            await typewriter_animation(chat_id, _n_text, context.bot, _n_delay)
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id, text=_n_text,
+                parse_mode=_start_notify.params.get("parse_mode", "HTML"),
+            )
 
     # SE-007_4 / OR-004_9: STATE_VIDEO_PRODUCTION kullanıcı cevabı bekleyen
     # bir state değildir — oturum timeout'u üretim sırasında çalışmaz.
@@ -2705,7 +2717,6 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
     # CONSTITUTIONAL BOOT CHAIN: Production Runtime yetkilendirme kontrolü
     # HLK Runtime ve Constitution Runtime aktif olmadan Production BAŞLATILAMAZ
     # ════════════════════════════════════════════════════════════════════
-    from services.hlk_runtime import hlk_runtime as _hr
     if not _hr.authorize_production(user.id):
         logger.critical(
             f"🚨 [BOOT CHAIN İHLAL] Production Runtime yetkilendirmesi REDDEDILDI — "
@@ -2725,15 +2736,20 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
         )
         from services.olay_kayit_merkezi import event_registry as _er
         _er.register_from_eec(_auth_fail)
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=(
-                "⚠️ <b>Uretim baslatilamadi.</b>\n\n"
-                "Anayasal dogrulama tamamlanamadi. "
-                "<i>Lutfen</i> <b>/start</b> <i>yazarak yeniden deneyin.</i>"
-            ),
-            parse_mode="HTML",
-        )
+        # MASTER-013 / OR-004_12: Yetkilendirme reddi bildirimi bir süreç
+        # mesajıdır — içeriği ve gönderim izni HLK Runtime kararıdır.
+        _deny_notify = _hr.request_decision(_NotifyReq(
+            pid="",
+            category=_NotifyCat.USER_NOTIFICATION.value,
+            requester="website.handle_admin_payment_approve",
+            context={"kind": "authorization_denied"},
+        ))
+        if _deny_notify.verdict == "NOTIFY":
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=_deny_notify.params.get("text", ""),
+                parse_mode=_deny_notify.params.get("parse_mode", "HTML"),
+            )
         return
 
     # ── STATE_VIDEO_PRODUCTION: Üretim talebi Production Runtime'a DEVREDİLİR ──

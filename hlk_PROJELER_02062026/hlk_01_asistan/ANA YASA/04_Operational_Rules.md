@@ -1128,3 +1128,52 @@ Flow Diagram ile üretilen konuşma arasında çelişki oluşursa;
 * Konuşma davranışı düzeltilir.
 * Gerekirse kod güncellenir.
 * Flow Diagram ihlal edilemez.
+
+---
+
+## OR-004_12
+
+### Başlık
+
+**Üretim Sırasında Karar Talebi Operasyon Kuralı — Runtime Decision Request Operational Rule**
+
+### Amaç
+
+MASTER-013 ve AR-002_81'de tanımlanan HLK Runtime karar otoritesinin, üretim sırasındaki operasyonel uygulanışını tanımlamak.
+
+### Kural
+
+Kullanıcının sistemi başlatan ilk tetikleyici komutu (örneğin /start) verildiği andan oturum tamamen kapanıncaya kadar, karar gerektiren bütün durumlarda karar yalnızca HLK Runtime tarafından üretilir.
+
+Yürütme katmanları (Production Executor, production_pipeline.py, provider entegrasyonları ve diğer tüm uygulayıcı bileşenler) karar gerektiren bir durumla karşılaştığında aşağıdaki operasyon sırasını eksiksiz uygular:
+
+1. Yürütme durdurulur.
+2. Karar talebi, ham teknik kanıtlarla birlikte HLK Runtime'a iletilir (AR-002_81 Karar Talep Protokolü).
+3. HLK Runtime kararını verir ve gerekçesiyle kaydeder (15_KARAR_GEREKCESI_STANDARDI.md).
+4. Yürütme, verilen karara göre eksiksiz devam eder.
+
+Tereddüt halinde karar üretmek yasaktır. Tereddüt halinde HLK Runtime'dan karar istenir.
+
+### Kullanıcı Bilgilendirme Sınırı
+
+Kullanıcıya gönderilecek ve süreç kararı içeren hiçbir mesaj ("üretim başladı", "üretim tamamlandı" ve benzerleri) yürütme katmanı tarafından üretilemez.
+
+Bu mesajların içeriği yalnızca HLK Runtime kararı ile belirlenir (GK-001_5, OR-004_11, AR-002_81 DELIVERY / USER_NOTIFICATION kategorileri).
+
+Yürütme katmanı, HLK Runtime tarafından onaylanan mesajı değiştirmeden iletir.
+
+### Kayıt Zorunluluğu
+
+Her karar talebi ve her Runtime kararı;
+
+* PID ile ilişkilendirilir (AR-002_57),
+* Decision History'ye kaydedilir (15_KARAR_GEREKCESI_STANDARDI.md),
+* Event sistemi üzerinden izlenebilir hale getirilir (AR-002_73, 22_EXECUTION_EVENT_COLLECTOR.md).
+
+### Beklenen Sonuç
+
+* Üretim sırasında hiçbir yürütme katmanı karar üretmez.
+* Karar gerektiren durumlar durdur → talep et → karar → devam et akışıyla çözülür.
+* Kullanıcıya giden süreç mesajları yalnızca HLK Runtime kararıyla üretilir.
+* Tüm kararlar gerekçeleriyle birlikte izlenebilir olur.
+* Bu kural; Workflow, Production, Research, Agent, Selection, Delivery, Quality Control, Constitution Enforcement, Feedback Loop ve gelecekte eklenecek tüm modüller için geçerlidir (MASTER-013 Kapsam).

@@ -457,3 +457,51 @@ Referans tasarım yalnızca Proje Yöneticisinin açık onayı ile değiştirile
 HLK yalnızca bir PNG dosyasını değil, bu PNG'nin temsil ettiği kurumsal tasarım mantığını da öğrenmiş olur.
 
 Bundan sonra oluşturulacak tüm Senaryo Onay Formları aynı tasarım ilkelerine uygun olarak geliştirilir.
+
+---
+
+## MR-0005_7
+
+### Başlık
+
+**Modül Karar Bağımlılığı Kuralı — Module Decision Dependency Rule**
+
+### Kural
+
+HLK_01_asistan projesindeki tüm modüller, kullanıcının sistemi başlatan ilk tetikleyici komutundan (örneğin /start) oturum tamamen kapanıncaya kadar HLK Runtime'ın hiyerarşik kontrolü altında çalışır (MASTER-013).
+
+Hiçbir modül;
+
+* HLK Runtime adına karar veremez,
+* kendi karar mekanizmasını oluşturamaz,
+* karar niteliği taşıyan bir durumu kendi içinde karara bağlayamaz.
+
+Karar gerektiren her durumda modül; yürütmeyi durdurur, karar talebini HLK Runtime'a iletir ve verilen kararı eksiksiz uygular (AR-002_81 Karar Talep Protokolü, OR-004_12).
+
+Tereddüt halinde karar üretmek yasaktır; tereddüt halinde HLK Runtime'dan karar istenir.
+
+### Kapsam
+
+Bu kural;
+
+* Workflow
+* Production
+* Research
+* Agent
+* Selection
+* Delivery
+* Quality Control
+* Constitution Enforcement
+* Feedback Loop
+* gelecekte eklenecek tüm modüller
+
+için geçerlidir.
+
+Yeni eklenen her modül, bu kurala uyumu tasarım aşamasında sağlamak zorundadır (MASTER-006).
+
+### Beklenen Sonuç
+
+* Tüm modüller tek karar otoritesi (HLK Runtime) altında hiyerarşik olarak çalışır.
+* Modül seviyesinde bağımsız karar mekanizması oluşmaz.
+* Karar gerektiren durumlar Karar Talep Protokolü ile HLK Runtime'a taşınır.
+* Gelecekte eklenecek modüller aynı karar hiyerarşisine otomatik olarak tabi olur.

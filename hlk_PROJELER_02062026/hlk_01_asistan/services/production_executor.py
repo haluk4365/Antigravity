@@ -58,6 +58,7 @@ logger = logging.getLogger(__name__)
 
 _GC_EXECUTOR_MAX_RETRY = int(os.getenv("GC_EXECUTOR_MAX_RETRY", "3"))
 _GC_EXECUTOR_TASK_TIMEOUT = float(os.getenv("GC_EXECUTOR_TASK_TIMEOUT", "300.0"))
+_GC_EXECUTOR_RETRY_DELAY = float(os.getenv("GC_EXECUTOR_RETRY_DELAY", "0.5"))
 _GC_EXECUTOR_STATE_DIR = Path(
     os.getenv("GC_EXECUTOR_STATE_DIR", "data")
 )
@@ -504,7 +505,8 @@ class ProductionExecutor:
 
                 if attempt < max_retry:
                     logger.info(f"🔄 [Executor] Retry: {task_id} (deneme {attempt + 1})")
-                    await asyncio.sleep(0.5)  # retry öncesi kısa bekleme
+                    # Retry bekleme süresi GC parametresidir (AR-002_81)
+                    await asyncio.sleep(_GC_EXECUTOR_RETRY_DELAY)
                 else:
                     logger.error(
                         f"🚨 [Executor] Tüm denemeler başarısız: {task_id} "
@@ -750,16 +752,40 @@ class ProductionExecutor:
 
                 # Tamamlanmamış task'ları bul
                 all_tasks = await self._load_task_packages(pid)
+
+                # Restart senaryosu (AR-002_79 — Kaldığı Noktadan Devam):
+                # Yeni Executor instance'ı ile recovery yapıldığında rapor
+                # henüz oluşmamıştır; burada başlatılır.
+                if self._report is None:
+                    self._report = ExecutorReport(
+                        pid=pid,
+                        started_at=datetime.now(timezone.utc).isoformat(),
+                    )
+                if not self._report.total_tasks:
+                    self._report.total_tasks = len(all_tasks)
+
                 completed_task_ids = {
-                    r.get("task_id") for r in self._report.results
-                    if r.status == ExecutionStatus.SUCCESS.value
-                } if self._report else set()
+                    (r.get("task_id") if isinstance(r, dict) else r.task_id)
+                    for r in self._report.results
+                    if (r.get("status") if isinstance(r, dict) else r.status)
+                    == ExecutionStatus.SUCCESS.value
+                } if self._report.results else set()
 
                 pending_tasks = [
                     t for t in all_tasks
                     if t.get("task_id") not in completed_task_ids
                     and t.get("status") not in ("COMPLETED", "SUCCESS")
                 ]
+
+                # Checkpoint ile daha önce tamamlanmış (bu raporda henüz
+                # sayılmamış) task'lar rapora yansıtılır — recovery raporu
+                # üretimin TAM tamamlanma durumunu gösterir (AR-002_79)
+                already_done = [
+                    t for t in all_tasks
+                    if t.get("task_id") not in completed_task_ids
+                    and t.get("status") in ("COMPLETED", "SUCCESS")
+                ]
+                self._report.completed_tasks += len(already_done)
 
                 logger.info(
                     f"📋 [Executor] Recovery: {len(pending_tasks)}/{len(all_tasks)} "

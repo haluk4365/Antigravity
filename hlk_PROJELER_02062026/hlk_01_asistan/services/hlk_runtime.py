@@ -19,20 +19,25 @@ Production Completed/Failed/Timeout/Cancelled gerçekleşene kadar aktif
 kalmak zorundadır.
 
 Mimari Dayanak:
+- MASTER-013: HLK Karar Otoritesi ve Üretim Yürütücüsü Rol Ayrımı
+- AR-002_81: HLK Runtime Karar Otoritesi ve Karar Talep Protokolü
 - AR-002_62: Constitution-First Runtime Verification
 - AR-002_22: Constitutional Feedback Loop (Constitution Compiler → Rule Cache)
 - AR-002_60: CEE
 - AR-002_70: STATE_VIDEO_PRODUCTION Runtime
 - CEE-001: Zorunlu Geçiş Kuralı
 - MASTER-011: Runtime Aktiflik Doğrulama Prensibi
+- OR-004_12: Üretim Sırasında Karar Talebi Operasyon Kuralı
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -72,6 +77,85 @@ class RuntimeContext:
             "workflow_started": self.workflow_started,
             "production_active": self.production_active,
             "production_pid": self.production_pid,
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1B. KARAR TALEP PROTOKOLÜ — MASTER-013 / AR-002_81 Veri Modelleri
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class DecisionCategory(str, Enum):
+    """AR-002_81: Karar gerektiren durum kategorileri.
+
+    Bu kategorilerin tamamı yalnızca HLK Runtime tarafından karara bağlanır.
+    Tablo sınırlayıcı değildir; karar niteliği taşıyan her yeni durum
+    AMBIGUITY üzerinden protokole tabidir (MASTER-013: Tereddüt Kuralı).
+    """
+    PROVIDER_RESULT = "PROVIDER_RESULT"        # Provider çıktısı kabul/red
+    PROVIDER_SWITCH = "PROVIDER_SWITCH"        # Sıradaki provider'a geçiş
+    EXECUTION_FAILURE = "EXECUTION_FAILURE"    # Retry / re-evaluate / escalate
+    CREATIVE_CONTENT = "CREATIVE_CONTENT"      # Yaratıcı içerik (AR-002_77)
+    DELIVERY = "DELIVERY"                      # Teslim şekli + kullanıcı mesajı
+    COMPLETION = "COMPLETION"                  # Tamamlanma kararı (AR-002_80)
+    USER_NOTIFICATION = "USER_NOTIFICATION"    # Süreç kararı içeren bildirim
+    AMBIGUITY = "AMBIGUITY"                    # Tereddüt — karar üretilemeyen durum
+
+
+@dataclass
+class DecisionRequest:
+    """AR-002_81 Adım 2: Karar Talebi.
+
+    Yürütme katmanı tarafından oluşturulur. Karar, öneri veya varsayım
+    İÇEREMEZ; yalnızca ham teknik kanıt (context) taşır.
+    """
+    pid: str = ""                              # Üretim Kimliği (AR-002_57)
+    category: str = DecisionCategory.AMBIGUITY.value  # Karar Kategorisi
+    requester: str = ""                        # Talep Eden Katman
+    context: dict = field(default_factory=dict)  # Teknik Kanıt / Bağlam
+    request_id: str = ""                       # Talep Kimliği
+    created_at: str = ""
+
+    def __post_init__(self):
+        if not self.request_id:
+            self.request_id = f"REQ-{time.time_ns()}"
+        if not self.created_at:
+            self.created_at = datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
+class RuntimeDecision:
+    """AR-002_81 Adım 3: HLK Runtime tarafından üretilen Runtime Kararı.
+
+    Yürütme katmanı bu kararı eksiksiz ve değiştirmeden uygular.
+    """
+    decision_id: str = ""                      # Karar Kimliği
+    request_id: str = ""                       # Karara esas Talep Kimliği
+    pid: str = ""                              # Üretim Kimliği
+    category: str = ""                         # Karar Kategorisi
+    verdict: str = ""                          # Karar
+    params: dict = field(default_factory=dict)  # Karar Parametreleri
+    rationale: dict = field(default_factory=dict)  # Karar Gerekçesi (15_KARAR)
+    decided_at: str = ""
+
+    def __post_init__(self):
+        if not self.decision_id:
+            self.decision_id = f"RTD-{time.time_ns()}"
+        if not self.decided_at:
+            self.decided_at = datetime.now(timezone.utc).isoformat()
+
+    def to_dict(self) -> dict:
+        return {
+            "decision_id": self.decision_id,
+            "request_id": self.request_id,
+            "pid": self.pid,
+            "category": self.category,
+            "verdict": self.verdict,
+            "params": {
+                k: v for k, v in self.params.items()
+                if isinstance(v, (str, int, float, bool, list, dict, type(None)))
+            },
+            "rationale": self.rationale,
+            "decided_at": self.decided_at,
         }
 
 
@@ -301,7 +385,7 @@ class ConstitutionRuntime:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class HLKRuntime:
-    """HLK Runtime — Oturum başlatma, doğrulama ve Production yetkilendirme.
+    """HLK Runtime — Oturum yönetimi, karar otoritesi ve Production yetkilendirme.
 
     HLK Runtime:
     - Her /start'ta yeni bir oturum (session) başlatır
@@ -311,8 +395,15 @@ class HLKRuntime:
     - Production Runtime başlatılmadan önce yetkilendirme kontrolü yapar
     - Production tamamlandığında session'ı serbest bırakır
 
+    HLK Runtime (MASTER-013 / AR-002_81):
+    - İlk tetikleyici komuttan (/start) oturum kapanışına kadar TEK karar
+      otoritesidir; yürütme katmanlarından gelen Karar Taleplerini
+      (DecisionRequest) karara bağlar (request_decision)
+    - Karar destek bileşenlerini (Decision Engine, Feedback Loop,
+      Escalation Engine) kendi hiyerarşik kontrolü altında çalıştırır
+
     HLK Runtime:
-    - Karar vermez (MASTER-004)
+    - Kod yürütmez / video üretmez (yürütme Executor'undur — AR-002_76)
     - State değiştirmez (SE-007)
     - Yeni Event oluşturmaz (14_OLAY_KAYIT_MERKEZI.md yetkisidir)
     """
@@ -322,6 +413,8 @@ class HLKRuntime:
         self._sessions: dict[str, RuntimeContext] = {}
         # Production sırasında aktif olan session'lar: session_id → start_time
         self._production_sessions: dict[str, float] = {}
+        # MASTER-013 / AR-002_81: Bu oturumda üretilen Runtime Kararları
+        self._decision_log: list[RuntimeDecision] = []
 
     # ── Properties ───────────────────────────────────────────────────────────
 
@@ -450,6 +543,442 @@ class HLKRuntime:
             ctx = self.get_session(user_id)
             return ctx is not None and ctx.constitution_runtime_active
         return _constitution_runtime.is_active
+
+    # ── MASTER-013 / AR-002_81: Karar Otoritesi ──────────────────────────────
+
+    def request_decision(self, request: DecisionRequest) -> RuntimeDecision:
+        """AR-002_81 Adım 3: Karar Talebini karara bağlar.
+
+        HLK Runtime, oturum boyunca TEK karar otoritesidir (MASTER-013).
+        Yürütme katmanları karar gerektiren her durumda yürütmeyi durdurur
+        ve bu metodu çağırır; dönen kararı eksiksiz uygular (OR-004_12).
+
+        Karar destek bileşenleri (Decision Engine, Escalation Engine)
+        gerektiğinde bu metod içerisinden, HLK Runtime'ın hiyerarşik
+        kontrolü altında çalıştırılır.
+
+        Args:
+            request: Yürütme katmanının Karar Talebi (ham teknik kanıt içerir).
+
+        Returns:
+            RuntimeDecision — yürütmenin değiştirmeden uygulayacağı karar.
+        """
+        deciders = {
+            DecisionCategory.PROVIDER_RESULT.value: self._decide_provider_result,
+            DecisionCategory.PROVIDER_SWITCH.value: self._decide_provider_switch,
+            DecisionCategory.EXECUTION_FAILURE.value: self._decide_execution_failure,
+            DecisionCategory.CREATIVE_CONTENT.value: self._decide_creative_content,
+            DecisionCategory.DELIVERY.value: self._decide_delivery,
+            DecisionCategory.COMPLETION.value: self._decide_completion,
+            DecisionCategory.USER_NOTIFICATION.value: self._decide_user_notification,
+            DecisionCategory.AMBIGUITY.value: self._decide_ambiguity,
+        }
+        decider = deciders.get(request.category, self._decide_ambiguity)
+        decision = decider(request)
+
+        # Karar kaydı (15_KARAR_GEREKCESI_STANDARDI.md + izlenebilirlik)
+        self._decision_log.append(decision)
+        logger.info(
+            f"⚖️ [HLK Runtime Decision] {decision.decision_id} | "
+            f"kategori={decision.category} | karar={decision.verdict} | "
+            f"talep={request.requester or 'bilinmiyor'} | PID={decision.pid or '-'}"
+        )
+        return decision
+
+    def get_decisions(self, pid: str = "") -> list[RuntimeDecision]:
+        """Bu oturumda üretilen Runtime Kararlarını döndürür (PID filtreli)."""
+        if not pid:
+            return list(self._decision_log)
+        return [d for d in self._decision_log if d.pid == pid]
+
+    # ── Karar Vericiler (yalnızca HLK Runtime içinden çağrılır) ─────────────
+
+    def _new_decision(
+        self,
+        request: DecisionRequest,
+        verdict: str,
+        params: dict,
+        justifications: list[str],
+    ) -> RuntimeDecision:
+        """Runtime Kararını 15_KARAR_GEREKCESI_STANDARDI.md uyumlu üretir."""
+        return RuntimeDecision(
+            request_id=request.request_id,
+            pid=request.pid,
+            category=request.category,
+            verdict=verdict,
+            params=params,
+            rationale={
+                "DecisionName": f"{request.category} — {request.pid or 'NO-PID'}",
+                "DecisionMaker": "HLK_RUNTIME",
+                "DecisionTimestamp": datetime.now(timezone.utc).isoformat(),
+                "Requester": request.requester,
+                "Justifications": justifications,
+                "PID": request.pid,
+            },
+        )
+
+    def _decide_provider_result(self, request: DecisionRequest) -> RuntimeDecision:
+        """PROVIDER_RESULT: Provider çıktısının kabul/red kararı (AR-002_75/76).
+
+        Kanıt: artifact (üretilen çıktı yolu), error, remaining_candidates.
+        """
+        ctx = request.context
+        provider = ctx.get("provider", "unknown")
+        artifact = ctx.get("artifact", "")
+        remaining = int(ctx.get("remaining_candidates", 0))
+
+        if artifact:
+            return self._new_decision(
+                request, "ACCEPT", {"action": "USE_ARTIFACT"},
+                [f"{provider} doğrulanabilir çıktı üretti: {artifact}"],
+            )
+        if remaining > 0:
+            return self._new_decision(
+                request, "REJECT", {"action": "NEXT_PROVIDER"},
+                [
+                    f"{provider} çıktı üretemedi: {ctx.get('error', 'çıktı yok')}",
+                    f"Öncelik sıralamasında {remaining} aday mevcut (AR-002_19/21)",
+                ],
+            )
+        return self._new_decision(
+            request, "REJECT", {"action": "REPORT_FAILURE"},
+            [
+                f"{provider} çıktı üretemedi: {ctx.get('error', 'çıktı yok')}",
+                "Öncelik sıralamasında başka aday yok — başarısızlık raporlanacak",
+            ],
+        )
+
+    def _decide_provider_switch(self, request: DecisionRequest) -> RuntimeDecision:
+        """PROVIDER_SWITCH: Sıradaki provider adayına geçiş kararı (AR-002_21)."""
+        remaining = int(request.context.get("remaining_candidates", 0))
+        if remaining > 0:
+            return self._new_decision(
+                request, "NEXT_PROVIDER", {"action": "NEXT_PROVIDER"},
+                [f"Dinamik öncelik sıralamasında {remaining} aday mevcut (AR-002_19)"],
+            )
+        return self._new_decision(
+            request, "NO_CANDIDATE", {"action": "REPORT_FAILURE"},
+            ["Öncelik sıralamasında aday kalmadı — başarısızlık raporlanacak"],
+        )
+
+    def _decide_execution_failure(self, request: DecisionRequest) -> RuntimeDecision:
+        """EXECUTION_FAILURE: Başarısızlık sonrası süreklilik kararı.
+
+        AR-002_22 Feedback Loop zinciri HLK Runtime'ın hiyerarşik kontrolü
+        altında çalıştırılır: retry sınırı değerlendirilir, gerekirse
+        Decision Engine yeniden değerlendirmeye çağrılır, sınır aşıldıysa
+        Escalation Engine tetiklenir (AR-002_79).
+        """
+        ctx = request.context
+        decision_packet = ctx.get("decision_packet")
+        prod_context = ctx.get("prod_context")
+        category = ctx.get("category", "")
+        failed_provider = ctx.get("failed_provider", "unknown")
+        failure_detail = ctx.get("failure_detail", "")
+        has_fallback = bool(ctx.get("has_fallback", False))
+
+        if decision_packet is None or prod_context is None:
+            return self._new_decision(
+                request, "HOLD", {"action": "NONE"},
+                ["Karar için yeterli kanıt yok (decision_packet/prod_context eksik)"],
+            )
+
+        retry_count = decision_packet.re_evaluation_count + 1
+        max_retry = int(os.getenv("GC_MAX_RE_EVALUATION_COUNT", "3"))
+
+        if retry_count > max_retry:
+            logger.error(
+                f"🚨 [HLK Runtime] Maksimum yeniden değerlendirme aşıldı "
+                f"({max_retry}) — Escalation Engine tetikleniyor. "
+                f"Kategori={category}, başarısız={failed_provider}"
+            )
+            try:
+                from services.escalation_engine import (
+                    escalation_engine, EscalationReason,
+                )
+                escalation_engine.escalate(
+                    pid=getattr(prod_context, "pid", request.pid),
+                    reason=EscalationReason.ALL_PROVIDERS_FAILED.value,
+                    detail=(
+                        f"Kategori={category}, başarısız={failed_provider}: "
+                        f"{failure_detail}"
+                    ),
+                    failed_providers=[failed_provider],
+                    retry_count=retry_count,
+                )
+            except Exception as e:
+                logger.error(f"❌ [HLK Runtime] Eskalasyon yazılamadı: {e}")
+            return self._new_decision(
+                request, "ESCALATE", {"action": "ESCALATED"},
+                [
+                    f"Yeniden değerlendirme sınırı aşıldı: {retry_count}/{max_retry} "
+                    f"(GC_MAX_RE_EVALUATION_COUNT)",
+                    "AR-002_19 operasyonel eskalasyon başlatıldı",
+                ],
+            )
+
+        if not has_fallback:
+            return self._new_decision(
+                request, "CONTINUE_WITHOUT", {"action": "NONE"},
+                [
+                    f"{category} kategorisinde yedek provider yok — "
+                    "üretim mevcut çıktılarla sürdürülür (AR-002_79 süreklilik)",
+                ],
+            )
+
+        logger.info(
+            f"🔄 [Feedback Loop Started] kategori={category}, "
+            f"başarısız={failed_provider}, deneme={retry_count}/{max_retry}"
+        )
+        try:
+            from services.decision_engine import decision_engine as de
+            from services.decision_packet import (
+                ReEvaluationContext, ReEvaluationReason,
+            )
+            re_ctx = ReEvaluationContext(
+                original_decision_id=decision_packet.decision_id,
+                trigger_event="EXECUTOR_FAILED",
+                re_evaluation_reason=ReEvaluationReason.EXECUTION_FAILED.value,
+                current_state="STATE_VIDEO_PRODUCTION",
+                re_evaluation_count=retry_count,
+                failure_detail=failure_detail,
+                failed_provider=failed_provider,
+            )
+            new_packet = de.re_evaluate(re_ctx, prod_context)
+            logger.info(
+                f"✅ [HLK Runtime] Yeni karar: {new_packet.decision_id} "
+                f"(re-eval of {decision_packet.decision_id}, deneme={retry_count})"
+            )
+            return self._new_decision(
+                request, "RE_EVALUATE",
+                {"action": "APPLY_NEW_PACKET", "new_packet": new_packet},
+                [
+                    f"Deneme {retry_count}/{max_retry} sınır içinde",
+                    "Decision Engine güncel koşullarla yeniden değerlendirme yaptı "
+                    "(AR-002_22 Adım 3)",
+                ],
+            )
+        except Exception as e:
+            logger.error(f"❌ [HLK Runtime] Yeniden değerlendirme başarısız: {e}")
+            return self._new_decision(
+                request, "HOLD", {"action": "NONE"},
+                [f"Yeniden değerlendirme hatası: {e}"],
+            )
+
+    def _decide_creative_content(self, request: DecisionRequest) -> RuntimeDecision:
+        """CREATIVE_CONTENT: Yaratıcı içerik kararı (AR-002_77).
+
+        Seslendirme metni gibi yaratıcı içerikler yürütme katmanında
+        üretilemez; içerik HLK Runtime kararı ile belirlenir.
+        """
+        ctx = request.context
+        kind = ctx.get("kind", "")
+        if kind == "voice_script":
+            brand = ctx.get("brand", "")
+            product_name = ctx.get("product_name", "")
+            voice_lang = ctx.get("voice_lang", "tr")
+            if voice_lang == "tr":
+                voice_text = (
+                    f"{brand} {product_name} urununu simdi kesfedin. "
+                    f"Kalite ve uygun fiyat bir arada. Hemen siparis vermek icin tiklayin."
+                )
+            else:
+                voice_text = (
+                    f"Discover {brand} {product_name} now. "
+                    f"Quality and affordable price together. Order now!"
+                )
+            return self._new_decision(
+                request, "PROVIDE", {"voice_text": voice_text},
+                [
+                    f"Seslendirme metni HLK Runtime tarafından belirlendi "
+                    f"(dil={voice_lang}, AR-002_77)",
+                ],
+            )
+        return self._new_decision(
+            request, "HOLD", {"action": "NONE"},
+            [f"Tanımsız yaratıcı içerik türü: {kind or 'belirtilmedi'}"],
+        )
+
+    def _decide_delivery(self, request: DecisionRequest) -> RuntimeDecision:
+        """DELIVERY: Teslim şekli ve kullanıcı mesajı kararı (AR-002_36).
+
+        Kullanıcıya gönderilecek süreç mesajlarının içeriği yalnızca
+        HLK Runtime kararı ile belirlenir (MASTER-013, OR-004_12).
+        Yürütme katmanı onaylanan metni değiştirmeden iletir.
+        """
+        ctx = request.context
+        pid = request.pid or "PID-UNKNOWN"
+        brand = ctx.get("brand", "")
+        product_name = ctx.get("product_name", "")
+        duration = ctx.get("duration", 0)
+        voice_lang = str(ctx.get("voice_lang", "tr"))
+        video_available = bool(ctx.get("video_available", False))
+
+        if video_available:
+            caption = (
+                f"🎬 <b>{brand} — {product_name}</b>\n\n"
+                f"Videonuz hazir! 📋 PID: <code>{pid}</code>"
+            )
+            return self._new_decision(
+                request, "DELIVER_VIDEO",
+                {"caption": caption, "parse_mode": "HTML"},
+                [
+                    "Nihai video mevcut — video teslimi kararlaştırıldı (AR-002_36)",
+                    "Teslim mesajı HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
+        text = (
+            f"🎬 <b>Uretim Tamamlandi!</b>\n\n"
+            f"📋 PID: <code>{pid}</code>\n"
+            f"Urun: <b>{brand} — {product_name}</b>\n"
+            f"Video suresi: {duration} sn | Ses: {voice_lang.upper()}\n\n"
+            f"Videonuz hazirlaniyor, en kisa surede gonderilecektir.\n"
+            f"<i>HLK AI Reklam Asistani</i>"
+        )
+        return self._new_decision(
+            request, "DELIVER_INFO",
+            {"text": text, "parse_mode": "HTML"},
+            [
+                "Nihai video mevcut değil — bilgilendirme teslimi kararlaştırıldı",
+                "Bilgilendirme metni HLK Runtime tarafından onaylandı (OR-004_12)",
+            ],
+        )
+
+    def _decide_completion(self, request: DecisionRequest) -> RuntimeDecision:
+        """COMPLETION: Üretimin tamamlanmış kabul edilmesi kararı (AR-002_80)."""
+        ctx = request.context
+        delivered = bool(ctx.get("delivered", False))
+        video = bool(ctx.get("video", False))
+        failed_tasks = int(ctx.get("failed_tasks", 0))
+        justifications = [
+            f"Teslim durumu: {'tamamlandı' if delivered else 'tamamlanmadı'}",
+            f"Nihai video: {'mevcut' if video else 'mevcut değil'}",
+            f"Başarısız task sayısı: {failed_tasks}",
+        ]
+        if failed_tasks == 0 and delivered:
+            justifications.append("Anayasal kapanış kriterleri sağlandı (AR-002_80)")
+        else:
+            justifications.append(
+                "Eksiklikler Event kayıtlarında raporlandı; kapanış "
+                "AR-002_79/80 kapsamında değerlendirildi"
+            )
+        return self._new_decision(
+            request, "CONFIRM_COMPLETION", {"success": True},
+            justifications,
+        )
+
+    def _decide_user_notification(self, request: DecisionRequest) -> RuntimeDecision:
+        """USER_NOTIFICATION: Süreç kararı içeren kullanıcı bildirimi kararı.
+
+        Yürütme katmanları kullanıcıya süreç mesajı üretemez (MASTER-013);
+        bildirim metni yalnızca HLK Runtime tarafından belirlenir.
+        """
+        ctx = request.context
+        kind = ctx.get("kind", "production_failure")
+        pid = request.pid or ctx.get("pid", "PID-UNKNOWN")
+
+        if kind == "production_failure":
+            text = (
+                f"⚠️ <b>Uretim surecinde beklenmeyen bir durum olustu.</b>\n\n"
+                f"📋 PID: <code>{pid}</code>\n"
+                f"Yoneticimiz bilgilendirildi; uretiminiz kontrol edilerek "
+                f"en kisa surede tamamlanacaktir.\n"
+                f"<i>HLK AI Reklam Asistani</i>"
+            )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    "Dürüst bilgilendirme zorunluluğu (EEC-001: Fake Progress yasağı)",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
+        if kind == "production_start":
+            # Üretim başlangıç bildirimi — süreç mesajıdır; içerik, zaman,
+            # gönderim izni ve iletim parametreleri HLK Runtime kararıdır
+            # (MASTER-013 Yetki Sınırları, OR-004_12, FD-008_1, GK-001_5).
+            lang = str(ctx.get("lang", "tr"))
+            product_name = ctx.get("product_name", "urununuz")
+            duration = ctx.get("duration", "")
+            if lang == "tr":
+                text = (
+                    f"<b>✅ Odemeniz onaylandi!</b>\n\n"
+                    f"<b>{product_name}</b> icin <b><i>video uretiminiz</i></b> hemen basladi. 🎬\n"
+                    f"Bu islem yaklasik <b>{duration} dakika</b> kadar surecek.\n"
+                    f"Videonuz <b>hazir olur olmaz</b> size buradan <b>otomatik olarak</b> gonderecegim.\n\n"
+                    f"<i>Bol kazanclar dilerim!</i> 🚀"
+                )
+            else:
+                from config.i18n import t
+                text = (
+                    f"<b>✅ {t('final.payment_received', lang)}</b>\n\n"
+                    f"<b>{product_name}</b> — <b><i>{t('final.production_started', lang)}</i></b> 🎬\n"
+                    f"{t('final.duration_info', lang)}: <b>~{duration} min</b>.\n"
+                    f"<b>{t('final.auto_delivery', lang)}</b>\n\n"
+                    f"<i>🚀</i>"
+                )
+            return self._new_decision(
+                request, "NOTIFY",
+                {
+                    "text": text,
+                    "parse_mode": "HTML",
+                    "delivery": "typewriter",       # FD-008_1: daktilo efekti
+                    "typewriter_delay": 0.06,        # Karar parametresi (AR-002_81)
+                },
+                [
+                    "EVENT_PAYMENT_APPROVED sonrası üretim başlangıç bildirimi "
+                    "kararlaştırıldı (FD-008_1, AR-002_56)",
+                    "Metin, zamanlama, gönderim izni ve iletim parametreleri "
+                    "HLK Runtime kararıdır (MASTER-013, OR-004_12)",
+                ],
+            )
+
+        if kind == "authorization_denied":
+            # Boot Chain yetkilendirme reddi bildirimi (AR-002_70 ön koşul).
+            text = (
+                "⚠️ <b>Uretim baslatilamadi.</b>\n\n"
+                "Anayasal dogrulama tamamlanamadi. "
+                "<i>Lutfen</i> <b>/start</b> <i>yazarak yeniden deneyin.</i>"
+            )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    "Constitutional Boot Chain yetkilendirmesi reddedildi — "
+                    "kullanıcıya dürüst bilgilendirme (EEC-001)",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
+        return self._new_decision(
+            request, "HOLD", {"action": "NONE"},
+            [f"Tanımsız bildirim türü: {kind}"],
+        )
+
+    def _decide_ambiguity(self, request: DecisionRequest) -> RuntimeDecision:
+        """AMBIGUITY: Tereddüt kararı (MASTER-013 Karar Prensibi).
+
+        Yürütme katmanı karara bağlayamadığı her durumu buraya iletir.
+        """
+        ctx = request.context
+        reason = ctx.get("reason", "")
+        if reason == "unsupported_provider":
+            provider = ctx.get("provider", "unknown")
+            return self._new_decision(
+                request, "SKIP", {"action": "SKIP"},
+                [
+                    f"Provider '{provider}' için kayıtlı yürütme entegrasyonu yok",
+                    "Öncelik sıralamasındaki sonraki aday değerlendirilecek "
+                    "(AR-002_19/21)",
+                ],
+            )
+        return self._new_decision(
+            request, "HOLD", {"action": "NONE"},
+            [
+                f"Tereddüt kaydı alındı: {reason or 'gerekçe belirtilmedi'} — "
+                "yürütme karar üretmeden raporladı (MASTER-013)",
+            ],
+        )
 
     # ── Production Yetkilendirme ─────────────────────────────────────────────
 

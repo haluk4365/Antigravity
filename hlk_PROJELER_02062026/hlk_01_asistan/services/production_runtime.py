@@ -23,12 +23,15 @@ Bu modül:
 - Agent seçmez (AR-002_75)
 - Prompt üretmez / Video üretmez (AR-002_70)
 - Kalite değerlendirmez (QR-004)
-- Karar vermez (MASTER-004)
+- Karar vermez (MASTER-004, MASTER-013) — karar gerektiren durumları
+  AR-002_81 Karar Talep Protokolü ile HLK Runtime'a iletir
 - State değiştirmez (SE-007)
 - Yeni Event oluşturmaz (14_OLAY_KAYIT_MERKEZI.md)
 - Yeni anayasa oluşturmaz (MASTER-001)
 
 Mimari Dayanak:
+- MASTER-013: HLK Karar Otoritesi ve Üretim Yürütücüsü Rol Ayrımı
+- AR-002_81: HLK Runtime Karar Otoritesi ve Karar Talep Protokolü
 - AR-002_70: STATE_VIDEO_PRODUCTION Runtime Architecture (10 adım)
 - AR-002_57: PID standardı
 - AR-002_58: Production Package Architecture
@@ -629,6 +632,16 @@ class ProductionRuntime:
         Returns:
             ProductionResult.
         """
+        # PID doğrulaması KİLİT ALINMADAN yapılır — start_production()
+        # aynı kilidi kullandığından, kilit altında çağrılması deadlock
+        # oluşturur (AR-002_79 süreklilik yolu güvencesi).
+        from services.pid_runtime import pid_runtime
+        pid_valid = await pid_runtime.validate(pid)
+        if not pid_valid.is_valid:
+            # PID yok — sıfırdan başlat
+            logger.info(f"🔄 [Production] Recovery: PID bulunamadı ({pid}), sıfırdan başlatılıyor...")
+            return await self.start_production()
+
         async with self._lock:
             self._state = ProductionState.RECOVERING
             self._current_pid = pid
@@ -642,14 +655,6 @@ class ProductionRuntime:
             )
 
             try:
-                # PID doğrulaması
-                from services.pid_runtime import pid_runtime
-                pid_valid = await pid_runtime.validate(pid)
-                if not pid_valid.is_valid:
-                    # PID yok — sıfırdan başlat
-                    logger.info("  PID bulunamadı, sıfırdan başlatılıyor...")
-                    return await self.start_production()
-
                 self._result.completed_steps = 7  # PID var
 
                 # Package kontrolü
@@ -1199,11 +1204,38 @@ class ProductionRuntime:
                 "--[EVENT_VIDEO_PRODUCTION_COMPLETED]--> STATE_SESSION_COMPLETED"
             )
 
-            # ── Tamamlanma ───────────────────────────────────────────────
+            # ── Tamamlanma — COMPLETION kararı HLK Runtime'ındır ─────────
+            # MASTER-013 / AR-002_81: Production Runtime tamamlanma kararını
+            # kendisi ÜRETMEZ; teknik kanıtları iletir, HLK Runtime karar verir.
+            try:
+                from services.hlk_runtime import (
+                    hlk_runtime as _hr_dec,
+                    DecisionRequest as _DecReq,
+                    DecisionCategory as _DecCat,
+                )
+                completion_decision = _hr_dec.request_decision(_DecReq(
+                    pid=pid,
+                    category=_DecCat.COMPLETION.value,
+                    requester="production_runtime.run_request",
+                    context={
+                        "delivered": ctx.delivered,
+                        "video": bool(ctx.video_path),
+                        "failed_tasks": executor_report.get("failed_tasks", 0),
+                    },
+                ))
+                completion_success = bool(
+                    completion_decision.params.get("success", True)
+                )
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ [ProductionRuntime] COMPLETION kararı alınamadı: {e}"
+                )
+                completion_success = True
+
             elapsed = time.time() - start_time
             self._state = ProductionState.COMPLETED
             self._result.state = ProductionState.COMPLETED.value
-            self._result.success = True
+            self._result.success = completion_success
             self._result.duration_seconds = elapsed
             self._result.completed_at = datetime.now(timezone.utc).isoformat()
             logger.info(
@@ -1311,19 +1343,27 @@ class ProductionRuntime:
             logger.warning(f"⚠️ [ProductionRuntime] State geçişi yapılamadı: {e}")
 
         # Kullanıcıya dürüst bilgilendirme (EEC-001: Fake Progress yasak)
+        # MASTER-013 / AR-002_81: Süreç kararı içeren kullanıcı mesajı
+        # yürütme katmanında ÜRETİLMEZ; içerik HLK Runtime kararı ile belirlenir.
         try:
             if request.bot is not None:
-                await request.bot.send_message(
-                    chat_id=request.chat_id,
-                    text=(
-                        f"⚠️ <b>Uretim surecinde beklenmeyen bir durum olustu.</b>\n\n"
-                        f"📋 PID: <code>{pid}</code>\n"
-                        f"Yoneticimiz bilgilendirildi; uretiminiz kontrol edilerek "
-                        f"en kisa surede tamamlanacaktir.\n"
-                        f"<i>HLK AI Reklam Asistani</i>"
-                    ),
-                    parse_mode="HTML",
+                from services.hlk_runtime import (
+                    hlk_runtime as _hr_notify,
+                    DecisionRequest as _NotifyReq,
+                    DecisionCategory as _NotifyCat,
                 )
+                notify_decision = _hr_notify.request_decision(_NotifyReq(
+                    pid=pid,
+                    category=_NotifyCat.USER_NOTIFICATION.value,
+                    requester="production_runtime._handle_failure",
+                    context={"kind": "production_failure", "pid": pid},
+                ))
+                if notify_decision.verdict == "NOTIFY":
+                    await request.bot.send_message(
+                        chat_id=request.chat_id,
+                        text=notify_decision.params.get("text", ""),
+                        parse_mode=notify_decision.params.get("parse_mode", "HTML"),
+                    )
         except Exception as e:
             logger.warning(f"⚠️ [ProductionRuntime] Kullanıcı bildirimi gönderilemedi: {e}")
 
