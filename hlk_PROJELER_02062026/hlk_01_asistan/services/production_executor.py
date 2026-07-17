@@ -182,8 +182,29 @@ class ProductionExecutor:
         self._report: Optional[ExecutorReport] = None
         self._current_pid: str = ""
 
+        # ── Gerçek task handler kayıtları (AR-002_76) ───────────────────
+        # agent adı → async handler(task: dict, pid: str) -> dict
+        # Handler'lar production_pipeline.register_handlers() ile kaydedilir.
+        self._handlers: dict = {}
+
         # ── Concurrency control ──────────────────────────────────────────
         self._lock = asyncio.Lock()
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Handler Kaydı (AR-002_76 — Executor yalnızca yürütür, işi handler yapar)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def register_handler(self, agent: str, handler) -> None:
+        """Bir agent adı için gerçek task handler'ı kaydeder.
+
+        Executor karar vermez; handler'lar Decision Packet'te seçilmiş
+        provider'ları uygular. Kayıt idempotenttir.
+
+        Args:
+            agent: Task Package'teki agent adı (örn. "VideoRenderer").
+            handler: async callable(task: dict, pid: str) -> dict.
+        """
+        self._handlers[agent] = handler
 
     # ═══════════════════════════════════════════════════════════════════════
     # Ana Yürütme Akışı
@@ -210,6 +231,7 @@ class ProductionExecutor:
         """
         async with self._lock:
             self._current_pid = pid
+            logger.info(f"⚙️ [Executor Started] pid={pid}")
             self._report = ExecutorReport(
                 pid=pid,
                 started_at=datetime.now(timezone.utc).isoformat(),
@@ -489,6 +511,12 @@ class ProductionExecutor:
                         f"({max_retry} deneme)"
                     )
 
+        # AR-002_76 Adım 6-7: Execution Result üretilir ve rapora eklenir.
+        # Feedback Loop değerlendirmesi Production Runtime seviyesinde yapılır.
+        logger.info(
+            f"🧾 [Execution Result] task={task_id} status={result.status} "
+            f"({result.duration_ms:.0f}ms, deneme={result.attempt})"
+        )
         return result
 
     async def _run_task_handler(self, task: dict, pid: str) -> dict:
@@ -517,6 +545,7 @@ class ProductionExecutor:
         """
         task_id = task.get("task_id", "unknown")
         task_status = task.get("status", "PENDING")
+        agent = task.get("agent", "unknown")
 
         # Task zaten tamamlanmışsa tekrar çalıştırma
         if task_status in ("COMPLETED", "SUCCESS"):
@@ -527,12 +556,29 @@ class ProductionExecutor:
                 "previous_status": task_status,
             }
 
+        # ── Gerçek handler dispatch (AR-002_76) ─────────────────────────
+        # Kayıtlı gerçek handler varsa üretim işi ona devredilir.
+        handler = self._handlers.get(agent)
+        if handler is not None:
+            logger.info(f"▶️ [Execution Started] task={task_id} agent={agent}")
+            output = await handler(task, pid)
+            if not isinstance(output, dict):
+                output = {"result": str(output)}
+            output.setdefault("task_id", task_id)
+            output["agent"] = agent
+            output["executed_at"] = datetime.now(timezone.utc).isoformat()
+
+            # Task Checkpoint: status'u COMPLETED olarak persist et
+            await self._checkpoint_task_completion(task_id, pid)
+            return output
+
+        # ── Fallback: handler kayıtlı değil (test/simülasyon modu) ──────
         # Task verilerini Production Package'ten al
         task_output = {
             "task_id": task_id,
             "pid": pid,
             "result": "executed",
-            "agent": task.get("agent", "unknown"),
+            "agent": agent,
             "task_status": task_status,
             "executed_at": datetime.now(timezone.utc).isoformat(),
         }

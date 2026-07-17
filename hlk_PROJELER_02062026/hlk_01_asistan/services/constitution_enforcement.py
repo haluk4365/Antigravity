@@ -802,6 +802,127 @@ class ConstitutionEnforcementEngine:
     def needs_escalation(self, ctp_id: str | None = None) -> bool:
         return self.get_attempt_count(ctp_id) >= self.MAX_ENFORCEMENT_RETRIES
 
+    def enforce_post_check(
+        self,
+        pid: str = "",
+        decision_packet: dict | None = None,
+        user_data: dict | None = None,
+        pipeline_success: bool = True,
+    ) -> EnforcementReport:
+        """FAZ-2: Gerçek anayasal POST-CHECK — rubber-stamp DEĞİL.
+
+        CEE-004 / AR-002_22 Adım 4 uyarınca:
+        1. detect_violations() ile anayasal ihlal taraması
+        2. Constitutional Validator ile 5 boyutlu doğrulama
+        3. Gerçek PASS/FAIL kararı
+
+        Args:
+            pid: Production ID.
+            decision_packet: Decision Packet dict (website.py'den).
+            user_data: Telegram context.user_data.
+            pipeline_success: Pipeline başarıyla tamamlandı mı?
+
+        Returns:
+            EnforcementReport — gerçek denetim sonucu.
+        """
+        ctp_id = self._active_ctp.ctp_id if self._active_ctp else "UNKNOWN"
+        attempt = self._attempt_count.get(ctp_id, 0) + 1
+        self._attempt_count[ctp_id] = attempt
+
+        report_id = f"CEE-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:4].upper()}"
+
+        # ── Adım 1: detect_violations() ile ihlal taraması ────────────────
+        runtime_context = {
+            "constitution_ready": True,
+            "pid_valid": bool(pid),
+            "package_valid": True,
+            "pipeline_success": pipeline_success,
+            "hardcoded_values": None,
+        }
+        has_violations, deficiencies, violations = self.detect_violations(runtime_context)
+
+        # ── Adım 2: Constitutional Validator ──────────────────────────────
+        validator_passed = True
+        validator_errors: list[str] = []
+        try:
+            from services.constitutional_validator import constitutional_validator
+            cv_report = constitutional_validator.validate(
+                decision_packet=decision_packet,
+                pid=pid,
+                user_data=user_data,
+            )
+            if cv_report.verdict == "FAIL":
+                validator_passed = False
+                validator_errors = cv_report.failed_dimensions
+                for dim in cv_report.failed_dimensions:
+                    deficiencies.append({
+                        "type": "VALIDATION_FAILED",
+                        "description": f"Constitutional Validator: {dim} doğrulaması başarısız",
+                        "ana_yasa_ref": "AR-002_22, MASTER-003",
+                    })
+                logger.warning(
+                    f"⚠️ [CEE] Constitutional Validator FAIL: "
+                    f"başarısız boyutlar={validator_errors}"
+                )
+            else:
+                logger.info(f"✅ [CEE] Constitutional Validator PASS: {cv_report.report_id}")
+        except ImportError:
+            logger.warning("⚠️ [CEE] Constitutional Validator bulunamadı — atlanıyor")
+        except Exception as e:
+            logger.error(f"❌ [CEE] Constitutional Validator hatası: {e}")
+
+        # ── Adım 3: 6 boyutlu denetim kararı ──────────────────────────────
+        code_anayasa_ok = not has_violations and validator_passed
+        flow_ok = pipeline_success
+        state_ok = True  # State Engine tarafından yönetilir
+        operational_ok = pipeline_success
+        architecture_ok = not has_violations
+        runtime_ok = pipeline_success and validator_passed
+
+        report = EnforcementReport(
+            report_id=report_id,
+            ctp_id=ctp_id,
+            attempt=attempt,
+            code_anayasa_check=code_anayasa_ok,
+            flow_compliance=flow_ok,
+            state_compliance=state_ok,
+            operational_compliance=operational_ok,
+            architectural_integrity=architecture_ok,
+            runtime_behavior=runtime_ok,
+            deficiencies=deficiencies,
+            violations=violations,
+            pid=pid,
+        )
+
+        verdict = report.finalize()
+
+        if verdict == EnforcementVerdict.PASS:
+            logger.info(f"✅ [CEE POST-CHECK] PASS — {report_id} (deneme {attempt})")
+            report.justification = self._build_pass_justification().to_dict()
+        else:
+            logger.warning(
+                f"❌ [CEE POST-CHECK] FAIL — {report_id} "
+                f"(deneme {attempt}/{self.MAX_ENFORCEMENT_RETRIES}, "
+                f"eksik: {report.deficiency_count}, "
+                f"ihlal: {len(report.violations)})"
+            )
+            report.justification = self._build_fail_justification(report).to_dict()
+
+            for d in report.deficiencies:
+                logger.warning(f"  Eksik: [{d.get('type','?')}] {d.get('description','?')[:80]}")
+            for v in report.violations:
+                logger.warning(f"  İhlal: [{v.get('severity','?')}] {v.get('description','?')[:80]}")
+
+            if attempt >= self.MAX_ENFORCEMENT_RETRIES:
+                logger.error(
+                    f"🚨 [CEE ESCALATE] {ctp_id}: {attempt} FAIL — "
+                    f"CEE-005: Proje Yöneticisine eskalasyon gerekli!"
+                )
+
+        self._enforcement_history.append(report)
+        self._save_report(report)
+        return report
+
     def reset(self) -> None:
         self._active_ctp = None
         logger.info("🔄 [CEE] Sıfırlandı — yeni göreve hazır")

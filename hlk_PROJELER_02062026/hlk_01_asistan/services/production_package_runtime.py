@@ -375,7 +375,8 @@ class ProductionPackageRuntime:
                 )
 
             # Aynı PID için package zaten var mı?
-            existing = await self.load(pid)
+            # (kilit tutulurken load() ÇAĞRILMAZ — deadlock; bkz. _load_unlocked)
+            existing = self._load_unlocked(pid)
             if existing is not None:
                 raise ValueError(
                     f"Bu PID için Production Package zaten mevcut: {pid} "
@@ -416,28 +417,37 @@ class ProductionPackageRuntime:
             ProductionPackage veya None (bulunamazsa).
         """
         async with self._lock:
-            # In-memory kontrol
-            if pid in self._packages:
-                return self._packages[pid]
+            return self._load_unlocked(pid)
 
-            # Diskten yükle
-            pkg_path = self._package_path(pid)
-            archive_path = self._archive_path(pid)
+    def _load_unlocked(self, pid: str) -> Optional[ProductionPackage]:
+        """Kilitsiz iç yükleyici — YALNIZCA self._lock altında çağrılır.
 
-            for path in (pkg_path, archive_path):
-                if path.exists():
-                    try:
-                        package = self._load_from_disk(path)
-                        if package:
-                            self._packages[pid] = package
-                            return package
-                    except Exception as e:
-                        logger.warning(
-                            f"⚠️ [Package Runtime] Package yüklenemedi "
-                            f"{pid}: {e}"
-                        )
+        asyncio.Lock re-entrant değildir; kilit tutan metodların (create vb.)
+        load() çağırması deadlock üretir. Bu helper her iki kullanım için
+        tek gerçek yükleme mantığıdır.
+        """
+        # In-memory kontrol
+        if pid in self._packages:
+            return self._packages[pid]
 
-            return None
+        # Diskten yükle
+        pkg_path = self._package_path(pid)
+        archive_path = self._archive_path(pid)
+
+        for path in (pkg_path, archive_path):
+            if path.exists():
+                try:
+                    package = self._load_from_disk(path)
+                    if package:
+                        self._packages[pid] = package
+                        return package
+                except Exception as e:
+                    logger.warning(
+                        f"⚠️ [Package Runtime] Package yüklenemedi "
+                        f"{pid}: {e}"
+                    )
+
+        return None
 
     # ── Package Doğrulama ────────────────────────────────────────────────
 
