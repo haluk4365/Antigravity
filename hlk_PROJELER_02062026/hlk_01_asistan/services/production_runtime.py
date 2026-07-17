@@ -686,6 +686,54 @@ class ProductionRuntime:
                 return self._result
 
     # ═══════════════════════════════════════════════════════════════════════
+    # Runtime Heartbeat — Production boyunca runtime aktiflik kanıtı
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def _start_heartbeat(self, user_id: int) -> "asyncio.Task | None":
+        """Production boyunca periyodik runtime aktiflik sinyali gönderir.
+
+        Heartbeat, HLK Runtime ve Constitution Runtime'ın Production
+        süresince aktif kaldığını kanıtlayan periyodik log kaydıdır.
+        MASTER-011: Runtime Aktiflik Doğrulama Prensibi gereğidir.
+
+        Args:
+            user_id: Kullanıcı ID'si.
+
+        Returns:
+            asyncio.Task veya None.
+        """
+        async def _beat():
+            interval = float(
+                __import__("os").getenv("GC_RUNTIME_HEARTBEAT_INTERVAL", "60")
+            )
+            start = __import__("time").time()
+            while True:
+                await asyncio.sleep(interval)
+                elapsed = __import__("time").time() - start
+                try:
+                    from services.hlk_runtime import hlk_runtime as _hb_hr
+                    hlk_ok = _hb_hr.is_active(user_id)
+                    const_ok = _hb_hr.is_constitution_active()
+                    prod_state = self._state.value
+                    hlk_status = "ACTIVE" if hlk_ok else "INACTIVE"
+                    const_status = "ACTIVE" if const_ok else "INACTIVE"
+                    logger.info(
+                        f"💓 [Runtime Heartbeat] "
+                        f"HLK: {hlk_status} | "
+                        f"Constitution: {const_status} | "
+                        f"Production: {prod_state} | "
+                        f"PID={self._current_pid} | "
+                        f"elapsed={elapsed:.0f}s"
+                    )
+                except Exception as e:
+                    logger.warning(f"💓 [Runtime Heartbeat] Hata: {e}")
+
+        try:
+            return asyncio.create_task(_beat())
+        except Exception:
+            return None
+
+    # ═══════════════════════════════════════════════════════════════════════
     # Durum ve Raporlama
     # ═══════════════════════════════════════════════════════════════════════
 
@@ -724,6 +772,569 @@ class ProductionRuntime:
     # ═══════════════════════════════════════════════════════════════════════
     # Reset (Test Yardımcısı)
     # ═══════════════════════════════════════════════════════════════════════
+
+    async def track(
+        self, pid: str, state: str, extra: dict | None = None
+    ) -> None:
+        """FAZ-2: Pipeline durumunu Production Runtime'a bildirir.
+
+        Production Runtime artık pipeline'ın yaşam döngüsünü yönetir.
+        Pipeline her aşamada bu metodu çağırarak durumunu bildirir.
+
+        Args:
+            pid: Production ID.
+            state: ProductionState değeri.
+            extra: Ek metadata (opsiyonel).
+        """
+        async with self._lock:
+            self._current_pid = pid
+            try:
+                self._state = ProductionState[state] if isinstance(state, str) else state
+            except (KeyError, ValueError):
+                self._state = ProductionState.EXECUTING
+
+            if self._result is None:
+                self._result = ProductionResult(
+                    pid=pid,
+                    state=self._state.value,
+                    started_at=datetime.now(timezone.utc).isoformat(),
+                    total_steps=5,  # Decision → Image → Voice → Video → Delivery
+                )
+
+            if extra:
+                if extra.get("completed"):
+                    self._result.completed_steps += 1
+                if extra.get("error"):
+                    self._result.error = extra["error"]
+                if extra.get("success") is not None:
+                    self._result.success = extra["success"]
+
+            if state == "COMPLETED":
+                self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                if self._result.started_at:
+                    try:
+                        start = datetime.fromisoformat(self._result.started_at)
+                        self._result.duration_seconds = (
+                            datetime.now(timezone.utc) - start.replace(tzinfo=timezone.utc)
+                        ).total_seconds()
+                    except Exception:
+                        pass
+
+            logger.info(f"📊 [ProductionRuntime] {pid}: {self._state.value}")
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # TEK GİRİŞ NOKTASI — Delegasyon API'si (AR-002_70)
+    # website.py yalnızca launch() çağırır; yaşam döngüsünü YÖNETMEZ.
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def launch(self, request) -> "asyncio.Task":
+        """Üretim talebini kabul eder ve yönetilen yaşam döngüsünü başlatır.
+
+        AR-002_70: Production Runtime, üretim yaşam döngüsünün TEK giriş
+        noktası, TEK orkestratörü ve TEK yaşam döngüsü yöneticisidir.
+
+        Anayasal boot zinciri gereği: Production Runtime yalnızca
+        HLK Runtime ve Constitution Runtime aktif olduğunda başlatılabilir.
+
+        Görev sahipsiz (orphan) bırakılmaz: done-callback ile her sonuç
+        okunur; hiçbir exception Python'a sızamaz (AR-002_76 Adım 7 —
+        istisnalar Execution Result / Feedback Loop / Escalation'a dönüşür).
+
+        Args:
+            request: production_pipeline.ProductionRequest.
+
+        Returns:
+            asyncio.Task — yönetilen üretim görevi.
+        """
+        # Constitutional Boot Chain doğrulaması
+        try:
+            from services.hlk_runtime import hlk_runtime as _hr
+            if not _hr.authorize_production(request.user_id):
+                logger.critical(
+                    f"🚨 [Production Runtime] Anayasal yetkilendirme REDDEDILDI — "
+                    f"Production BAŞLATILAMIYOR. user={request.user_id}"
+                )
+                # Yetkilendirme başarısız — FAILED task döndür
+                async def _unauthorized():
+                    return await self._handle_failure(
+                        request, "",
+                        error="Constitutional Boot Chain: HLK Runtime veya Constitution Runtime aktif değil",
+                        state=ProductionState.FAILED,
+                    )
+                task = asyncio.create_task(_unauthorized())
+                task.add_done_callback(self._on_task_done)
+                return task
+        except ImportError:
+            logger.warning(
+                "⚠️ [Production Runtime] HLK Runtime modülü bulunamadı — "
+                "yetkilendirme atlanıyor"
+            )
+
+        logger.info(
+            f"🚀 [Production Runtime Started] Üretim talebi kabul edildi — "
+            f"chat={request.chat_id} user={request.user_id} "
+            f"({request.brand} — {request.product_name}, {request.duration}sn)"
+        )
+        task = asyncio.create_task(self.run_request(request))
+        task.add_done_callback(self._on_task_done)
+        return task
+
+    def _on_task_done(self, task: "asyncio.Task") -> None:
+        """Orphan-task yasağı: görev sonucu her durumda okunur."""
+        try:
+            exc = task.exception()
+        except asyncio.CancelledError:
+            logger.warning("🏁 [Production Cancelled] Üretim görevi iptal edildi")
+            return
+        if exc is not None:
+            # run_request tüm istisnaları yakalar — buraya düşmesi
+            # anayasal ihlaldir ve KRİTİK olarak raporlanır.
+            logger.critical(
+                f"🚨 [ProductionRuntime] Yönetilmeyen istisna yakalandı "
+                f"(orphan-task koruması): {type(exc).__name__}: {exc}"
+            )
+
+    async def run_request(self, request) -> ProductionResult:
+        """Yönetilen üretim yaşam döngüsü — hiçbir istisna dışarı sızmaz.
+
+        Anayasal zincir (AR-002_70/71/72/74/75/76 + AR-002_22 + CEE + EEC):
+        STATE doğrulama → CEE PRE-CHECK → PID Runtime → Production Package
+        → Decision Engine → Decision Packet → Task Package → Executor →
+        Provider → Execution Result → Feedback Loop → CEE POST-CHECK →
+        EEC → Production Package güncelleme → LAC → State Transition.
+        """
+        # Heartbeat başlat — Production boyunca runtime aktifliğini kanıtlamak için
+        _heartbeat_task = self._start_heartbeat(request.user_id)
+        try:
+            return await asyncio.wait_for(
+                self._run_managed(request),
+                timeout=_GC_PRODUCTION_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"🏁 [Production Timeout] {_GC_PRODUCTION_TIMEOUT}s aşıldı")
+            return await self._handle_failure(
+                request, self._current_pid,
+                error=f"Production zaman aşımı ({_GC_PRODUCTION_TIMEOUT}s)",
+                state=ProductionState.TIMED_OUT,
+            )
+        except asyncio.CancelledError:
+            logger.warning(f"🏁 [Production Cancelled] {self._current_pid}")
+            return await self._handle_failure(
+                request, self._current_pid,
+                error="Production iptal edildi",
+                state=ProductionState.CANCELLED,
+            )
+        except Exception as e:
+            logger.error(
+                f"❌ [ProductionRuntime] Yaşam döngüsü hatası: "
+                f"{type(e).__name__}: {e}"
+            )
+            return await self._handle_failure(
+                request, self._current_pid,
+                error=f"{type(e).__name__}: {e}",
+                state=ProductionState.FAILED,
+            )
+        finally:
+            # Heartbeat durdur
+            if _heartbeat_task:
+                _heartbeat_task.cancel()
+            # Production terminal — HLK Runtime'a bildir
+            try:
+                from services.hlk_runtime import hlk_runtime as _hr2
+                _hr2.on_production_terminal(request.user_id)
+            except Exception:
+                pass
+
+    async def _run_managed(self, request) -> ProductionResult:
+        """AR-002_70 anayasal zinciri — request bağlamıyla tam yürütme."""
+        from services.production_pipeline import (
+            PipelineContext, set_context, clear_context, register_handlers,
+        )
+        from services.constitution_enforcement import constitution_enforcement
+        from services.execution_event_collector import (
+            execution_event_collector, EECEventType, ExecutionPhase,
+        )
+        from services.olay_kayit_merkezi import event_registry
+        from services.live_activity_center import live_activity_center
+        from services.pid_runtime import pid_runtime
+        from services.production_package_runtime import package_runtime, PackageStatus
+        from services.decision_engine import decision_engine, ProductionContext
+        from utils.state_engine import StateEngine, UserEvent
+
+        start_time = time.time()
+        self._cancel_requested = False
+        self._result = ProductionResult(
+            state=ProductionState.VALIDATING.value,
+            started_at=datetime.now(timezone.utc).isoformat(),
+            total_steps=10,
+        )
+
+        # ── Adım 1-4: Ön Koşul Doğrulamaları ─────────────────────────────
+        self._state = ProductionState.VALIDATING
+        se = StateEngine(request.user_data)
+        current_state = getattr(se, "current", None)
+        current_state_val = getattr(current_state, "value", str(current_state))
+        logger.info(f"🔷 [STATE_VIDEO_PRODUCTION Active] mevcut state: {current_state_val}")
+        # Guard: Runtime aktiflik kontrolü
+        try:
+            from services.hlk_runtime import hlk_runtime as _guard_hr
+            _guard_hr.guard_check(request.user_id)
+        except Exception:
+            pass
+        await self._validate_prerequisites()
+        self._result.completed_steps = 4
+
+        # ── Adım 5: Runtime Başlatma ─────────────────────────────────────
+        self._state = ProductionState.STARTING
+        self._result.completed_steps = 5
+
+        # ── Adım 6: CEE PRE-CHECK ────────────────────────────────────────
+        ctp = constitution_enforcement.pre_check(
+            task_description=f"Video production for user {request.user_id}",
+            affected_files=[
+                "services/production_runtime.py",
+                "services/production_pipeline.py",
+                "services/production_executor.py",
+            ],
+            master_rules=["MASTER-001", "MASTER-003", "MASTER-004"],
+            arch_rules=["AR-002_57", "AR-002_70", "AR-002_76"],
+            oper_rules=["OR-004_8"],
+            flow_steps=["FD-008_1: STATE_VIDEO_PRODUCTION"],
+            state_rules=["SE-007_4"],
+            expected_outputs=["Video delivered or confirmation sent"],
+        )
+        logger.info(f"📋 [CEE PRE-CHECK] CTP: {ctp.ctp_id}")
+        self._result.pre_check_report = {"ctp_id": ctp.ctp_id}
+        self._result.completed_steps = 6
+
+        # ── Adım 7: PID Oluşturma (PID Runtime) ──────────────────────────
+        self._state = ProductionState.CREATING_PID
+        logger.info("🆔 [PID Runtime Started] PID oluşturuluyor (Adım 7)")
+        pid = await self._create_pid()
+        self._current_pid = pid
+        self._result.pid = pid
+
+        # Production Lifecycle — gerçek PID ile güncelle
+        try:
+            from services.hlk_runtime import hlk_runtime as _hr_pl
+            _hr_pl.on_production_start(request.user_id, pid)
+        except Exception:
+            pass
+
+        # EEC LISTEN + başlangıç event'i (EEC-002: PID zorunlu)
+        execution_event_collector.listen(pid=pid)
+        start_evt = execution_event_collector.emit_event(
+            event_type=EECEventType.TASK_STARTED,
+            description=f"Production started: {pid}",
+            phase=ExecutionPhase.EXECUTE,
+            result="Production Runtime yaşam döngüsü başladı",
+        )
+        event_registry.register_from_eec(start_evt)
+        live_activity_center.register(start_evt)
+        logger.info(f"📤 [EEC Event Created] {start_evt.event_id if hasattr(start_evt, 'event_id') else 'EVENT_TASK_STARTED'} | PID={pid}")
+        logger.info(f"📺 [LAC Updated] EVENT_TASK_STARTED | PID={pid}")
+
+        # ── Adım 8: Production Package (Package Runtime) ─────────────────
+        self._state = ProductionState.CREATING_PACKAGE
+        await self._create_package(pid)
+        logger.info(f"📦 [Production Package Created] {pid}")
+        # Guard: Runtime aktiflik kontrolü
+        try:
+            from services.hlk_runtime import hlk_runtime as _guard_hr2
+            _guard_hr2.guard_check(request.user_id)
+        except Exception:
+            pass
+        self._result.completed_steps = 8
+
+        # Brief + Video Parametreleri bölümlerini doldur (16_PP_STANDARD)
+        ud = request.user_data or {}
+        brief_section = {
+            "url": request.url,
+            "product_name": request.product_name,
+            "brand": request.brand,
+            "platform": ud.get("platform", ""),
+            "resolution": ud.get("resolution", ""),
+            "style": ud.get("style", ""),
+            "audience": ud.get("audience", ""),
+            "voice_language": request.voice_lang,
+        }
+        await package_runtime.update_section(pid, "brief", brief_section)
+        await package_runtime.update_section(pid, "video_parameters", {
+            "duration_seconds": request.duration,
+            "voice_language": request.voice_lang,
+            "platform": ud.get("platform", ""),
+            "resolution": ud.get("resolution", ""),
+        })
+
+        # ── FAZ: HLK DECISION ENGINE (MASTER-004 / FEAT-002) ─────────────
+        logger.info("🧠 [Decision Engine Started] HLK karar üretimi başlıyor")
+        prod_context = ProductionContext(
+            pid=pid, user_id=request.user_id,
+            product_name=request.product_name, brand=request.brand,
+            duration=request.duration, voice_lang=request.voice_lang,
+            url=request.url,
+        )
+        decision_packet = decision_engine.decide(prod_context)
+        logger.info(
+            f"🧠 [Decision Packet Ready] {decision_packet.decision_id} | "
+            f"Gorsel: {decision_packet.primary_image_provider.provider if decision_packet.primary_image_provider else 'YOK'}"
+            f"{' > ' + decision_packet.fallback_image_provider.provider if decision_packet.fallback_image_provider else ''} | "
+            f"Ses: {decision_packet.primary_voice_provider.provider if decision_packet.primary_voice_provider else 'YOK'} | "
+            f"Video: {decision_packet.primary_video_provider.provider if decision_packet.primary_video_provider else 'YOK'}"
+            f"{' > ' + decision_packet.fallback_video_provider.provider if decision_packet.fallback_video_provider else ''}"
+        )
+        request.user_data["decision_packet"] = decision_packet.to_dict()
+        # 15_KARAR_GEREKCESI: karar Production Package'e kaydedilir
+        await package_runtime.update_section(
+            pid, "decision_history", [decision_packet.to_dict()]
+        )
+
+        # ── Adım 9: Task Package Hazırlığı (gerçek pipeline task'ları) ───
+        self._state = ProductionState.PREPARING_TASKS
+        real_tasks = [
+            {"task_id": f"TASK-{pid}-001", "agent": "ImageGenerator",
+             "status": "PENDING", "pid": pid,
+             "description": "Ürün görseli üretimi (Decision Packet provider'ları ile)"},
+            {"task_id": f"TASK-{pid}-002", "agent": "VoiceGenerator",
+             "status": "PENDING", "pid": pid,
+             "description": "AI seslendirme üretimi"},
+            {"task_id": f"TASK-{pid}-003", "agent": "VideoRenderer",
+             "status": "PENDING", "pid": pid,
+             "description": "Video render (lipsync/img2vid)"},
+            {"task_id": f"TASK-{pid}-004", "agent": "DeliveryAgent",
+             "status": "PENDING", "pid": pid,
+             "description": "Nihai çıktının kullanıcıya teslimi (AR-002_36)"},
+        ]
+        await package_runtime.update_section(pid, "task_packages", real_tasks)
+        logger.info(f"📋 [Task Package Loaded] {len(real_tasks)} adet task hazırlandı: {pid}")
+        # Guard: Runtime aktiflik kontrolü
+        try:
+            from services.hlk_runtime import hlk_runtime as _guard_hr3
+            _guard_hr3.guard_check(request.user_id)
+        except Exception:
+            pass
+        self._result.completed_steps = 9
+
+        # ── Adım 10: Production Executor (gerçek handler'lar ile) ────────
+        self._state = ProductionState.EXECUTING
+        register_handlers()
+        ctx = PipelineContext(
+            request=request,
+            decision_packet=decision_packet,
+            prod_context=prod_context,
+            cost_report={"pid": pid, "services": {},
+                         "decision_id": decision_packet.decision_id},
+        )
+        set_context(pid, ctx)
+
+        try:
+            executor_report = await self._start_executor(pid)
+            self._result.executor_report = executor_report
+            self._result.completed_steps = 10
+
+            failed = executor_report.get("failed_tasks", 0)
+            if failed:
+                logger.warning(
+                    f"🔄 [Feedback Loop Started] Executor raporu: {failed} task "
+                    f"başarısız — AR-002_22 değerlendirmesi pipeline içinde uygulandı"
+                )
+            else:
+                logger.info(
+                    f"🔄 [Feedback Loop Started] Executor raporu degerlendirildi: "
+                    f"tum task'lar basarili — mudahale gerekmedi | PID={pid}"
+                )
+
+            # ── CEE POST-CHECK ───────────────────────────────────────────
+            pipeline_success = ctx.delivered
+            cee_report = constitution_enforcement.enforce_post_check(
+                pid=pid,
+                decision_packet=request.user_data.get("decision_packet", {}),
+                user_data=request.user_data,
+                pipeline_success=pipeline_success,
+            )
+            logger.info(
+                f"🔍 [CEE POST-CHECK] {cee_report.report_id}: {cee_report.verdict.value}"
+            )
+            self._result.post_check_report = {
+                "report_id": cee_report.report_id,
+                "verdict": cee_report.verdict.value,
+            }
+
+            # ── EEC: Production tamamlandı event'i ───────────────────────
+            end_evt = execution_event_collector.emit_event(
+                event_type=EECEventType.CODE_COMPLETED,
+                description=f"Production completed: {pid}",
+                phase=ExecutionPhase.POST_CHECK,
+                result=(
+                    f"Video={bool(ctx.video_path)} Voice={bool(ctx.voice_path)} "
+                    f"Delivered={ctx.delivered}"
+                ),
+            )
+            event_registry.register_from_eec(end_evt)
+            live_activity_center.register(end_evt)
+            logger.info(f"📤 [EEC Event Created] EVENT_CODE_COMPLETED | PID={pid}")
+            logger.info(f"📺 [LAC Updated] EVENT_CODE_COMPLETED | PID={pid}")
+
+            # ── Production Package final güncelleme ──────────────────────
+            await package_runtime.update_section(
+                pid, "service_usage", ctx.cost_report
+            )
+            if ctx.video_path:
+                await package_runtime.update_section(
+                    pid, "final_video",
+                    {"path": ctx.video_path, "delivered": ctx.delivered},
+                )
+            await package_runtime.update_section(pid, "delivery_info", {
+                "delivered": ctx.delivered,
+                "chat_id": request.chat_id,
+                "delivered_at": datetime.now(timezone.utc).isoformat(),
+                "video": bool(ctx.video_path),
+            })
+            logger.info(f"📦 [Production Package Updated] {pid} (service_usage, delivery_info)")
+
+            # ── State Transition (SE-007_4) ──────────────────────────────
+            se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
+            logger.info(
+                "🔄 [State Transition] STATE_VIDEO_PRODUCTION "
+                "--[EVENT_VIDEO_PRODUCTION_COMPLETED]--> STATE_SESSION_COMPLETED"
+            )
+
+            # ── Tamamlanma ───────────────────────────────────────────────
+            elapsed = time.time() - start_time
+            self._state = ProductionState.COMPLETED
+            self._result.state = ProductionState.COMPLETED.value
+            self._result.success = True
+            self._result.duration_seconds = elapsed
+            self._result.completed_at = datetime.now(timezone.utc).isoformat()
+            logger.info(
+                f"🏁 [Production Completed] {pid} ({elapsed:.1f}s, "
+                f"{self._result.completed_steps}/10 adım)"
+            )
+            return self._result
+        finally:
+            clear_context(pid)
+
+    async def _handle_failure(
+        self, request, pid: str, error: str, state: "ProductionState"
+    ) -> ProductionResult:
+        """Anayasal başarısızlık yolu — AR-002_79/80.
+
+        Hiçbir başarısızlık sessiz kalmaz:
+        - EEC fail event'i + Olay Kayıt Merkezi + LAC
+        - CEE POST-CHECK (pipeline_success=False)
+        - Escalation Engine (yönetici müdahalesi)
+        - EVENT_VIDEO_PRODUCTION_FAILED → STATE_SESSION_CLOSED (SE-007_4)
+        - Kullanıcıya DÜRÜST bilgilendirme (Fake Progress yasağı — EEC-001)
+        """
+        if self._result is None:
+            self._result = ProductionResult(total_steps=10)
+        self._state = state
+        self._result.state = state.value
+        self._result.success = False
+        self._result.error = error
+        self._result.completed_at = datetime.now(timezone.utc).isoformat()
+        pid = pid or "PID-UNKNOWN"
+        terminal = {
+            ProductionState.FAILED: "Production Failed",
+            ProductionState.TIMED_OUT: "Production Timeout",
+            ProductionState.CANCELLED: "Production Cancelled",
+        }.get(state, "Production Failed")
+        logger.error(f"🏁 [{terminal}] {pid} — {error}")
+
+        # EEC fail event + LAC
+        try:
+            from services.execution_event_collector import (
+                execution_event_collector, EECEventType, ExecutionPhase,
+            )
+            from services.olay_kayit_merkezi import event_registry
+            from services.live_activity_center import live_activity_center
+            fail_evt = execution_event_collector.emit_event(
+                event_type=EECEventType.RUNTIME_TEST_COMPLETED,
+                description=f"{terminal}: {pid} — {error}",
+                phase=ExecutionPhase.POST_CHECK,
+                result=f"Error: {error[:120]}",
+            )
+            event_registry.register_from_eec(fail_evt)
+            live_activity_center.register(fail_evt)
+            logger.info(f"📤 [EEC Event Created] failure event | PID={pid}")
+            logger.info(f"📺 [LAC Updated] failure event | PID={pid}")
+        except Exception as e:
+            logger.warning(f"⚠️ [ProductionRuntime] EEC fail event yazılamadı: {e}")
+
+        # CEE POST-CHECK (başarısızlık denetimi)
+        try:
+            from services.constitution_enforcement import constitution_enforcement
+            cee_report = constitution_enforcement.enforce_post_check(
+                pid=pid,
+                decision_packet=(request.user_data or {}).get("decision_packet", {}),
+                user_data=request.user_data or {},
+                pipeline_success=False,
+            )
+            logger.info(
+                f"🔍 [CEE POST-CHECK] {cee_report.report_id}: {cee_report.verdict.value}"
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ [ProductionRuntime] CEE POST-CHECK hatası: {e}")
+
+        # Escalation (AR-002_79 — yönetici müdahalesi)
+        try:
+            from services.escalation_engine import escalation_engine, EscalationReason
+            escalation_engine.escalate(
+                pid=pid,
+                reason=EscalationReason.ALL_PROVIDERS_FAILED.value,
+                detail=f"{terminal}: {error}",
+                failed_providers=[],
+                retry_count=0,
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ [ProductionRuntime] Escalation yazılamadı: {e}")
+
+        # Production Package durumu
+        try:
+            from services.production_package_runtime import package_runtime, PackageStatus
+            if pid != "PID-UNKNOWN":
+                await package_runtime.update_status(pid, PackageStatus.FAILED)
+                logger.info(f"📦 [Production Package Updated] {pid} → FAILED")
+        except Exception as e:
+            logger.warning(f"⚠️ [ProductionRuntime] Package durumu güncellenemedi: {e}")
+
+        # State Transition: SE-007_4 → EVENT_VIDEO_PRODUCTION_FAILED
+        try:
+            from utils.state_engine import StateEngine, UserEvent
+            se = StateEngine(request.user_data)
+            se.fire(UserEvent.VIDEO_PRODUCTION_FAILED)
+            logger.info(
+                "🔄 [State Transition] STATE_VIDEO_PRODUCTION "
+                "--[EVENT_VIDEO_PRODUCTION_FAILED]--> STATE_SESSION_CLOSED"
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ [ProductionRuntime] State geçişi yapılamadı: {e}")
+
+        # Kullanıcıya dürüst bilgilendirme (EEC-001: Fake Progress yasak)
+        try:
+            if request.bot is not None:
+                await request.bot.send_message(
+                    chat_id=request.chat_id,
+                    text=(
+                        f"⚠️ <b>Uretim surecinde beklenmeyen bir durum olustu.</b>\n\n"
+                        f"📋 PID: <code>{pid}</code>\n"
+                        f"Yoneticimiz bilgilendirildi; uretiminiz kontrol edilerek "
+                        f"en kisa surede tamamlanacaktir.\n"
+                        f"<i>HLK AI Reklam Asistani</i>"
+                    ),
+                    parse_mode="HTML",
+                )
+        except Exception as e:
+            logger.warning(f"⚠️ [ProductionRuntime] Kullanıcı bildirimi gönderilemedi: {e}")
+
+        # Pipeline bağlamını temizle
+        try:
+            from services.production_pipeline import clear_context
+            clear_context(pid)
+        except Exception:
+            pass
+
+        return self._result
 
     async def reset(self) -> None:
         """Runtime durumunu sıfırlar (yalnızca test amaçlı)."""

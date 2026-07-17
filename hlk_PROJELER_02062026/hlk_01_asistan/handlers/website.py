@@ -31,6 +31,12 @@ from services.execution_event_collector import (
 )
 from services.olay_kayit_merkezi import event_registry
 from services.pid_runtime import pid_runtime
+from services.decision_engine import decision_engine, ProductionContext
+from services.decision_packet import DecisionPacket
+from services.production_runtime import production_runtime
+from services.production_pipeline import ProductionRequest
+from services.live_activity_center import live_activity_center
+from services.escalation_engine import escalation_engine, EscalationReason
 
 logger = logging.getLogger(__name__)
 
@@ -125,12 +131,14 @@ async def handle_website_link(update: Update, context: ContextTypes.DEFAULT_TYPE
     logger.info(f"📨 {user.id} link gönderdi: {text[:80]}...")
 
     if not is_valid_url(text):
+        import os as _os
+        max_retry = int(_os.getenv("GC_MAX_PRODUCT_LINK_RETRY", "5"))
         link_attempts = context.user_data.setdefault("link_attempts", 0) + 1
         context.user_data["link_attempts"] = link_attempts
-        remaining = 5 - link_attempts
-        logger.info(f"❌ Geçersiz link #{link_attempts}/5: {text[:60]}")
+        remaining = max_retry - link_attempts
+        logger.info(f"❌ Geçersiz link #{link_attempts}/{max_retry}: {text[:60]}")
 
-        if link_attempts >= 5:
+        if link_attempts >= max_retry:
             await update.message.reply_text(
                 "⚠️ <b>5 başarısız link denemesi.</b>\n\n"
                 "Oturumunuz kapatılıyor. Lütfen daha sonra "
@@ -2687,15 +2695,67 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
         )
     await typewriter_animation(chat_id, done_text, context.bot, 0.06)
 
-    from utils.session_timeout import start_timer
-    start_timer(user.id, chat_id, context.bot, context.user_data)
+    # SE-007_4 / OR-004_9: STATE_VIDEO_PRODUCTION kullanıcı cevabı bekleyen
+    # bir state değildir — oturum timeout'u üretim sırasında çalışmaz.
+    # Üretim süresi Production Runtime tarafından yönetilir (GC_PRODUCTION_TIMEOUT).
+    from utils.session_timeout import cancel_timer
+    cancel_timer(user.id)
 
-    # ── STATE_VIDEO_PRODUCTION: Production Runtime Entegrasyonu ──
-    # AR-002_70: STATE_VIDEO_PRODUCTION → Production zinciri başlatılır
-    # Production arka planda çalışır, callback'i bloke etmez
-    asyncio.create_task(
-        _run_production_pipeline(chat_id, context, user.id)
+    # ════════════════════════════════════════════════════════════════════
+    # CONSTITUTIONAL BOOT CHAIN: Production Runtime yetkilendirme kontrolü
+    # HLK Runtime ve Constitution Runtime aktif olmadan Production BAŞLATILAMAZ
+    # ════════════════════════════════════════════════════════════════════
+    from services.hlk_runtime import hlk_runtime as _hr
+    if not _hr.authorize_production(user.id):
+        logger.critical(
+            f"🚨 [BOOT CHAIN İHLAL] Production Runtime yetkilendirmesi REDDEDILDI — "
+            f"HLK Runtime veya Constitution Runtime AKTIF DEGIL. user={user.id}"
+        )
+        # EEC fail event'i
+        from services.execution_event_collector import (
+            execution_event_collector as _eec,
+            EECEventType as _EET, ExecutionPhase as _EP,
+        )
+        _eec.listen(pid=str(user.id))
+        _auth_fail = _eec.emit_event(
+            event_type=_EET.TASK_STARTED,
+            description=f"Production yetkilendirme RED — user={user.id}",
+            phase=_EP.PRE_CHECK,
+            result="FAILED: HLK Runtime veya Constitution Runtime aktif degil",
+        )
+        from services.olay_kayit_merkezi import event_registry as _er
+        _er.register_from_eec(_auth_fail)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "⚠️ <b>Uretim baslatilamadi.</b>\n\n"
+                "Anayasal dogrulama tamamlanamadi. "
+                "<i>Lutfen</i> <b>/start</b> <i>yazarak yeniden deneyin.</i>"
+            ),
+            parse_mode="HTML",
+        )
+        return
+
+    # ── STATE_VIDEO_PRODUCTION: Üretim talebi Production Runtime'a DEVREDİLİR ──
+    # AR-002_70: Production Runtime; üretim yaşam döngüsünün TEK giriş noktası,
+    # TEK orkestratörü ve TEK yaşam döngüsü yöneticisidir.
+    # website.py yalnızca talebi devreder — yaşam döngüsünü YÖNETMEZ.
+    try:
+        _req_duration = int(context.user_data.get("video_duration", 15) or 15)
+    except (TypeError, ValueError):
+        _req_duration = 15  # "HLK'ya Bırak" gibi sayısal olmayan değerlerde varsayılan
+    request = ProductionRequest(
+        chat_id=chat_id,
+        user_id=user.id,
+        url=context.user_data.get("website_url", ""),
+        product_name=product_name,
+        brand=context.user_data.get("brand", "Marka") or "Marka",
+        duration=_req_duration,
+        voice_lang=context.user_data.get("voice_language", "tr"),
+        bot=context.bot,
+        user_data=context.user_data,
     )
+    production_runtime.launch(request)
 
 
 async def handle_admin_payment_ret(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2722,303 +2782,6 @@ async def handle_admin_payment_ret(update: Update, context: ContextTypes.DEFAULT
         f"{t('final.new_session_start', lang)}"
     )
     await context.bot.send_message(chat_id=chat_id, text=ret_text, parse_mode="HTML")
-
-
-async def _run_production_pipeline(
-    chat_id: int, context: ContextTypes.DEFAULT_TYPE, user_id: int
-) -> None:
-    """STATE_VIDEO_PRODUCTION: Production Runtime zincirini arka planda çalıştırır.
-
-    AR-002_70 uyarınca Production zinciri:
-    Production Runtime → CEE PRE-CHECK → PID → Package → Task → Executor → CEE POST-CHECK
-
-    Production sonucuna göre State Engine'e uygun event gönderilir.
-    Bu fonksiyon callback'i bloke etmez — asyncio.create_task ile çağrılır.
-
-    Crash Recovery: PID context.user_data'ya kaydedilir. Restart sonrası
-    bu PID ile production_runtime.recover(pid) çağrılarak kaldığı yerden
-    devam edilir.
-    """
-    from utils.state_engine import StateEngine, UserEvent
-    import os as _os, tempfile, json as _json
-
-    se = StateEngine(context.user_data)
-
-    # ════════════════════════════════════════════════════════════
-    # FAZ 0: CEE PRE-CHECK + PID (MASTER-003, AR-002_57, AR-002_70)
-    # ════════════════════════════════════════════════════════════
-    from services.constitution_enforcement import constitution_enforcement
-    from services.execution_event_collector import execution_event_collector, EECEventType, ExecutionPhase
-    from services.olay_kayit_merkezi import event_registry
-    from services.pid_runtime import pid_runtime
-
-    # CEE PRE-CHECK
-    ctp = constitution_enforcement.pre_check(
-        task_description=f"Video production for user {user_id}",
-        affected_files=["handlers/website.py"],
-        master_rules=["MASTER-001","MASTER-003","MASTER-004"],
-        arch_rules=["AR-002_57","AR-002_70"],
-        oper_rules=["OR-004_8"],
-        flow_steps=["FD-008_1: STATE_VIDEO_PRODUCTION"],
-        state_rules=["SE-007_4"],
-        expected_outputs=["Video delivered or confirmation sent"],
-    )
-    logger.info(f"📋 [CEE PRE-CHECK] CTP: {ctp.ctp_id}")
-
-    # PID olustur (AR-002_57)
-    record = await pid_runtime.generate()
-    pid = record.pid
-    logger.info(f"🆔 [Production] PID: {pid}")
-
-    # EEC LISTEN + baslangic event'i
-    execution_event_collector.listen(pid=pid)
-    start_evt = execution_event_collector.emit_event(
-        event_type=EECEventType.TASK_STARTED,
-        description=f"Production started: {pid}",
-        phase=ExecutionPhase.EXECUTION,
-        result="Production pipeline initiated",
-    )
-    event_registry.register_from_eec(start_evt)
-    url = context.user_data.get("website_url", "")
-    product_name = url.split("/")[-1].replace("-", " ").replace("_", " ") if "/" in url else "urununuz"
-    brand = context.user_data.get("brand", "Marka") or "Marka"
-    duration = int(context.user_data.get("video_duration", 15))
-    voice_lang = context.user_data.get("voice_language", "tr")
-    logger.info(f"🎬 [Production] Basliyor: {pid} | {brand} — {product_name} | {duration}sn | {voice_lang}")
-
-    voice_path = None; video_path = None; img_path = None
-    cost_report = {"pid": pid, "services": {}}
-    tmp = tempfile.gettempdir()
-
-    try:
-        # ================================================================
-        # ADIM 1: GORSEL URETIMI (Fal.ai > Kie AI)
-        # ================================================================
-        logger.info(f"🎨 [Production/1] Gorsel uretimi...")
-        import requests as _r
-        # FAL_KEY .env'den al — format: UUID:hash
-        fal_key = _os.getenv("FAL_KEY", "")
-        logger.info(f"🎨 [Production/1] FAL_KEY mevcut: {bool(fal_key)}")
-        if fal_key:
-            try:
-                logger.info(f"🎨 [Production/1] Fal.ai deneniyor...")
-                resp = _r.post("https://queue.fal.run/fal-ai/fast-sdxl",
-                    headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
-                    json={"prompt": f"professional product photo of {brand} {product_name}, studio lighting, white background, high quality"},
-                    timeout=30)
-                logger.info(f"🎨 [Production/1] Fal.ai response: {resp.status_code}")
-                if resp.status_code == 200:
-                    data = resp.json()
-                    req_id = data.get("request_id")
-                    if req_id:
-                        for _ in range(8):
-                            await asyncio.sleep(3)
-                            st = _r.get(f"https://queue.fal.run/fal-ai/fast-sdxl/requests/{req_id}/status",
-                                headers={"Authorization": f"Key {fal_key}"}, timeout=10)
-                            if st.status_code == 200:
-                                st_data = st.json()
-                                if st_data.get("status") == "COMPLETED":
-                                    images = st_data.get("response", {}).get("images", [])
-                                    if images:
-                                        img_url = images[0].get("url", "")
-                                        if img_url:
-                                            img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
-                                            _r.urlretrieve(img_url, img_path)
-                                            logger.info(f"✅ [Production] Fal.ai gorsel: {img_path}")
-                                            cost_report["services"]["fal.ai"] = "ok"
-                                    break
-            except Exception as e:
-                logger.warning(f"⚠️ [Production] Fal.ai basarisiz: {e}")
-
-        # Fal basarisizsa Kie AI dene
-        if not img_path:
-            try:
-                kie_key = _os.getenv("KIE_AI_API_KEY", "")
-                logger.info(f"🎨 [Production/1] Kie AI deneniyor (key: {bool(kie_key)})...")
-                if kie_key:
-                    resp = _r.post("https://api.kie.ai/api/v1/jobs/createTask",
-                        headers={"Authorization": f"Bearer {kie_key}", "Content-Type": "application/json"},
-                        json={"model": "z-image", "prompt": f"{brand} {product_name} product photo, clean background"},
-                        timeout=30)
-                    logger.info(f"🎨 [Production/1] Kie createTask: {resp.status_code}")
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        # Kie AI response: {"code":200, "data": {"taskId": "..."}}
-                        task_id = data.get("data", {})
-                        if isinstance(task_id, dict):
-                            task_id = task_id.get("taskId", "")
-                        elif isinstance(task_id, str):
-                            task_id = task_id
-                        if task_id:
-                            for _ in range(10):
-                                await asyncio.sleep(3)
-                                st = _r.get(f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
-                                    headers={"Authorization": f"Bearer {kie_key}"}, timeout=10)
-                                if st.status_code == 200:
-                                    st_data = st.json()
-                                    # Response: {"code":200, "data": {"status": "completed", "result_url": "..."}}
-                                    inner = st_data.get("data", {})
-                                    if isinstance(inner, dict):
-                                        status = inner.get("status", "")
-                                        img_url = inner.get("result_url") or inner.get("image_url") or inner.get("output_url", "")
-                                        if status in ("completed", "success") and img_url:
-                                            img_path = _os.path.join(tmp, f"hlk_img_{user_id}.png")
-                                            _r.urlretrieve(img_url, img_path)
-                                            logger.info(f"✅ [Production] Kie AI gorsel: {img_path}")
-                                            cost_report["services"]["kie.ai"] = "ok"
-                                            break
-            except Exception as e:
-                logger.warning(f"⚠️ [Production] Kie AI basarisiz: {e}")
-
-        # Hicbiri olmadiysa gorsel OLMADAN devam et (dummy kullanma!)
-        if not img_path:
-            logger.warning("⚠️ [Production] Gorsel uretilemedi — sesli teslim yapilacak")
-            cost_report["services"]["image"] = "failed"
-
-        # ================================================================
-        # ADIM 2: SES URETIMI (ElevenLabs)
-        # ================================================================
-        logger.info(f"🎙️ [Production/2] Ses uretimi...")
-        try:
-            from services.voice_generator import ahu_voice_generator
-            if voice_lang == "tr":
-                voice_text = (
-                    f"{brand} {product_name} urununu simdi kesfedin. "
-                    f"Kalite ve uygun fiyat bir arada. Hemen siparis vermek icin tiklayin."
-                )
-            else:
-                voice_text = (
-                    f"Discover {brand} {product_name} now. "
-                    f"Quality and affordable price together. Order now!"
-                )
-            voice_path = ahu_voice_generator.generate(voice_text, language=voice_lang)
-            if voice_path:
-                logger.info(f"✅ [Production] ElevenLabs ses: {voice_path}")
-                cost_report["services"]["elevenlabs"] = "ok"
-        except Exception as e:
-            logger.warning(f"⚠️ [Production] ElevenLabs basarisiz: {e}")
-
-        # ================================================================
-        # ADIM 3: VIDEO URETIMI (Hedra > Higgsfield)
-        # ================================================================
-        logger.info(f"🎬 [Production/3] Video uretimi...")
-        if voice_path and img_path:
-            # --- Hedra (birincil) ---
-            try:
-                from services.hedra_generator import HedraGenerator
-                hedra = HedraGenerator()
-                video_path = _os.path.join(tmp, f"hlk_video_{user_id}.mp4")
-                ok = await asyncio.to_thread(hedra.create_lipsync_video, img_path, str(voice_path), video_path)
-                if ok:
-                    logger.info(f"✅ [Production] Hedra video: {video_path}")
-                    cost_report["services"]["hedra"] = "ok"
-            except Exception as e:
-                logger.warning(f"⚠️ [Production] Hedra basarisiz: {e}")
-
-        # --- Higgsfield (yedek) ---
-        if not video_path and img_path:
-            try:
-                hf_key_id = _os.getenv("HIGGSFIELD_KEY_ID", "")
-                hf_key_secret = _os.getenv("HIGGSFIELD_KEY_SECRET", "")
-                if hf_key_id and hf_key_secret:
-                    # Upload image
-                    with open(img_path, "rb") as f:
-                        up_resp = _r.post("https://platform.higgsfield.ai/v1/files/upload",
-                            headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}"},
-                            files={"file": f}, timeout=30)
-                    if up_resp.status_code == 200:
-                        file_url = up_resp.json().get("url", "")
-                        gen_resp = _r.post("https://platform.higgsfield.ai/higgsfield-ai/seedance/standard",
-                            headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}", "Content-Type": "application/json"},
-                            json={"image_url": file_url, "duration": duration},
-                            timeout=30)
-                        if gen_resp.status_code == 200:
-                            req_id = gen_resp.json().get("request_id", "")
-                            for _ in range(10):
-                                await asyncio.sleep(5)
-                                st = _r.get(f"https://platform.higgsfield.ai/requests/{req_id}/status",
-                                    headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}"}, timeout=10)
-                                if st.status_code == 200 and st.json().get("status") == "completed":
-                                    vid_url = st.json().get("output_url", "")
-                                    if vid_url:
-                                        video_path = _os.path.join(tmp, f"hlk_video_{user_id}.mp4")
-                                        _r.urlretrieve(vid_url, video_path)
-                                        logger.info(f"✅ [Production] Higgsfield video: {video_path}")
-                                        cost_report["services"]["higgsfield"] = "ok"
-                                    break
-            except Exception as e:
-                logger.warning(f"⚠️ [Production] Higgsfield basarisiz: {e}")
-
-        # ================================================================
-        # ADIM 4: TESLIM (sadece metin — ses/video oynaticisi gosterilmez)
-        # ================================================================
-        if video_path and _os.path.exists(video_path):
-            with open(video_path, "rb") as vf:
-                await context.bot.send_video(
-                    chat_id=chat_id, video=vf,
-                    caption=f"🎬 <b>{brand} — {product_name}</b>\n\n"
-                            f"Videonuz hazir! 📋 PID: <code>{pid}</code>",
-                    parse_mode="HTML",
-                )
-            logger.info(f"✅ [Production] VIDEO GONDERILDI: {pid}")
-        else:
-            # Ses/video oynaticisi GONDERILMEZ — sadece bilgilendirme metni
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"🎬 <b>Uretim Tamamlandi!</b>\n\n"
-                     f"📋 PID: <code>{pid}</code>\n"
-                     f"Urun: <b>{brand} — {product_name}</b>\n"
-                     f"Video suresi: {duration} sn | Ses: {voice_lang.upper()}\n\n"
-                     f"Videonuz hazirlaniyor, en kisa surede gonderilecektir.\n"
-                     f"<i>HLK AI Reklam Asistani</i>",
-                parse_mode="HTML",
-            )
-            logger.info(f"✅ [Production] BILGILENDIRME: {pid}")
-
-        cost_report["status"] = "completed"
-        logger.info(f"📊 [Production] Maliyet raporu: {_json.dumps(cost_report)}")
-
-        # CEE POST-CHECK (MASTER-003)
-        cee_report = constitution_enforcement.post_check(
-            code_anayasa_ok=True, flow_ok=True, state_ok=True,
-            operational_ok=True, architecture_ok=True, runtime_ok=True,
-        )
-        logger.info(f"📋 [CEE POST-CHECK] {cee_report.report_id}: {cee_report.verdict.value}")
-
-        # EEC: Production tamamlandi event'i
-        end_evt = execution_event_collector.emit_event(
-            event_type=EECEventType.CODE_COMPLETED,
-            description=f"Production completed: {pid}",
-            phase=ExecutionPhase.POST_CHECK,
-            result=f"Video={bool(video_path)} Voice={bool(voice_path)}",
-        )
-        event_registry.register_from_eec(end_evt)
-
-        se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
-
-    except Exception as e:
-        logger.error(f"🚨 [Production] Hata: {e}")
-        # CEE POST-CHECK — FAIL
-        try:
-            constitution_enforcement.post_check(
-                code_anayasa_ok=True, flow_ok=True, state_ok=True,
-                operational_ok=False, architecture_ok=True, runtime_ok=False,
-            )
-        except Exception:
-            pass
-        try:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"🎬 <b>Uretim Tamamlandi!</b>\n\n"
-                     f"📋 PID: <code>{pid}</code>\n"
-                     f"Urun: <b>{brand} — {product_name}</b>\n\n"
-                     f"Videonuz hazirlaniyor, en kisa surede gonderilecektir.\n"
-                     f"<i>HLK AI Reklam Asistani</i>",
-                parse_mode="HTML",
-            )
-        except Exception:
-            pass
-        se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
 
 
 async def handle_payment_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -112,6 +112,10 @@ logger.info("✅ Live Activity Center (LAC) hazır")
 from services.constitution_cache import constitution_cache
 logger.info("✅ Constitution Cache Manager hazır")
 
+# HLK Runtime + Constitution Runtime — Constitutional Boot Chain
+from services.hlk_runtime import hlk_runtime
+logger.info("✅ HLK Runtime (Constitutional Boot Chain) hazır")
+
 # Handler'lar
 from handlers.start import (
     start_handler,

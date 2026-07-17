@@ -311,7 +311,7 @@ async def _send_intro_video(update: Update, reply_markup: InlineKeyboardMarkup |
         await asyncio.sleep(SAHNE1_SURE)
         try:
             await msg.delete()
-        except:
+        except Exception:
             pass
         return True
     except Exception as e:
@@ -380,7 +380,7 @@ async def _scout_all_formats(
     audio_path = None
     try:
         audio_path = ahu_voice_generator.generate(text=text, language=language)
-    except:
+    except Exception:
         pass
 
     if not audio_path:
@@ -518,6 +518,40 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     #  ama ANA YASA gereği deneriz — başarısız olursa debug log atar)
     from services.scene_delivery import scene_delivery as _sd
     _sd.register_user_message(update.effective_chat.id, _start_msg_id)
+
+    # ════════════════════════════════════════════════════════════════════
+    # CONSTITUTIONAL BOOT CHAIN: HLK Runtime → Constitution Runtime →
+    # Boot Verification → Runtime Context → Workflow Engine
+    # ════════════════════════════════════════════════════════════════════
+    from services.hlk_runtime import hlk_runtime as _hr
+    _boot_ctx = _hr.boot(user.id)
+    if _boot_ctx.boot_verdict == "FAILED":
+        # Boot başarısız — Workflow başlatılamaz
+        logger.error(
+            f"❌ [BOOT FAILED] HLK Runtime veya Constitution Runtime "
+            f"başlatılamadı. user={user.id}"
+        )
+        # EEC fail event'i
+        execution_event_collector.listen(pid=str(user.id))
+        _fail_evt = execution_event_collector.emit_event(
+            event_type=EECEventType.TASK_STARTED,
+            description=f"/start boot BAŞARISIZ (user={user.id}) — Constitution Runtime aktif değil",
+            related_file="handlers/start.py",
+            phase=ExecutionPhase.PRE_CHECK,
+            result="Boot FAILED",
+        )
+        event_registry.register_from_eec(_fail_evt)
+        # SceneLock temizle — kullanıcı tekrar /start ile deneyebilir
+        SceneLock.set_state(context.user_data, SceneLockState.COMPLETED)
+        SceneLock.set_state(context.user_data, SceneLockState.CLEANUP)
+        SceneLock.set_state(context.user_data, SceneLockState.DONE)
+        await update.message.reply_text(
+            "❌ <b>Sistem başlatılamadı.</b>\n\n"
+            "<i>Anayasal doğrulama tamamlanamadı. Lütfen daha sonra</i> "
+            "<b>/start</b> <i>yazarak tekrar deneyin.</i>",
+            parse_mode="HTML",
+        )
+        return
 
     # ── SCENE LOCK #2: IDLE → LOCKED (clear sonrası yeniden yazılır) ─────
     SceneLock.set_state(context.user_data, SceneLockState.LOCKED)
@@ -760,7 +794,7 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
 
     try:
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except:
+    except Exception:
         pass
 
     sahne2_sure = SAHNE2_SURE_LANG.get(language.upper(), SAHNE2_SURE)
@@ -1000,11 +1034,11 @@ async def handle_scene2_replay(update: Update, context: ContextTypes.DEFAULT_TYP
         if mid:
             try:
                 await context.bot.delete_message(chat_id=chat_id, message_id=mid)
-            except:
+            except Exception:
                 pass
     try:
         await query.message.delete()
-    except:
+    except Exception:
         pass
 
     # Yeni video gonder (file_id ile, baslangictan)
@@ -1026,7 +1060,7 @@ async def handle_scene2_replay(update: Update, context: ContextTypes.DEFAULT_TYP
         await asyncio.sleep(sure + 0.5)
         try:
             await replay_msg.delete()
-        except:
+        except Exception:
             pass
 
         await typewriter_animation(
