@@ -1069,6 +1069,20 @@ class ProductionRuntime:
         set_context(pid, ctx)
 
         try:
+            # ── Adım 17.5: Önceki üretimden kalan kalıcı asset'leri
+            # pipeline context'e geri yükle (AR-002_84 — görsel/ses
+            # dosyaları /tmp'de olduğu için deploy'da silinir; volume'da
+            # saklanan kopyaları yeniden üretimde kullanılır).
+            _assets_dir = Path(os.getenv("GC_PACKAGE_STORAGE_DIR", "data/production_packages")).parent / "assets"
+            _img_path = _assets_dir / f"{pid}_image.png"
+            _voice_path = _assets_dir / f"{pid}_voice.mp3"
+            if _img_path.exists():
+                ctx.img_path = str(_img_path)
+                logger.info(f"🖼 [Reproduction] Kayıtlı görsel geri yüklendi: {pid}")
+            if _voice_path.exists():
+                ctx.voice_path = str(_voice_path)
+                logger.info(f"🔊 [Reproduction] Kayıtlı ses geri yüklendi: {pid}")
+
             # ── Adım 18: Üretim yönetimi (Executor recovery — AR-002_79) ─
             self._state = ProductionState.EXECUTING
             from services.production_executor import production_executor
@@ -1119,6 +1133,20 @@ class ProductionRuntime:
                 )
 
             # ── Adım 20: Dijital varlık ilişkilendirme + sürüm geçmişi ──
+            # Kalıcı asset depolama — volume'da saklanır, deploy sonrası
+            # yeniden üretimde geri yüklenir (AR-002_84).
+            import shutil as _shutil
+            _assets_dir = Path(os.getenv("GC_PACKAGE_STORAGE_DIR", "data/production_packages")).parent / "assets"
+            _assets_dir.mkdir(parents=True, exist_ok=True)
+            if ctx.img_path and os.path.exists(ctx.img_path):
+                _dst = _assets_dir / f"{pid}_image.png"
+                _shutil.copy2(ctx.img_path, _dst)
+                logger.info(f"🖼 [Reproduction] Görsel kalıcı depolandı: {_dst}")
+            if ctx.voice_path and os.path.exists(ctx.voice_path):
+                _dst = _assets_dir / f"{pid}_voice.mp3"
+                _shutil.copy2(ctx.voice_path, _dst)
+                logger.info(f"🔊 [Reproduction] Ses kalıcı depolandı: {_dst}")
+
             await package_runtime.update_section(
                 pid, "service_usage", ctx.cost_report
             )
