@@ -7941,3 +7941,191 @@ HLK'nın başarı kriteri, ilk hatada kaynağı değiştirmek değil; anayasal R
 * İlk hatada kaynak değiştirilmez — önce anayasal recovery uygulanır.
 * Tüm recovery süreci Event Log ve Decision Log'a kaydedilir.
 * Decision Engine onayı olmadan alternatif kaynağa geçilmez.
+
+---
+
+## AR-002_88
+
+### Madde Adı
+
+**ÜRETİM KARAR YETKİ ZİNCİRİ — Production State Ownership**
+
+### Amaç
+
+Production sürecinde Event, Status ve Decision katmanlarının birbirinden kesin olarak ayrılmasını sağlamak.
+
+Hiçbir yürütme bileşeni anayasal karar üretemez.
+
+---
+
+### 1. Production Executor
+
+Production Executor yalnızca **yürütme katmanıdır.**
+
+Görevleri:
+
+* Task yürütmek
+* Teknik sonuç üretmek
+* Teknik Event yayınlamak
+
+Örnek Event'ler:
+
+* `TASK_STARTED`
+* `TASK_PROGRESS`
+* `TASK_COMPLETED`
+* `TASK_FAILED`
+* `VIDEO_CREATED`
+* `VIDEO_NOT_CREATED`
+* `DOWNLOAD_COMPLETED`
+* `DOWNLOAD_FAILED`
+* `UPLOAD_COMPLETED`
+* `UPLOAD_FAILED`
+* `EXECUTION_FINISHED`
+
+Bu Event'ler **karar değildir.** Yalnızca teknik durum bildirimidir.
+
+Executor hiçbir koşulda aşağıdaki kararları üretemez:
+
+* `COMPLETED`
+* `FAILED`
+* `RETRY`
+* `RESUME`
+* `REPLAY`
+* `ESCALATE`
+* `CANCELLED`
+
+Executor hiçbir koşulda:
+
+`PackageStatus.update(...)`
+
+çağıramaz.
+
+---
+
+### 2. Production Runtime
+
+Production Runtime;
+
+* Executor'dan gelen Event'leri toplar.
+* Gerekli tüm teknik doğrulamaları yapar.
+
+Örneğin:
+
+* Video gerçekten üretildi mi?
+* Asset oluştu mu?
+* Dosya erişilebilir mi?
+* Production Package bütünlüğü sağlandı mı?
+* Delivery teknik olarak mümkün mü?
+
+Production Runtime **karar üretmez.**
+
+Sadece **Decision Request** oluşturur.
+
+---
+
+### 3. HLK Runtime
+
+HLK Runtime sistemin **tek karar otoritesidir** (MASTER-013).
+
+Production Runtime'dan gelen Decision Request'i değerlendirir.
+
+AR-002_80 başta olmak üzere ilgili anayasal maddeleri uygular.
+
+Nihai kararlardan yalnızca HLK Runtime sorumludur.
+
+---
+
+### 4. Constitution Enforcement Engine (CEE)
+
+CEE;
+
+HLK Runtime tarafından üretilen anayasal kararın kurallara uygunluğunu doğrular.
+
+Kararı:
+
+* Onaylayabilir
+* Reddedebilir
+* Yeniden değerlendirilmesini isteyebilir
+
+---
+
+### 5. Package Status Ownership
+
+Package Status;
+
+teknik bir değişken değildir.
+
+Package Status;
+
+HLK Runtime tarafından verilen anayasal kararın kayıt altına alınmış sonucudur.
+
+Bu nedenle Package Status yalnızca aşağıdaki zincir tamamlandıktan sonra güncellenebilir:
+
+```
+Executor                 → Teknik Event yayınlar
+        ↓
+Production Runtime       → Event'leri toplar, doğrular, Decision Request oluşturur
+        ↓
+HLK Runtime              → Anayasal kararı üretir
+        ↓
+CEE Validation           → Kararı denetler, onaylar veya reddeder
+        ↓
+Package Status Update    → Karar kayıt altına alınır
+```
+
+Bu zincir dışında **hiçbir modül** Package Status değiştiremez.
+
+---
+
+### Yasaklar
+
+Aşağıdaki işlemler anayasal olarak yasaktır:
+
+* Executor'ın `COMPLETED` kararı üretmesi
+* Executor'ın `FAILED` kararı üretmesi
+* Executor'ın `PackageStatus` değiştirmesi
+* Runtime dışındaki bileşenlerin Completion kararı vermesi
+* Teknik Event'lerin anayasal karar yerine kullanılması
+
+---
+
+### Temel İlke
+
+**Event bilgi üretir.**
+
+**Runtime değerlendirme yapar.**
+
+**HLK karar verir.**
+
+**CEE doğrular.**
+
+**Package yalnızca kararı kaydeder.**
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | ANA YASA üstünlüğü — yetki zinciri tüm modülleri bağlar |
+| **MASTER** | MASTER-004 | HLK Karar Mekanizması — nihai karar HLK'ya aittir |
+| **MASTER** | MASTER-007 | AI Geliştirici görev ayrımı — Executor uygulayıcıdır, karar verici değil |
+| **MASTER** | MASTER-013 | HLK Runtime tek karar otoritesi |
+| **AR** | AR-002_60 | Constitution Enforcement Engine — CEE karar denetimi |
+| **AR** | AR-002_70 | Production Runtime — tek giriş noktası ve orkestratör |
+| **AR** | AR-002_76 | Production Execution — Executor'un anayasal konumu |
+| **AR** | AR-002_80 | Üretim Kapanış Mimarisi — COMPLETED kararının kriterleri |
+| **AR** | AR-002_85 | Video Üretim Başarı İlkesi — doğrulanmamış başarı yasağı |
+| **AR** | AR-002_86 | Anayasal Yürütme İlkesi — CEE onayı olmadan karar üretilemez |
+
+---
+
+### Beklenen Sonuç
+
+* Executor yalnızca teknik Event yayınlar, asla karar üretmez.
+* Production Runtime yalnızca Decision Request oluşturur, karar vermez.
+* HLK Runtime sistemdeki tek karar otoritesidir.
+* CEE tüm anayasal kararları denetler.
+* Package Status yalnızca anayasal zincir tamamlandıktan sonra güncellenir.
+* Hiçbir modül yetki zincirini atlayarak doğrudan Package Status değiştiremez.
+* Teknik Event ile anayasal karar birbirine karıştırılamaz.
