@@ -7145,3 +7145,128 @@ Tüm sayısal değerler yalnızca Global Configuration parametrelerinden okunur 
 * Yürütme katmanlarındaki tüm sayısal değerler GC parametrelerinden okunur.
 * Constitution Scan Engine, karar üretiminin yalnızca HLK Runtime'da gerçekleştiğini denetleyebilir.
 * Bu protokol; Workflow, Production, Research, Agent, Selection, Delivery, Quality Control, Constitution Enforcement, Feedback Loop ve gelecekte eklenecek tüm modüller için geçerlidir.
+
+---
+
+## AR-002_82
+
+### Başlık
+
+Mission Persistence Architecture (Görevde Israr Mimarisi)
+
+### Amaç
+
+HLK'nın temel görevi, kullanıcı tarafından talep edilen nihai çıktıyı mümkün olan en yüksek başarı olasılığıyla üretmektir.
+
+Bu mimari; HLK'nın ilk başarısızlıkta görevi sonlandırmasını engeller ve anayasal olarak tanımlanmış tüm çözüm yollarını sistematik şekilde değerlendirmesini zorunlu hale getirir.
+
+### Kural
+
+HLK Runtime, kullanıcı tarafından talep edilen nihai çıktı başarıyla üretilmeden "Completed", "Delivered", "Production Completed" veya benzeri başarı kararlarını üretemez.
+
+Her başarısız üretim girişiminden sonra HLK Runtime aşağıdaki anayasal değerlendirme sürecini işletmek zorundadır.
+
+1. Başarısızlığın gerçek nedeni analiz edilir.
+2. Hatanın geçici veya kalıcı olduğu belirlenir.
+3. Problemin çözülebilir olup olmadığı değerlendirilir.
+4. Mission Success olasılığı yeniden değerlendirilir.
+5. Recovery süreci uygulanır.
+6. Uygun görülen anayasal çözüm stratejileri yeniden planlanır.
+7. Gerekli ise farklı Provider, farklı Model veya diğer anayasal mekanizmalar değerlendirilir.
+8. Her karar HLK Runtime tarafından yeniden değerlendirilir ve gerekçelendirilir.
+
+Recovery sürecinin amacı yalnızca yeniden deneme yapmak değildir.
+
+Recovery süreci, kullanıcı tarafından talep edilen nihai çıktıyı üretebilmek için en uygun anayasal stratejiyi belirlemek ve uygulamaktır.
+
+HLK Runtime, yeniden değerlendirme gerektiren veya çözülebilir hata türlerinde, anayasal Recovery Policy kapsamında tanımlanmış çözüm adımlarını uygulamadan bir Provider'ı "Provider Exhausted" durumuna geçiremez.
+
+Bir Provider ancak ilgili anayasal Recovery Policy kapsamında tanımlanmış çözüm yolları tüketildikten sonra "Provider Exhausted" olarak işaretlenebilir.
+
+HLK Runtime;
+
+- ilk başarısızlığı nihai sonuç kabul etmez,
+- kullanıcı hedefini esas alır,
+- anayasal çözüm yollarını değerlendirmeden görevi sonlandıramaz,
+- mümkün olan en yüksek başarı olasılığına ulaşmaya çalışır.
+
+### Tamamlanma Kriteri
+
+Production Completed kararı yalnızca aşağıdaki durumlardan biri gerçekleştiğinde üretilebilir.
+
+- Kullanıcının talep ettiği nihai çıktı başarıyla üretilmiştir.
+
+veya
+
+- Anayasada tanımlanmış tüm ilgili çözüm mekanizmaları anayasal süreçlere uygun şekilde değerlendirilmiş ve HLK Runtime tarafından nihai karar gerekçelendirilmiştir.
+
+Bu durumda üretim, anayasal olarak tanımlanmış uygun durum kodu ile sonlandırılır.
+
+### Beklenen Sonuç
+
+Bu mimari sayesinde;
+
+- HLK erken vazgeçmez.
+- HLK kullanıcı hedefini merkeze alır.
+- Recovery süreci anayasal bir karar mekanizmasına dönüşür.
+- Provider Exhausted kavramı standartlaşır.
+- Recovery ile Mission Success birbirinden ayrılır.
+- "Production Completed" kararı yalnızca anayasal gerekçelerle üretilebilir.
+- HLK'nın temel başarı kriteri çalışan bir süreç değil, kullanıcıya ulaştırılan nihai çıktıdır.
+
+---
+
+## AR-002_83
+
+### Başlık
+
+Recovery Policy Architecture
+
+### Amaç
+
+Recovery Policy'nin amacı, üretim sürecinde meydana gelen başarısızlıkların ardından HLK Runtime'ın sistematik, tutarlı ve anayasal olarak tanımlanmış bir karar süreci uygulamasını sağlamaktır.
+
+Recovery Policy, HLK'nın nasıl yeniden değerlendirme yapacağını, hangi çözüm yollarını hangi koşullarda değerlendireceğini ve bir üretim girişiminin hangi aşamada gerçekten tüketilmiş sayılacağını tanımlar.
+
+### Kural
+
+HLK Runtime, Recovery gerektiren her durumda anayasal Recovery Policy'yi uygulamak zorundadır.
+
+Recovery Policy kapsamında HLK Runtime;
+
+- başarısızlığın nedenini analiz eder,
+- hatanın sınıfını belirler,
+- problemin çözülebilir olup olmadığını değerlendirir,
+- Mission Success olasılığını yeniden değerlendirir,
+- uygun anayasal çözüm stratejilerini belirler,
+- çözüm stratejilerinin uygulanmasına karar verir,
+- her adımı yeniden değerlendirerek üretim sürecini yönetir.
+
+Recovery Policy hiçbir zaman tek bir yeniden deneme mekanizması değildir.
+
+Recovery Policy;
+
+- Retry,
+- Provider değerlendirmesi,
+- Model değerlendirmesi,
+- Prompt değerlendirmesi,
+- Queue değerlendirmesi,
+- Escalation değerlendirmesi,
+- diğer anayasal çözüm mekanizmalarının tamamını kapsayan üst politika katmanıdır.
+
+Recovery Policy kapsamında uygulanacak stratejiler, mevcut koşullar ve anayasal karar mekanizması tarafından belirlenir.
+
+Recovery Policy'nin amacı mümkün olduğu kadar çok işlem yapmak değil, kullanıcı tarafından talep edilen nihai çıktıyı anayasal kurallar çerçevesinde en yüksek başarı olasılığıyla üretebilmektir.
+
+Bir üretim girişiminin veya Provider'ın tüketildiğine ilişkin karar ancak Recovery Policy kapsamında gerekli anayasal değerlendirmeler tamamlandıktan sonra verilebilir.
+
+### Beklenen Sonuç
+
+Bu mimari sayesinde;
+
+- Recovery süreci standartlaşır.
+- Recovery kararları kişisel değil anayasal olur.
+- Recovery mekanizması genişletilebilir hale gelir.
+- Yeni Recovery stratejileri mevcut mimariyi değiştirmeden sisteme eklenebilir.
+- Runtime kararlarının tutarlılığı artar.
+- Mission Persistence ilkesi ile Recovery mekanizması birbirinden ayrılarak mimari sadeleşir.
