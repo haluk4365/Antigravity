@@ -523,6 +523,16 @@ def main():
         )
         logger.info(f"📋 [CEE PRE-CHECK] CTP: {ctp.ctp_id}")
 
+        # AR-002_86: Anayasal Yürütme — pasif anayasa maddesi taraması
+        _passive = constitution_enforcement._scan_passive_rules()
+        if _passive:
+            logger.warning(
+                f"⚠️ [BOOT] PASIF ANAYASA MADDELERI ({len(_passive)} adet): "
+                f"{', '.join(_passive[:10])}"
+            )
+        else:
+            logger.info("✅ [BOOT] Tüm anayasa maddeleri aktif")
+
         # EEC: Bot başlangıç event'i
         execution_event_collector.listen(pid=f"BOT-{_os.getpid()}")
         bot_start_event = execution_event_collector.emit_event(

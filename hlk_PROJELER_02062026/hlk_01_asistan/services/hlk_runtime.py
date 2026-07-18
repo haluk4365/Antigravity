@@ -858,15 +858,17 @@ class HLKRuntime:
             f"Nihai video: {'mevcut' if video else 'mevcut değil'}",
             f"Başarısız task sayısı: {failed_tasks}",
         ]
-        if failed_tasks == 0 and delivered:
+        if failed_tasks == 0 and delivered and video:
             justifications.append("Anayasal kapanış kriterleri sağlandı (AR-002_80)")
+            completion_success = True
         else:
             justifications.append(
                 "Eksiklikler Event kayıtlarında raporlandı; kapanış "
                 "AR-002_79/80 kapsamında değerlendirildi"
             )
+            completion_success = False
         return self._new_decision(
-            request, "CONFIRM_COMPLETION", {"success": True},
+            request, "CONFIRM_COMPLETION", {"success": completion_success},
             justifications,
         )
 

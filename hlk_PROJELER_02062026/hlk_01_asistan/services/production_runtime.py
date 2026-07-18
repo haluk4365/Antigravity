@@ -262,7 +262,13 @@ class ProductionRuntime:
                 elapsed = time.time() - start_time
                 self._state = ProductionState.COMPLETED
                 self._result.state = ProductionState.COMPLETED.value
-                self._result.success = True
+                # AR-002_85: başarı kararı yalnızca doğrulanmış sonuçlardan
+                # hesaplanır — executor raporu başarısız task içermemeli.
+                _exec_failed = (
+                    executor_report.get("failed_tasks", 0)
+                    if isinstance(executor_report, dict) else 0
+                )
+                self._result.success = _exec_failed == 0
                 self._result.duration_seconds = elapsed
                 self._result.completed_at = datetime.now(timezone.utc).isoformat()
 
@@ -676,7 +682,13 @@ class ProductionRuntime:
 
                 self._state = ProductionState.COMPLETED
                 self._result.state = ProductionState.COMPLETED.value
-                self._result.success = True
+                # AR-002_85: başarı kararı yalnızca doğrulanmış sonuçlardan
+                # hesaplanır — executor raporu başarısız task içermemeli.
+                _exec_failed_rec = (
+                    executor_report.get("failed_tasks", 0)
+                    if isinstance(executor_report, dict) else 0
+                )
+                self._result.success = _exec_failed_rec == 0
                 self._result.completed_at = datetime.now(timezone.utc).isoformat()
 
                 logger.info(f"✅ [Production] Recovery tamamlandı: {pid}")
@@ -1109,10 +1121,23 @@ class ProductionRuntime:
                 "verdict": cee_report.verdict.value,
             }
 
-            if failed or not pipeline_success:
+            # AR-002_86: CEE ihlalleri de başarıyı engeller
+            cee_blocked = (
+                cee_report.verdict.value == "FAIL"
+                or len(cee_report.violations) > 0
+            )
+            if failed or not pipeline_success or cee_blocked:
                 # Başarısızlık: durum + anayasal gerekçe bildirilir (Adım 21)
                 errors = report_dict.get("errors", [])
-                if not pipeline_success and not failed:
+                if cee_blocked and not failed:
+                    _cee_desc = "; ".join(
+                        v.get("description", "") for v in cee_report.violations[:3]
+                    )
+                    error_msg = (
+                        f"CEE anayasal ihlal tespit etti: {_cee_desc}"
+                        if _cee_desc else "CEE POST-CHECK FAIL (AR-002_86)"
+                    )
+                elif not pipeline_success and not failed:
                     error_msg = (
                         "Video teslimi gerceklesmedi — gorsel/ses saglayici "
                         "basarisiz veya video uretilemedi (AR-002_84)"
@@ -1189,13 +1214,16 @@ class ProductionRuntime:
                 },
             ))
             completion_success = bool(
-                completion_decision.params.get("success", True)
+                completion_decision.params.get("success", False)
             )
 
             # ── Adım 21: Telegram bildirimi (Yönetici + Kullanıcı) ──────
+            # AR-002_85: başarı kararı yalnızca doğrulanmış gerçek
+            # sonuçlardan hesaplanır — sabit değer kullanılamaz.
+            reproduction_success = ctx.delivered and bool(ctx.video_path)
             await self._notify_reproduction_result(
                 pid, bot, admin_chat_id, int(user_chat_id),
-                success=True, product_name=request.product_name,
+                success=reproduction_success, product_name=request.product_name,
             )
 
             elapsed = time.time() - start_time
@@ -1957,13 +1985,15 @@ class ProductionRuntime:
                     },
                 ))
                 completion_success = bool(
-                    completion_decision.params.get("success", True)
+                    completion_decision.params.get("success", False)
                 )
             except Exception as e:
                 logger.warning(
                     f"⚠️ [ProductionRuntime] COMPLETION kararı alınamadı: {e}"
                 )
-                completion_success = True
+                # AR-002_85: doğrulanmamış başarı kararı üretilemez.
+                # COMPLETION kararı alınamazsa varsayılan başarısızlıktır.
+                completion_success = False
 
             elapsed = time.time() - start_time
             self._state = ProductionState.COMPLETED

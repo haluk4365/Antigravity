@@ -7482,3 +7482,247 @@ Bu mimari;
 * Teknik kararların tamamı HLK Runtime tarafından alınır.
 * Üretim sonucu Telegram üzerinden hem Yöneticiye hem de ilgili Kullanıcıya otomatik olarak bildirilir.
 * Mevcut anayasal mimari korunur.
+
+---
+
+## AR-002_85
+
+### Madde Adı
+
+**VİDEO ÜRETİM BAŞARI İLKESİ**
+
+### Kural
+
+HLK;
+
+gerçekte doğrulanmamış hiçbir video üretimini;
+
+* başarı olarak değerlendiremez,
+* tamamlandı olarak işaretleyemez,
+* teslim edildi olarak kaydedemez,
+* kullanıcıya veya yöneticiye gerçekleşmiş gibi bildiremez.
+
+Bu anayasa maddesi;
+
+* İlk Video Üretimi
+* Yeniden Üretim
+* Devam Ettirme
+* Tekrar Deneme
+* Toplu Üretim
+* Gelecekte eklenecek bütün video üretim süreçleri
+
+için zorunludur.
+
+Hiçbir modül, servis, workflow, runtime, handler veya ajan bu anayasa maddesini ihlal edemez.
+
+---
+
+### BAŞARI KARARI
+
+HLK;
+
+aşağıdaki doğrulamaların **tamamı** başarıyla sonuçlanmadan;
+
+* Üretim Tamamlandı
+* Video Hazır
+* Teslim Edildi
+* Başarıyla Tamamlandı
+
+kararlarından hiçbirini oluşturamaz.
+
+---
+
+### ZORUNLU DOĞRULAMALAR
+
+HLK başarı kararı vermeden önce aşağıdaki durumları doğrulamak zorundadır.
+
+1. Video dosyası gerçekten oluşturulmuştur.
+2. Video dosyası fiziksel olarak mevcuttur.
+3. Video dosyası okunabilmektedir.
+4. Video dosyası geçerli bir video dosyasıdır.
+5. Production Package video bilgisi başarıyla güncellenmiştir.
+6. Teslim işlemi gerçekten gerçekleştirilmiştir.
+7. Teslim işlemi başarıyla sonuçlanmıştır.
+8. İlgili olay kayıtları eksiksiz oluşturulmuştur.
+9. Constitution Enforcement Engine başarı kararını onaylamıştır.
+
+Yukarıdaki doğrulamalardan herhangi biri başarısız ise;
+
+HLK başarı kararı üretemez.
+
+---
+
+### YASAK
+
+Kod içerisinde;
+
+* `success=True`
+* `başarı=True`
+
+veya benzeri sabit başarı değerleri kullanılamaz.
+
+Başarı kararı;
+
+yalnızca doğrulanmış gerçek sonuçlardan hesaplanabilir.
+
+Hiçbir modül HLK'ya doğrulanmamış başarı bilgisi gönderemez.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | ANA YASA üstünlüğü — bu kural tüm modülleri bağlar |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — kod bu kurala uygun olmalı |
+| **MASTER** | MASTER-004 | HLK Karar Mekanizması — başarı kararı yalnızca HLK'ya aittir |
+| **MASTER** | MASTER-007 | AI Geliştirici görev ayrımı — PASS/FAIL kararı HLK/CEE'dedir |
+| **MASTER** | MASTER-013 | HLK Runtime tek karar otoritesi — başarı bildirimi HLK kararıdır |
+| **AR** | AR-002_70 | Production Runtime tek giriş noktası |
+| **AR** | AR-002_76 | Production Execution — checkpoint'li yürütme ve sonuç doğrulama |
+| **AR** | AR-002_79 | Üretim Sürekliliği — başarısızlık sonrası doğru durum |
+| **AR** | AR-002_80 | Üretim Kapanış Mimarisi — tamamlanma kriterleri |
+| **AR** | AR-002_84 | Yönetici Yeniden Üretim Prosedürü |
+| **CEE** | CEE-001 | Fake Progress yasağı |
+| **CEE** | CEE-006 | Kendi Kendine Düzeltme Kuralı |
+
+---
+
+### Beklenen Sonuç
+
+* HLK yalnızca doğrulanmış video üretimlerini başarı olarak değerlendirir.
+* Hiçbir kod yolu doğrulanmamış başarı üretemez.
+* `success=True` gibi sabit değerler kod tabanından tamamen kaldırılmıştır.
+* Tüm başarı kararları gerçek dosya varlığı, teslimat onayı ve CEE denetiminden geçer.
+* Kullanıcıya veya Yöneticiye yanlış "teslim edildi" bildirimi gitmesi teknik olarak imkânsızdır.
+
+---
+
+## AR-002_86
+
+### Madde Adı
+
+**ANAYASAL YÜRÜTME İLKESİ**
+
+### Kural
+
+HLK Anayasası pasif bir doküman değildir.
+
+HLK Anayasasının bütün maddeleri;
+
+uygulanabildiği ölçüde,
+
+HLK tarafından otomatik olarak yürütülmek zorundadır.
+
+Yeni eklenen hiçbir anayasa maddesi yalnızca dokümanda kalamaz.
+
+Her yeni anayasa maddesi;
+
+* Constitution Scan Engine,
+* Constitution Enforcement Engine,
+* Constitution Diff Engine,
+* Runtime,
+* Workflow,
+
+ve ilgili anayasal bileşenler tarafından uygulanabilir hale getirilmek zorundadır.
+
+Uygulanmayan anayasa maddesi;
+
+**"Pasif Anayasa Maddesi"**
+
+olarak değerlendirilir.
+
+Pasif anayasa maddeleri anayasal eksiklik kabul edilir.
+
+HLK Runtime;
+
+yalnızca Constitution Enforcement Engine tarafından anayasal olarak onaylanan kararları uygulayabilir.
+
+Anayasal olarak uygulanmayan hiçbir karar;
+
+* Başarılı
+* Tamamlandı
+* Teslim Edildi
+* Kullanıcı Bildirimi
+* Yönetici Bildirimi
+
+oluşturamaz.
+
+---
+
+### Anayasal Yürütme Zinciri
+
+HLK içerisinde anayasal yürütme aşağıdaki zincirle sağlanır:
+
+```
+ANA YASA Maddesi
+    ↓
+Constitution Scan Engine (CSE)        — kuralı tanır, koda eşler
+    ↓
+Constitution Diff Engine (CDE)        — değişiklikleri izler, etki analizi yapar
+    ↓
+Constitution Enforcement Engine (CEE) — ihlalleri tespit eder, engeller
+    ↓
+Runtime                               — yalnızca onaylı kararları uygular
+```
+
+Bu zincirdeki herhangi bir halka kopuksa;
+
+ilgili anayasa maddesi **Pasif** kabul edilir.
+
+---
+
+### Anayasal Durum Sınıflandırması
+
+Her anayasa maddesi aşağıdaki durumlardan birinde olmalıdır:
+
+| Durum | Tanım | Koşul |
+|---|---|---|
+| **AKTİF** | Kural CEE tarafından runtime'da denetleniyor | CEE detect_violations bu kuralı kapsar |
+| **KISMEN AKTİF** | Kural tanımlı ancak denetim eksik | CEE kısmen kapsar veya manuel denetim gerekir |
+| **PASİF** | Kural yalnızca dokümanda var | Hiçbir runtime denetimi yok |
+
+---
+
+### Zorunlu Anayasal Tarama
+
+HLK;
+
+* Her yeni anayasa maddesi eklendiğinde,
+* Her Runtime başlangıcında,
+* Her Production başlangıcında,
+* Her Reproduction başlangıcında
+
+Constitution Scan Engine'i çalıştırarak bütün anayasa maddelerinin durumunu değerlendirir.
+
+Pasif anayasa maddeleri tespit edilirse;
+
+* Production başlatılmaz (güvenli varsayılan).
+* Yöneticiye anayasal eksiklik bildirimi yapılır.
+* Eksiklik giderilene kadar sistem kısıtlı modda çalışır.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | ANA YASA üstünlüğü — yürütme bu üstünlüğün teknik karşılığıdır |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — yürütme olmadan uyumluluk sağlanamaz |
+| **MASTER** | MASTER-004 | HLK Karar Mekanizması — kararlar anayasal denetimden geçer |
+| **MASTER** | MASTER-011 | Runtime Aktiflik — anayasa maddeleri de runtime'da aktif olmalı |
+| **MASTER** | MASTER-013 | HLK Runtime tek karar otoritesi — CEE onayı olmadan karar üretilemez |
+| **AR** | AR-002_60 | Constitution Enforcement Engine — anayasal denetimin teknik uygulayıcısı |
+| **AR** | AR-002_62 | Constitutional Boot Chain — sistem başlangıcında anayasal doğrulama |
+| **AR** | AR-002_85 | Video Üretim Başarı İlkesi — doğrulanmamış başarı yasağı |
+
+---
+
+### Beklenen Sonuç
+
+* HLK Anayasası yalnızca doküman değil, aktif yürütme sistemidir.
+* Her anayasa maddesi CEE/CSE/CDE tarafından denetlenir.
+* Pasif anayasa maddesi kalmaz.
+* Anayasa ihlalleri insan müdahalesi olmadan tespit edilir ve engellenir.
+* HLK Runtime yalnızca CEE onaylı kararları uygular.
+* Anayasa dışı hiçbir "Başarılı", "Tamamlandı", "Teslim Edildi" kararı üretilemez.
