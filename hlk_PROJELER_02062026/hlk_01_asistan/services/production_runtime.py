@@ -829,9 +829,23 @@ class ProductionRuntime:
         # ── Adım 1: PID doğrulama (AR-002_57) ────────────────────────────
         pid_valid = await pid_runtime.validate(pid)
         if not pid_valid.is_valid:
-            return await self._reject_reproduction(
-                pid, bot, admin_chat_id,
-                reason=f"PID dogrulanamadi: {pid_valid.error}",
+            # AR-002_84: PID formatı geçerliyse registry kaydı olmasa da
+            # yeniden üretime izin ver — paket diskte mevcut olabilir,
+            # pid_runtime_state.json kaybı/pasifliği bloğa sebep olmamalı.
+            checks = getattr(pid_valid, "checks", {})
+            if not (
+                checks.get("format_valid")
+                and checks.get("date_valid")
+                and checks.get("sequence_valid")
+            ):
+                return await self._reject_reproduction(
+                    pid, bot, admin_chat_id,
+                    reason=f"PID dogrulanamadi: {pid_valid.error}",
+                )
+            # Format/date/sequence geçerli → registry eksikliğini logla, devam et
+            logger.warning(
+                f"⚠️ [Reproduction] PID registry kaydı eksik ancak format "
+                f"geçerli — diskten yüklenerek devam ediliyor: {pid}"
             )
 
         # ── Adım 2-10: Anayasal kayıtların yüklenmesi (AR-002_72/73) ────
