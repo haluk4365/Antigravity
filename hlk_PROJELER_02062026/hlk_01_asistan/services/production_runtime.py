@@ -1079,7 +1079,11 @@ class ProductionRuntime:
             failed = report_dict.get("failed_tasks", 0)
 
             # ── CEE POST-CHECK ───────────────────────────────────────────
-            pipeline_success = ctx.delivered or failed == 0
+            # AR-002_84: yalnızca gerçek video teslimi başarı sayılır.
+            # failed==0 tek başına yeterli değildir — task'lar tamamlansa
+            # bile video üretilmemiş olabilir (örn. görsel sağlayıcı
+            # reddettiğinde VideoRenderer atlanır).
+            pipeline_success = ctx.delivered and bool(ctx.video_path)
             cee_report = constitution_enforcement.enforce_post_check(
                 pid=pid,
                 decision_packet=request.user_data.get("decision_packet", {}),
@@ -1091,17 +1095,26 @@ class ProductionRuntime:
                 "verdict": cee_report.verdict.value,
             }
 
-            if failed:
+            if failed or not pipeline_success:
                 # Başarısızlık: durum + anayasal gerekçe bildirilir (Adım 21)
                 errors = report_dict.get("errors", [])
+                if not pipeline_success and not failed:
+                    error_msg = (
+                        "Video teslimi gerceklesmedi — gorsel/ses saglayici "
+                        "basarisiz veya video uretilemedi (AR-002_84)"
+                    )
+                else:
+                    error_msg = "; ".join(errors) or f"{failed} task başarısız"
                 return await self._handle_reproduction_failure(
                     pid, bot, admin_chat_id,
-                    error="; ".join(errors) or f"{failed} task başarısız",
+                    error=error_msg,
                     state=ProductionState.FAILED,
                     user_chat_id=int(user_chat_id),
                     justifications=[
                         f"{failed} task başarısız (AR-002_76 Execution Result)",
                         *errors[:3],
+                    ] if failed else [
+                        "Video teslimi gerceklesmedi (AR-002_84 Adim 18/19)",
                     ],
                 )
 

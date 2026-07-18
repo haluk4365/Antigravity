@@ -631,10 +631,13 @@ async def task_delivery(task: dict, pid: str) -> dict:
         )
         logger.info(f"✅ [Production] BILGILENDIRME: {pid}")
 
-    ctx.delivered = True  # Teknik sonuç kaydı — karar değildir (AR-002_76 Adım 6)
+    # Yalnızca gerçek video teslimi yapıldıysa delivered=True
+    # (DELIVER_INFO metin bildirimi teslim sayılmaz — AR-002_84)
+    if delivery_decision.verdict == "DELIVER_VIDEO":
+        ctx.delivered = True  # Teknik sonuç kaydı — karar değildir (AR-002_76 Adım 6)
     return {
         "task_id": task.get("task_id"),
-        "delivered": True,
+        "delivered": delivery_decision.verdict == "DELIVER_VIDEO",
         "video": bool(ctx.video_path),
     }
 
