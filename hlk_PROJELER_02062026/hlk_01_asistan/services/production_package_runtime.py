@@ -846,6 +846,16 @@ class ProductionPackageRuntime:
             if package is not None:
                 return package
 
+        # PID formatı geçerli ancak registry'de kayıtlı değilse de
+        # diskten yüklemeyi dene — paket mevcut olabilir, PID state
+        # kaydı silinmiş veya pasif olabilir (AR-002_84 yeniden üretim).
+        if not pid_validation.is_valid and pid_validation.checks.get(
+            "format_valid"
+        ):
+            package = await self.load(query_clean)
+            if package is not None:
+                return package
+
         # Adım 2: Ürün adı / marka / senaryo başlığında ara
         query_lower = query_clean.lower()
         candidates: list[tuple[ProductionPackage, str]] = []
