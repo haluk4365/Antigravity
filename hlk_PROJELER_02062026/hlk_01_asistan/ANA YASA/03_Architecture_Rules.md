@@ -6000,15 +6000,24 @@ Bu Event'ler:
 * EEC tarafından toplanır (22_EXECUTION_EVENT_COLLECTOR.md),
 * LAC üzerinden gerçek zamanlı izlenebilir (FEAT-015).
 
-**Adım 5 — Üretim Çıktılarının Kaydedilmesi**
+**Adım 5 — Teknik Çıktıların Kaydedilmesi**
 
-Executor, üretim çıktılarını ilgili Production Package'e kaydeder.
+Executor, yürütme sonucunda oluşan teknik çıktıları Production Package'e kaydeder.
 
-Çıktılar:
+Executor'un kaydedebileceği teknik çıktılar:
 
-* Production Package'in ilgili bölümlerine yazılır (16_PRODUCTION_PACKAGE_STANDARD.md),
-* PID ile ilişkilendirilir,
-* Task Package altında saklanır (AR-002_74).
+* Task yürütme sonuçları (task status, duration, output),
+* Oluşturulan dosyaların referansları (görsel, ses, video yolu),
+* Execution Event'leri (EEC standardına uygun),
+* Task checkpoint kayıtları.
+
+Executor'un kaydedemeyeceği:
+
+* **PackageStatus (COMPLETED, FAILED, vb.)** — bu bir anayasal karardır (AR-002_88),
+* **Decision History** — bu HLK Runtime kararlarının kaydıdır,
+* **Production kararları** (RETRY, RESUME, REPLAY, vb.).
+
+Executor yalnızca teknik veri yazar; anayasal karar kaydetmez.
 
 **Adım 6 — Execution Result'ın Oluşturulması**
 
@@ -6017,6 +6026,10 @@ Executor, yürütme sonucunda bir Execution Result oluşturur.
 Execution Result en az aşağıdaki bilgileri içermelidir:
 
 * status: SUCCESS / FAILED / TIMEOUT / PARTIAL (AR-002_22)
+  Bu status'lar yalnızca task yürütme sonucunu belirtir; üretim kararı değildir.
+  SUCCESS = task teknik olarak tamamlandı (çıktı kalitesi garantisi yoktur).
+  FAILED  = task teknik olarak başarısız (exception, timeout).
+  Bu status'lar Production COMPLETED/FAILED kararı ile karıştırılamaz (AR-002_88).
 * output: Görev çıktısı
 * duration_ms: Görev süresi
 * error_detail: Hata detayı (FAILED/TIMEOUT ise)
@@ -6038,14 +6051,14 @@ Feedback Loop, Execution Result'ı alır ve değerlendirir:
 
 Üretim sırasında oluşan durumlar, ilgili Event sistemi üzerinden kayıt altına alınmalıdır (AR-002_73):
 
-| Durum | Execution Result Status | Event Kaydı | Sonraki Adım |
+| Task Sonucu | Execution Result Status | Teknik Event | Sonraki İşlem |
 |---|---|---|---|
-| **Başarı** | SUCCESS | Tamamlanma Event'i | Feedback Loop → normal akış |
-| **Başarısızlık** | FAILED | Başarısızlık Event'i | Feedback Loop → neden analizi |
-| **Timeout** | TIMEOUT | Timeout Event'i | AR-002_7 → alternatif Agent/servis |
-| **İptal** | CANCELLED | İptal Event'i | STATE_SESSION_CLOSED |
-| **Kısmi Tamamlama** | PARTIAL | Kısmi tamamlanma Event'i | Feedback Loop → eksik kısım için ek karar |
-| **Servis Değişikliği** | — | AGENT_REPLACED Event'i | AR-002_21 → yeni servis seçimi |
+| **Task tamamlandı** | SUCCESS | TASK_COMPLETED | Feedback Loop'a iletilir — değerlendirme HLK'ya aittir |
+| **Task başarısız** | FAILED | TASK_FAILED | Feedback Loop'a iletilir — neden analizi HLK'ya aittir |
+| **Task timeout** | TIMEOUT | TASK_TIMEOUT | Feedback Loop'a iletilir — AR-002_7 alternatif değerlendirmesi |
+| **Task iptal** | CANCELLED | TASK_CANCELLED | Feedback Loop'a iletilir |
+| **Task kısmi** | PARTIAL | TASK_PARTIAL | Feedback Loop'a iletilir — eksik kısım HLK kararına bağlı |
+| **Task servis değişimi** | — | PROVIDER_SWITCHED | AR-002_21 → HLK Runtime PROVIDER_SWITCH kararı |
 
 Tüm bu Event'ler:
 

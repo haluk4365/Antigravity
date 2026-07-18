@@ -113,21 +113,45 @@ STATE_VIDEO_PRODUCTION Girişi
     ↓
 PID Oluşturulur (AR-002_57)
     ↓
-Production Package Oluşturulur
+Production Package Oluşturulur → PackageStatus: CREATED
     ↓
 EVENT_PRODUCTION_PACKAGE_CREATED
     ↓
 Task Package'ler Oluşturulur (AR-002_47)
     ↓
-Agent'lar Görevlendirilir
+Agent'lar Görevlendirilir → PackageStatus: BUILDING
     ↓
-Video Üretimi Gerçekleşir
+Video Üretimi Gerçekleşir → PackageStatus: PRODUCING
     ↓
-Kalite Kontrol Yapılır
+**Executor:** Teknik Event'ler yayınlar (TASK_COMPLETED, EXECUTION_FINISHED)
+    ↓
+**Production Runtime:** Teknik doğrulamaları yapar, Decision Request oluşturur
+    ↓
+**HLK Runtime:** COMPLETION kararı (AR-002_80 kapanış kriterleri)
+    ↓
+**CEE:** Kararı denetler, onaylar veya reddeder
+    ↓
+**PackageStatus:** COMPLETED veya FAILED ← YALNIZCA bu zincirle güncellenir (AR-002_88)
     ↓
 Nihai Video Teslim Edilir
     ↓
-Production Package Arşivlenir
+Production Package Arşivlenir → PackageStatus: ARCHIVED
+
+**Package Status Güncelleme Zinciri (AR-002_88):**
+
+```
+Executor               → Teknik Event (TASK_COMPLETED, EXECUTION_FINISHED)
+    ↓
+Production Runtime     → Event'leri toplar, doğrular, Decision Request oluşturur
+    ↓
+HLK Runtime            → COMPLETION kararı
+    ↓
+CEE                    → Kararı onaylar/reddeder
+    ↓
+Package Status Update  ← Yalnızca bu zincir tamamlandığında
+```
+
+Bu zincir dışında hiçbir modül PackageStatus değiştiremez.
 ```
 
 ---
