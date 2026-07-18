@@ -15,6 +15,7 @@ class Settings:
     ENV: str = _ENV
     TELEGRAM_TOKEN: str = _TELEGRAM_TOKEN_TEST if _ENV == "test" else _TELEGRAM_TOKEN_PROD
     TELEGRAM_ALLOWED_USERS: str = os.getenv("TELEGRAM_ALLOWED_USERS", "*")
+    TELEGRAM_ADMIN_USER_ID: str = os.getenv("TELEGRAM_ADMIN_USER_ID", "")
 
     # Kie AI
     KIE_AI_API_KEY: str = os.getenv("KIE_AI_API_KEY", "")
@@ -47,3 +48,9 @@ class Settings:
     def is_user_allowed(self) -> bool:
         """Tüm kullanıcılar izin verili mi?"""
         return self.TELEGRAM_ALLOWED_USERS == "*"
+
+    def is_admin(self, user_id: str | int) -> bool:
+        """Kullanıcı yönetici mi? TELEGRAM_ADMIN_USER_ID tanımlı değilse herkes yönetici kabul edilmez."""
+        if not self.TELEGRAM_ADMIN_USER_ID:
+            return False
+        return str(user_id) == str(self.TELEGRAM_ADMIN_USER_ID)

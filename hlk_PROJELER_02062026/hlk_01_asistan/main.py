@@ -133,6 +133,12 @@ from handlers.website import handle_scenario_approve, handle_scenario_reject
 from handlers.website import handle_pricing_approve, handle_pricing_reject, handle_payment_declared, handle_payment_cancel
 from handlers.website import handle_admin_pricing_submit, handle_admin_payment_approve, handle_admin_payment_ret
 from handlers.website import handle_brief_approve, handle_brief_edit, handle_brief_edit_field
+# AR-002_84: Yönetici Yeniden Üretim Prosedürü (yalnızca Yönetici)
+from handlers.yeniden_uretim import (
+    handle_yeniden_uretim_command,
+    handle_yeniden_uretim_onay,
+    handle_yeniden_uretim_iptal,
+)
 
 # Dil destegi dogrulama (AR-002_37 / dil senkron)
 from handlers.start import validate_language_support
@@ -286,6 +292,8 @@ def main():
     app.add_handler(CommandHandler("audit", handle_audit_command))
     app.add_handler(CommandHandler("constitution", handle_constitution_command))
     app.add_handler(CommandHandler("rules", handle_rules_command))
+    # AR-002_84: Yönetici Yeniden Üretim Prosedürü (yalnızca Yönetici)
+    app.add_handler(CommandHandler("yeniden", handle_yeniden_uretim_command))
 
     # ── Callback Handlers (Inline Butonlar) ──
     # FD-008_1 Sahne geçişleri için callback handler'ları
@@ -397,6 +405,13 @@ def main():
     ))
     app.add_handler(CallbackQueryHandler(
         handle_admin_payment_ret, pattern="^admin_odeme_ret$"
+    ))
+    # AR-002_84: Yönetici Yeniden Üretim Prosedürü onay/iptal callback'leri
+    app.add_handler(CallbackQueryHandler(
+        handle_yeniden_uretim_onay, pattern="^reprod_onay:"
+    ))
+    app.add_handler(CallbackQueryHandler(
+        handle_yeniden_uretim_iptal, pattern="^reprod_iptal:"
     ))
 
     # ── Message Handler (SE-007_3: State tabanlı yönlendirme) ──

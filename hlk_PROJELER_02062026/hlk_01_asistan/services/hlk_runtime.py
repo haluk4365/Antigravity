@@ -98,6 +98,7 @@ class DecisionCategory(str, Enum):
     DELIVERY = "DELIVERY"                      # Teslim şekli + kullanıcı mesajı
     COMPLETION = "COMPLETION"                  # Tamamlanma kararı (AR-002_80)
     USER_NOTIFICATION = "USER_NOTIFICATION"    # Süreç kararı içeren bildirim
+    REPRODUCTION = "REPRODUCTION"              # Yeniden üretim prosedürü (AR-002_82/83)
     AMBIGUITY = "AMBIGUITY"                    # Tereddüt — karar üretilemeyen durum
 
 
@@ -571,6 +572,7 @@ class HLKRuntime:
             DecisionCategory.DELIVERY.value: self._decide_delivery,
             DecisionCategory.COMPLETION.value: self._decide_completion,
             DecisionCategory.USER_NOTIFICATION.value: self._decide_user_notification,
+            DecisionCategory.REPRODUCTION.value: self._decide_reproduction,
             DecisionCategory.AMBIGUITY.value: self._decide_ambiguity,
         }
         decider = deciders.get(request.category, self._decide_ambiguity)
@@ -950,9 +952,225 @@ class HLKRuntime:
                 ],
             )
 
+        # ── Yeniden Üretim Prosedürü bildirimleri (AR-002_84) ────────────
+        # Yönetici Yeniden Üretim Prosedürüne ait tüm süreç mesajları
+        # yalnızca HLK Runtime kararı ile üretilir (MASTER-013, OR-004_12).
+
+        if kind == "reproduction_not_found":
+            # İstisna akışı: PID doğrulanamadı veya Production Package yok.
+            query = ctx.get("query", "")
+            reason = ctx.get("reason", "PID dogrulanamadi veya Production Package bulunamadi")
+            text = (
+                f"⛔ <b>Yeniden uretim proseduru baslatilamadi.</b>\n\n"
+                f"🔎 Sorgu: <code>{query}</code>\n"
+                f"📋 Anayasal gerekce: {reason} (AR-002_57, AR-002_84).\n\n"
+                f"<i>Islem guvenli sekilde sonlandirildi; hicbir uretim baslatilmadi.</i>"
+            )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    "AR-002_84 İstisna Akışı: PID/Package doğrulanamadığında "
+                    "prosedür başlatılmaz, Yönetici gerekçesiyle bilgilendirilir",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
+        if kind == "reproduction_rejected":
+            # REPRODUCTION kararı REJECT — gerekçeler karar kaydından gelir.
+            reasons = ctx.get("justifications", []) or ["Gerekce kaydi bulunamadi"]
+            reason_lines = "\n".join(f"• {r}" for r in reasons)
+            text = (
+                f"⛔ <b>Yeniden uretim proseduru reddedildi.</b>\n\n"
+                f"📋 PID: <code>{pid}</code>\n"
+                f"<b>HLK Runtime karar gerekcesi:</b>\n{reason_lines}\n\n"
+                f"<i>Islem guvenli sekilde sonlandirildi (MASTER-013, AR-002_84).</i>"
+            )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    "REPRODUCTION kararı REJECT — Yönetici anayasal gerekçeyle "
+                    "bilgilendirilir (AR-002_84, 15_KARAR_GEREKCESI_STANDARDI.md)",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
+        if kind == "reproduction_started":
+            # Yönetici onayı sonrası prosedür başlangıç bildirimi.
+            procedure = ctx.get("procedure", "")
+            text = (
+                f"🔄 <b>Yeniden uretim proseduru baslatildi.</b>\n\n"
+                f"📋 PID: <code>{pid}</code>\n"
+                f"⚙️ HLK Runtime karari: <b>{procedure}</b>\n\n"
+                f"Uretim tamamlandiginda sonuc otomatik olarak bildirilecektir.\n"
+                f"<i>Tum teknik kararlar HLK Runtime tarafindan yonetilmektedir "
+                f"(MASTER-013).</i>"
+            )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    f"REPRODUCTION kararı ({procedure}) uygulanmak üzere onaylandı "
+                    "(AR-002_82, AR-002_83, AR-002_84)",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
+        if kind == "reproduction_completed":
+            # Adım 21: Üretim sonucu bildirimi — Yönetici ve Kullanıcı.
+            audience = ctx.get("audience", "admin")
+            product_name = ctx.get("product_name", "urununuz")
+            if audience == "user":
+                text = (
+                    f"✅ <b>Uretiminiz tamamlandi!</b>\n\n"
+                    f"<b>{product_name}</b> icin yeniden baslatilan video uretimi "
+                    f"basariyla tamamlandi ve cikti tarafiniza teslim edildi. 🎬\n\n"
+                    f"<i>HLK AI Reklam Asistani</i>"
+                )
+            else:
+                text = (
+                    f"✅ <b>Yeniden uretim proseduru basariyla tamamlandi.</b>\n\n"
+                    f"📋 PID: <code>{pid}</code>\n"
+                    f"📦 Urun: <b>{product_name}</b>\n"
+                    f"🎬 Ciktilar ilgili kullaniciya teslim edildi ve Production "
+                    f"Package ile iliskilendirildi (surum gecmisi korundu).\n\n"
+                    f"<i>AR-002_80 kapanis kriterleri HLK Runtime tarafindan "
+                    f"dogrulandi.</i>"
+                )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    "AR-002_84 Adım 21: Üretim sonucu Yöneticiye ve ilgili "
+                    "Kullanıcıya anayasal bildirim kurallarıyla iletilir",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
+        if kind == "reproduction_failed":
+            # Adım 21 (başarısızlık): durum + anayasal karar gerekçesi bildirilir.
+            audience = ctx.get("audience", "admin")
+            error = ctx.get("error", "ayrinti yok")
+            reasons = ctx.get("justifications", [])
+            if audience == "user":
+                text = (
+                    f"⚠️ <b>Uretim yeniden denendi ancak tamamlanamadi.</b>\n\n"
+                    f"📋 PID: <code>{pid}</code>\n"
+                    f"Yoneticimiz bilgilendirildi; uretiminiz anayasal kurallar "
+                    f"cercevesinde yeniden degerlendirilecektir.\n"
+                    f"<i>HLK AI Reklam Asistani</i>"
+                )
+            else:
+                reason_lines = "\n".join(f"• {r}" for r in reasons) if reasons else f"• {error}"
+                text = (
+                    f"❌ <b>Yeniden uretim proseduru basarisiz oldu.</b>\n\n"
+                    f"📋 PID: <code>{pid}</code>\n"
+                    f"🧾 Uretim durumu: <b>FAILED</b>\n"
+                    f"<b>Anayasal karar gerekcesi:</b>\n{reason_lines}\n\n"
+                    f"<i>Kayitlar Production Package, Olay Kayit Merkezi ve "
+                    f"Decision History uzerinden incelenebilir (AR-002_84).</i>"
+                )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    "AR-002_84 Adım 21: Başarısız üretim durumu ve anayasal karar "
+                    "gerekçesi bildirilir (EEC-001: Fake Progress yasağı)",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
         return self._new_decision(
             request, "HOLD", {"action": "NONE"},
             [f"Tanımsız bildirim türü: {kind}"],
+        )
+
+    def _decide_reproduction(self, request: DecisionRequest) -> RuntimeDecision:
+        """REPRODUCTION: Yönetici tarafından başlatılan yeniden üretim prosedürü.
+
+        AR-002_82 Mission Persistence Architecture ve AR-002_83 Recovery Policy
+        uyarınca HLK Runtime, mevcut Production Package durumunu analiz ederek
+        uygun yeniden üretim prosedürünü belirler.
+
+        Karar vericidir; yürütme katmanı bu kararı değiştirmeden uygular.
+        """
+        ctx = request.context
+        pid = request.pid or ctx.get("pid", "PID-UNKNOWN")
+        package_status = str(ctx.get("package_status", "")).upper()
+        failed_tasks = int(ctx.get("failed_tasks", 0))
+        completed_tasks = int(ctx.get("completed_tasks", 0))
+        total_tasks = int(ctx.get("total_tasks", 0))
+        last_error = ctx.get("last_error", "")
+        failed_step = ctx.get("failed_step", "")
+        hlk_active = ctx.get("hlk_runtime_active", False)
+
+        # Anayasal ön koşul: HLK Runtime aktif olmalı
+        if not hlk_active:
+            return self._new_decision(
+                request, "REJECT", {"action": "NONE"},
+                [
+                    "HLK Runtime aktif değil — Constitutional Boot Chain tamamlanmamış",
+                    "Yeniden üretim yalnızca anayasal runtime hazır olduğunda başlatılabilir (AR-002_62)",
+                ],
+            )
+
+        # Arşivlenmiş package asla yeniden üretilemez
+        if package_status == "ARCHIVED":
+            return self._new_decision(
+                request, "REJECT", {"action": "NONE"},
+                [
+                    "Production Package arşivlenmiş durumda (AR-002_58)",
+                    "Arşivlenmiş package'lar immutable kabul edilir; yeniden üretim yapılamaz",
+                ],
+            )
+
+        # Tamamlanmış package'lar tamamen sıfırdan üretilir (REPLAY)
+        if package_status == "COMPLETED":
+            return self._new_decision(
+                request, "REPLAY", {"action": "RESET_AND_EXECUTE"},
+                [
+                    f"Package daha önce başarıyla tamamlanmış (COMPLETED)",
+                    "Yönetici talebi üzerine üretim sıfırdan yeniden başlatılacak (AR-002_82)",
+                    "Mevcut dijital varlıklar korunarak yeni üretim sürümü oluşturulacak",
+                ],
+            )
+
+        # Başarısız package'larda sadece başarısız task'lar yeniden denenir (RETRY)
+        if package_status == "FAILED" or failed_tasks > 0:
+            return self._new_decision(
+                request, "RETRY", {"action": "RETRY_FAILED_TASKS"},
+                [
+                    f"Package durumu FAILED veya {failed_tasks} adet başarısız task var",
+                    f"Son başarısız adım: {failed_step or 'belirlenemedi'} — {last_error or 'hata ayrıntısı yok'}",
+                    "Yalnızca başarısız/zaman aşımına uğrayan task'lar yeniden denenecek (AR-002_83)",
+                    "Başarıyla tamamlanmış task'lar checkpoint'ten korunacak (AR-002_76)",
+                ],
+            )
+
+        # Yarım kalmış package'lar kaldığı yerden devam eder (RESUME)
+        if package_status in ("READY", "BUILDING", "PRODUCING"):
+            return self._new_decision(
+                request, "RESUME", {"action": "RESUME_FROM_CHECKPOINT"},
+                [
+                    f"Package durumu {package_status} — üretim yarım kalmış",
+                    f"Tamamlanmış task: {completed_tasks}/{total_tasks}",
+                    "Kaldığı yerden devam edilecek; tamamlanmış task'lar atlanacak (AR-002_79)",
+                ],
+            )
+
+        # Henüz başlamamış package
+        if package_status == "CREATED":
+            return self._new_decision(
+                request, "START_AS_NEW", {"action": "EXECUTE_FROM_CREATED"},
+                [
+                    "Package CREATED durumunda ancak henüz üretim başlamamış",
+                    "Mevcut PID korunarak normal üretim akışı başlatılacak (AR-002_57)",
+                ],
+            )
+
+        # Tanımlanamayan durum
+        return self._new_decision(
+            request, "REJECT", {"action": "NONE"},
+            [
+                f"Package durumu ({package_status}) için tanımlı bir reproduction prosedürü yok",
+                "Güvenli sonlandırma uygulanıyor (MASTER-013: tereddüt durumunda karar üretilmez)",
+            ],
         )
 
     def _decide_ambiguity(self, request: DecisionRequest) -> RuntimeDecision:

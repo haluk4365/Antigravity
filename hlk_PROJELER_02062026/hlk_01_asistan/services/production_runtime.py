@@ -691,6 +691,679 @@ class ProductionRuntime:
                 return self._result
 
     # ═══════════════════════════════════════════════════════════════════════
+    # Yönetici Yeniden Üretim Prosedürü (AR-002_84)
+    # ═══════════════════════════════════════════════════════════════════════
+    # Yalnızca Yönetici tarafından başlatılabilir (handler katmanı doğrular).
+    # Tüm teknik kararlar HLK Runtime tarafından üretilir (MASTER-013,
+    # AR-002_81); bu akış yalnızca kararları uygular ve kayıt altına alır.
+    # Mevcut mimariler yeniden kullanılır: Production Package Runtime
+    # (AR-002_72), Production Executor recovery (AR-002_76/79), Decision
+    # Engine (MASTER-004), EEC/Olay Kayıt Merkezi (AR-002_73), CEE (AR-002_60).
+
+    def launch_reproduction(
+        self, pid: str, bot, admin_chat_id: int, admin_user_id: int
+    ) -> "asyncio.Task":
+        """Yönetici onayı sonrası yeniden üretim prosedürünü devralır.
+
+        AR-002_84: Yönetici yalnızca prosedürü başlatır; üretimin devamı,
+        strateji ve tüm Runtime kararları HLK Runtime'a aittir (MASTER-013).
+
+        Args:
+            pid: Yeniden üretilecek Production ID (doğrulanmış).
+            bot: telegram.Bot — bildirim ve teslim için.
+            admin_chat_id: Prosedürü başlatan Yöneticinin sohbet ID'si.
+            admin_user_id: Prosedürü başlatan Yöneticinin kullanıcı ID'si.
+
+        Returns:
+            asyncio.Task — yönetilen yeniden üretim görevi.
+        """
+        logger.info(
+            f"🔄 [Reproduction] Yeniden üretim talebi kabul edildi — "
+            f"PID={pid} yönetici={admin_user_id}"
+        )
+        task = asyncio.create_task(
+            self.run_reproduction(pid, bot, admin_chat_id, admin_user_id)
+        )
+        task.add_done_callback(self._on_task_done)
+        return task
+
+    async def run_reproduction(
+        self, pid: str, bot, admin_chat_id: int, admin_user_id: int
+    ) -> ProductionResult:
+        """Yönetilen yeniden üretim yaşam döngüsü — istisnalar dışarı sızmaz.
+
+        GC_PRODUCTION_TIMEOUT ve Runtime Heartbeat (MASTER-011) korumaları
+        normal üretim yaşam döngüsüyle aynıdır.
+        """
+        _heartbeat_task = self._start_heartbeat(admin_user_id)
+        try:
+            return await asyncio.wait_for(
+                self._run_reproduction(pid, bot, admin_chat_id, admin_user_id),
+                timeout=_GC_PRODUCTION_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                f"🏁 [Reproduction Timeout] {_GC_PRODUCTION_TIMEOUT}s aşıldı — {pid}"
+            )
+            return await self._handle_reproduction_failure(
+                pid, bot, admin_chat_id,
+                error=f"Yeniden üretim zaman aşımı ({_GC_PRODUCTION_TIMEOUT}s)",
+                state=ProductionState.TIMED_OUT,
+            )
+        except Exception as e:
+            logger.error(
+                f"❌ [Reproduction] Yaşam döngüsü hatası: {type(e).__name__}: {e}"
+            )
+            return await self._handle_reproduction_failure(
+                pid, bot, admin_chat_id,
+                error=f"{type(e).__name__}: {e}",
+                state=ProductionState.FAILED,
+            )
+        finally:
+            if _heartbeat_task:
+                _heartbeat_task.cancel()
+            try:
+                from services.hlk_runtime import hlk_runtime as _hr_term
+                _hr_term.on_production_terminal(admin_user_id)
+            except Exception:
+                pass
+
+    async def _run_reproduction(
+        self, pid: str, bot, admin_chat_id: int, admin_user_id: int
+    ) -> ProductionResult:
+        """AR-002_84 anayasal yeniden üretim zinciri (Adım 1-21).
+
+        Adımlar:
+        1     PID doğrulama (AR-002_57)
+        2-10  Production Package + tüm anayasal kayıtların yüklenmesi
+              (Workflow, State Engine, Olay Kayıt Merkezi, Dijital Varlık
+              Arşivi/Kataloğu, Sahne Kayıt Defteri, Karar Gerekçeleri)
+        11    Bütünlük doğrulaması (SHA-256)
+        12-13 Son başarılı / başarısız aşamanın belirlenmesi
+        14-16 HLK Runtime REPRODUCTION kararı (MASTER-013, AR-002_81)
+        17    Üretimin otomatik başlatılması (paket hazırlığı + context)
+        18    Üretim yönetimi (Executor recovery — AR-002_76/79)
+        19    Olay kayıtları (AR-002_73, EEC, Olay Kayıt Merkezi)
+        20    Dijital varlıkların paket ile ilişkilendirilmesi + sürüm geçmişi
+        21    Telegram bildirimi (Yönetici + ilgili Kullanıcı)
+        """
+        from services.production_pipeline import (
+            ProductionRequest, PipelineContext,
+            set_context, clear_context, register_handlers,
+        )
+        from services.constitution_enforcement import constitution_enforcement
+        from services.execution_event_collector import (
+            execution_event_collector, EECEventType, ExecutionPhase,
+        )
+        from services.olay_kayit_merkezi import event_registry
+        from services.live_activity_center import live_activity_center
+        from services.pid_runtime import pid_runtime
+        from services.production_package_runtime import package_runtime
+        from services.decision_engine import decision_engine, ProductionContext
+        from services.hlk_runtime import (
+            hlk_runtime, DecisionRequest, DecisionCategory,
+        )
+
+        start_time = time.time()
+        self._cancel_requested = False
+        self._state = ProductionState.RECOVERING
+        self._current_pid = pid
+        self._result = ProductionResult(
+            pid=pid,
+            state=ProductionState.RECOVERING.value,
+            started_at=datetime.now(timezone.utc).isoformat(),
+            total_steps=10,
+        )
+
+        # OLAY-107: Yönetici yeniden üretim talebi (AR-002_84 giriş kaydı)
+        await self._record_reproduction_event(
+            pid,
+            event_constant="EVENT_REPRODUCTION_REQUESTED",
+            event_name="Yeniden Üretim Talep Edildi (OLAY-107)",
+            description=(
+                f"Yönetici ({admin_user_id}) yeniden üretim prosedürünü onayladı"
+            ),
+            result="REQUESTED",
+        )
+
+        # ── Adım 1: PID doğrulama (AR-002_57) ────────────────────────────
+        pid_valid = await pid_runtime.validate(pid)
+        if not pid_valid.is_valid:
+            return await self._reject_reproduction(
+                pid, bot, admin_chat_id,
+                reason=f"PID dogrulanamadi: {pid_valid.error}",
+            )
+
+        # ── Adım 2-10: Anayasal kayıtların yüklenmesi (AR-002_72/73) ────
+        context = await package_runtime.load_full_production_context(pid)
+        if context.get("error"):
+            return await self._reject_reproduction(
+                pid, bot, admin_chat_id,
+                reason=f"Production Package yuklenemedi: {context['error']}",
+            )
+        logger.info(
+            f"📦 [Reproduction] Anayasal kayıtlar yüklendi: {pid} — "
+            f"durum={context.get('package_status')} "
+            f"task={context.get('completed_tasks')}/{context.get('total_tasks')} "
+            f"event={len(context.get('event_logs', []))} "
+            f"karar={len(context.get('decision_history', []))}"
+        )
+
+        # ── Adım 11: Bütünlük doğrulaması ────────────────────────────────
+        integrity_ok, integrity_msg = await package_runtime.verify_integrity(pid)
+        if not integrity_ok:
+            logger.warning(
+                f"⚠️ [Reproduction] Bütünlük uyarısı ({pid}): {integrity_msg}"
+            )
+        else:
+            logger.info(f"🔐 [Reproduction] {integrity_msg}")
+
+        # ── Adım 12-13: Son başarılı / başarısız aşama ───────────────────
+        logger.info(
+            f"📍 [Reproduction] Son başarılı aşama: "
+            f"{context.get('last_successful_step') or '(yok)'} | "
+            f"Başarısız aşama: {context.get('failed_step') or '(yok)'}"
+        )
+
+        # ── Adım 14-16: HLK Runtime REPRODUCTION kararı (MASTER-013) ────
+        decision = hlk_runtime.request_decision(DecisionRequest(
+            pid=pid,
+            category=DecisionCategory.REPRODUCTION.value,
+            requester="production_runtime.run_reproduction",
+            context={
+                "pid": pid,
+                "package_status": context.get("package_status", ""),
+                "failed_tasks": context.get("failed_tasks", 0),
+                "completed_tasks": context.get("completed_tasks", 0),
+                "total_tasks": context.get("total_tasks", 0),
+                "last_error": context.get("last_error", ""),
+                "failed_step": context.get("failed_step", ""),
+                "hlk_runtime_active": hlk_runtime.is_active(admin_user_id),
+            },
+        ))
+        # Karar, Production Package Decision History'ye kaydedilir
+        # (15_KARAR_GEREKCESI_STANDARDI.md — kayıtlar silinemez, eklenir)
+        await self._append_package_list_section(pid, "decision_history", {
+            "decision_id": decision.decision_id,
+            "request_id": decision.request_id,
+            "category": decision.category,
+            "verdict": decision.verdict,
+            "params": decision.params,
+            "rationale": decision.rationale,
+        })
+
+        if decision.verdict == "REJECT":
+            # OLAY-109: Yeniden üretim reddedildi — güvenli sonlandırma
+            await self._record_reproduction_event(
+                pid,
+                event_constant="EVENT_REPRODUCTION_REJECTED",
+                event_name="Yeniden Üretim Reddedildi (OLAY-109)",
+                description=(
+                    "HLK Runtime REPRODUCTION kararı REJECT — "
+                    + "; ".join(decision.rationale.get("Justifications", []))
+                ),
+                result="REJECT",
+            )
+            notify = hlk_runtime.request_decision(DecisionRequest(
+                pid=pid,
+                category=DecisionCategory.USER_NOTIFICATION.value,
+                requester="production_runtime.run_reproduction",
+                context={
+                    "kind": "reproduction_rejected",
+                    "justifications": decision.rationale.get("Justifications", []),
+                },
+            ))
+            if notify.verdict == "NOTIFY" and bot is not None:
+                await bot.send_message(
+                    chat_id=admin_chat_id,
+                    text=notify.params.get("text", ""),
+                    parse_mode=notify.params.get("parse_mode", "HTML"),
+                )
+            self._state = ProductionState.IDLE
+            self._result.state = ProductionState.IDLE.value
+            self._result.success = False
+            self._result.error = "REPRODUCTION kararı: REJECT"
+            self._result.completed_at = datetime.now(timezone.utc).isoformat()
+            logger.info(f"⛔ [Reproduction] REJECT ile sonlandırıldı: {pid}")
+            return self._result
+
+        procedure = decision.verdict  # RESUME | RETRY | REPLAY | START_AS_NEW
+        logger.info(f"⚖️ [Reproduction] HLK Runtime prosedür kararı: {procedure}")
+
+        # ── Adım 17: Üretimin otomatik başlatılması ──────────────────────
+        prepared = await package_runtime.prepare_for_reproduction(pid, procedure)
+        if not prepared:
+            return await self._reject_reproduction(
+                pid, bot, admin_chat_id,
+                reason="Production Package yeniden üretime hazırlanamadı "
+                       "(arşivlenmiş veya erişilemez durumda)",
+            )
+
+        # ProductionRequest paketten yeniden kurulur (AR-002_72 kayıtları)
+        pkg = await package_runtime.load(pid)
+        brief = (pkg.brief or {}) if pkg else {}
+        vparams = (pkg.video_parameters or {}) if pkg else {}
+        delivery = (pkg.delivery_info or {}) if pkg else {}
+        user_chat_id = brief.get("chat_id") or delivery.get("chat_id") or admin_chat_id
+        user_user_id = brief.get("user_id") or admin_user_id
+        try:
+            duration = int(vparams.get("duration_seconds", 15) or 15)
+        except (TypeError, ValueError):
+            duration = 15
+        request = ProductionRequest(
+            chat_id=int(user_chat_id),
+            user_id=int(user_user_id),
+            url=brief.get("url", ""),
+            product_name=brief.get("product_name", "urununuz") or "urununuz",
+            brand=brief.get("brand", "Marka") or "Marka",
+            duration=duration,
+            voice_lang=(vparams.get("voice_language")
+                        or brief.get("voice_language") or "tr"),
+            bot=bot,
+            user_data={},
+        )
+
+        # Production Lifecycle — session PID ile güncellenir
+        try:
+            hlk_runtime.on_production_start(admin_user_id, pid)
+        except Exception:
+            pass
+
+        # CEE PRE-CHECK (AR-002_60 — anayasal görev paketi)
+        ctp = constitution_enforcement.pre_check(
+            task_description=f"Reproduction ({procedure}) for {pid}",
+            affected_files=[
+                "services/production_runtime.py",
+                "services/production_pipeline.py",
+                "services/production_executor.py",
+            ],
+            master_rules=["MASTER-001", "MASTER-003", "MASTER-013"],
+            arch_rules=["AR-002_57", "AR-002_79", "AR-002_82", "AR-002_83", "AR-002_84"],
+            oper_rules=["OR-004_12"],
+            flow_steps=["AR-002_84: Yönetici Yeniden Üretim Prosedürü"],
+            state_rules=["SE-007_3"],
+            expected_outputs=["Video delivered or constitutional termination"],
+        )
+        logger.info(f"📋 [CEE PRE-CHECK] CTP: {ctp.ctp_id}")
+        self._result.pre_check_report = {"ctp_id": ctp.ctp_id}
+
+        # OLAY-108: Yeniden üretim başladı (Adım 19 kayıt mekanizması)
+        execution_event_collector.listen(pid=pid)
+        start_evt = execution_event_collector.emit_event(
+            event_type=EECEventType.TASK_STARTED,
+            description=f"Reproduction started ({procedure}): {pid}",
+            phase=ExecutionPhase.EXECUTE,
+            result=f"Yeniden üretim prosedürü başladı — {procedure}",
+        )
+        event_registry.register_from_eec(start_evt)
+        live_activity_center.register(start_evt)
+        await self._record_reproduction_event(
+            pid,
+            event_constant="EVENT_REPRODUCTION_STARTED",
+            event_name="Yeniden Üretim Başlatıldı (OLAY-108)",
+            description=(
+                f"Yönetici onayı sonrası HLK Runtime {procedure} prosedürünü "
+                f"başlattı (yönetici={admin_user_id})"
+            ),
+            result=procedure,
+        )
+
+        # Yöneticiye başlangıç bildirimi (HLK Runtime kararı — MASTER-013)
+        start_notify = hlk_runtime.request_decision(DecisionRequest(
+            pid=pid,
+            category=DecisionCategory.USER_NOTIFICATION.value,
+            requester="production_runtime.run_reproduction",
+            context={"kind": "reproduction_started", "procedure": procedure},
+        ))
+        if start_notify.verdict == "NOTIFY" and bot is not None:
+            try:
+                await bot.send_message(
+                    chat_id=admin_chat_id,
+                    text=start_notify.params.get("text", ""),
+                    parse_mode=start_notify.params.get("parse_mode", "HTML"),
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ [Reproduction] Başlangıç bildirimi gönderilemedi: {e}")
+
+        # HLK Decision Engine — üretim stratejisi/servis seçimi yeniden
+        # değerlendirilir (MASTER-004, AR-002_75, AR-002_82 Adım 7)
+        prod_context = ProductionContext(
+            pid=pid, user_id=request.user_id,
+            product_name=request.product_name, brand=request.brand,
+            duration=request.duration, voice_lang=request.voice_lang,
+            url=request.url,
+        )
+        decision_packet = decision_engine.decide(prod_context)
+        request.user_data["decision_packet"] = decision_packet.to_dict()
+        await self._append_package_list_section(
+            pid, "decision_history", decision_packet.to_dict()
+        )
+        logger.info(
+            f"🧠 [Reproduction] Decision Packet: {decision_packet.decision_id}"
+        )
+
+        # Gerçek pipeline handler'ları + PID bağlamı (AR-002_76)
+        register_handlers()
+        ctx = PipelineContext(
+            request=request,
+            decision_packet=decision_packet,
+            prod_context=prod_context,
+            cost_report={"pid": pid, "services": {},
+                         "decision_id": decision_packet.decision_id,
+                         "reproduction": procedure},
+        )
+        set_context(pid, ctx)
+
+        try:
+            # ── Adım 18: Üretim yönetimi (Executor recovery — AR-002_79) ─
+            self._state = ProductionState.EXECUTING
+            from services.production_executor import production_executor
+            executor_report = await production_executor.recover(pid)
+            report_dict = executor_report.to_dict() if hasattr(
+                executor_report, "to_dict") else dict(executor_report)
+            self._result.executor_report = report_dict
+            failed = report_dict.get("failed_tasks", 0)
+
+            # ── CEE POST-CHECK ───────────────────────────────────────────
+            pipeline_success = ctx.delivered or failed == 0
+            cee_report = constitution_enforcement.enforce_post_check(
+                pid=pid,
+                decision_packet=request.user_data.get("decision_packet", {}),
+                user_data=request.user_data,
+                pipeline_success=pipeline_success,
+            )
+            self._result.post_check_report = {
+                "report_id": cee_report.report_id,
+                "verdict": cee_report.verdict.value,
+            }
+
+            if failed:
+                # Başarısızlık: durum + anayasal gerekçe bildirilir (Adım 21)
+                errors = report_dict.get("errors", [])
+                return await self._handle_reproduction_failure(
+                    pid, bot, admin_chat_id,
+                    error="; ".join(errors) or f"{failed} task başarısız",
+                    state=ProductionState.FAILED,
+                    user_chat_id=int(user_chat_id),
+                    justifications=[
+                        f"{failed} task başarısız (AR-002_76 Execution Result)",
+                        *errors[:3],
+                    ],
+                )
+
+            # ── Adım 20: Dijital varlık ilişkilendirme + sürüm geçmişi ──
+            await package_runtime.update_section(
+                pid, "service_usage", ctx.cost_report
+            )
+            if ctx.video_path:
+                await package_runtime.update_section(
+                    pid, "final_video",
+                    {"path": ctx.video_path, "delivered": ctx.delivered,
+                     "reproduction": procedure},
+                )
+            await package_runtime.update_section(pid, "delivery_info", {
+                "delivered": ctx.delivered,
+                "chat_id": int(user_chat_id),
+                "delivered_at": datetime.now(timezone.utc).isoformat(),
+                "video": bool(ctx.video_path),
+                "reproduction": procedure,
+            })
+
+            # EEC tamamlanma event'i (Adım 19)
+            end_evt = execution_event_collector.emit_event(
+                event_type=EECEventType.CODE_COMPLETED,
+                description=f"Reproduction completed: {pid}",
+                phase=ExecutionPhase.POST_CHECK,
+                result=(
+                    f"Video={bool(ctx.video_path)} Delivered={ctx.delivered} "
+                    f"Procedure={procedure}"
+                ),
+            )
+            event_registry.register_from_eec(end_evt)
+            live_activity_center.register(end_evt)
+
+            # ── Tamamlanma kararı HLK Runtime'ındır (AR-002_80/82) ──────
+            completion_decision = hlk_runtime.request_decision(DecisionRequest(
+                pid=pid,
+                category=DecisionCategory.COMPLETION.value,
+                requester="production_runtime.run_reproduction",
+                context={
+                    "delivered": ctx.delivered,
+                    "video": bool(ctx.video_path),
+                    "failed_tasks": failed,
+                },
+            ))
+            completion_success = bool(
+                completion_decision.params.get("success", True)
+            )
+
+            # ── Adım 21: Telegram bildirimi (Yönetici + Kullanıcı) ──────
+            await self._notify_reproduction_result(
+                pid, bot, admin_chat_id, int(user_chat_id),
+                success=True, product_name=request.product_name,
+            )
+
+            elapsed = time.time() - start_time
+            self._state = ProductionState.COMPLETED
+            self._result.state = ProductionState.COMPLETED.value
+            self._result.success = completion_success
+            self._result.duration_seconds = elapsed
+            self._result.completed_at = datetime.now(timezone.utc).isoformat()
+            logger.info(
+                f"🏁 [Reproduction Completed] {pid} ({elapsed:.1f}s, "
+                f"prosedür={procedure})"
+            )
+            return self._result
+        finally:
+            clear_context(pid)
+
+    async def _reject_reproduction(
+        self, pid: str, bot, admin_chat_id: int, reason: str
+    ) -> ProductionResult:
+        """AR-002_84 İstisna Akışı: prosedür başlatılmaz, Yönetici
+        anayasal gerekçesiyle bilgilendirilir, işlem güvenli sonlandırılır."""
+        from services.hlk_runtime import (
+            hlk_runtime, DecisionRequest, DecisionCategory,
+        )
+        logger.warning(f"⛔ [Reproduction] Güvenli sonlandırma: {pid} — {reason}")
+        notify = hlk_runtime.request_decision(DecisionRequest(
+            pid=pid,
+            category=DecisionCategory.USER_NOTIFICATION.value,
+            requester="production_runtime._reject_reproduction",
+            context={"kind": "reproduction_not_found",
+                     "query": pid, "reason": reason},
+        ))
+        if notify.verdict == "NOTIFY" and bot is not None:
+            try:
+                await bot.send_message(
+                    chat_id=admin_chat_id,
+                    text=notify.params.get("text", ""),
+                    parse_mode=notify.params.get("parse_mode", "HTML"),
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ [Reproduction] Red bildirimi gönderilemedi: {e}")
+        if self._result is None:
+            self._result = ProductionResult(pid=pid, total_steps=10)
+        self._state = ProductionState.IDLE
+        self._result.state = ProductionState.IDLE.value
+        self._result.success = False
+        self._result.error = reason
+        self._result.completed_at = datetime.now(timezone.utc).isoformat()
+        return self._result
+
+    async def _handle_reproduction_failure(
+        self, pid: str, bot, admin_chat_id: int,
+        error: str, state: "ProductionState",
+        user_chat_id: int = 0, justifications: list | None = None,
+    ) -> ProductionResult:
+        """AR-002_84 başarısızlık yolu — hiçbir başarısızlık sessiz kalmaz.
+
+        OLAY-025 (EVENT_VIDEO_PRODUCTION_FAILED) + eskalasyon + paket durumu
+        + Yönetici/Kullanıcı bildirimi (durum + anayasal karar gerekçesi).
+        """
+        from services.hlk_runtime import (
+            hlk_runtime, DecisionRequest, DecisionCategory,
+        )
+        if self._result is None:
+            self._result = ProductionResult(pid=pid, total_steps=10)
+        self._state = state
+        self._result.state = state.value
+        self._result.success = False
+        self._result.error = error
+        self._result.completed_at = datetime.now(timezone.utc).isoformat()
+        logger.error(f"🏁 [Reproduction Failed] {pid} — {error}")
+
+        # OLAY-025 kaydı (PID zorunlu — AR-002_57)
+        await self._record_reproduction_event(
+            pid,
+            event_constant="EVENT_VIDEO_PRODUCTION_FAILED",
+            event_name="Video Üretimi Başarısız Oldu (OLAY-025)",
+            description=f"Yeniden üretim başarısız: {error[:200]}",
+            result=f"Error: {error[:120]}",
+        )
+
+        # Eskalasyon (AR-002_79 — yönetici müdahale kaydı)
+        try:
+            from services.escalation_engine import escalation_engine, EscalationReason
+            escalation_engine.escalate(
+                pid=pid,
+                reason=EscalationReason.ALL_PROVIDERS_FAILED.value,
+                detail=f"Reproduction failed: {error}",
+                failed_providers=[],
+                retry_count=0,
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ [Reproduction] Escalation yazılamadı: {e}")
+
+        # Paket durumu FAILED (idempotent)
+        try:
+            from services.production_package_runtime import (
+                package_runtime, PackageStatus,
+            )
+            await package_runtime.update_status(pid, PackageStatus.FAILED)
+        except Exception as e:
+            logger.warning(f"⚠️ [Reproduction] Paket durumu güncellenemedi: {e}")
+
+        # Adım 21 (başarısızlık): Yönetici + Kullanıcı bildirimi
+        await self._notify_reproduction_result(
+            pid, bot, admin_chat_id, user_chat_id or admin_chat_id,
+            success=False, error=error, justifications=justifications or [],
+        )
+
+        # Pipeline bağlamını temizle
+        try:
+            from services.production_pipeline import clear_context
+            clear_context(pid)
+        except Exception:
+            pass
+        return self._result
+
+    async def _notify_reproduction_result(
+        self, pid: str, bot, admin_chat_id: int, user_chat_id: int,
+        success: bool, product_name: str = "", error: str = "",
+        justifications: list | None = None,
+    ) -> None:
+        """AR-002_84 Adım 21: Sonuç hem Yöneticiye hem ilgili Kullanıcıya
+        anayasal bildirim kurallarına uygun şekilde iletilir (MASTER-013:
+        bildirim içerikleri yalnızca HLK Runtime kararı ile üretilir)."""
+        from services.hlk_runtime import (
+            hlk_runtime, DecisionRequest, DecisionCategory,
+        )
+        if bot is None:
+            return
+        kind = "reproduction_completed" if success else "reproduction_failed"
+        targets = [("admin", admin_chat_id)]
+        if user_chat_id and user_chat_id != admin_chat_id:
+            targets.append(("user", user_chat_id))
+        for audience, chat_id in targets:
+            notify = hlk_runtime.request_decision(DecisionRequest(
+                pid=pid,
+                category=DecisionCategory.USER_NOTIFICATION.value,
+                requester="production_runtime._notify_reproduction_result",
+                context={
+                    "kind": kind,
+                    "audience": audience,
+                    "product_name": product_name,
+                    "error": error,
+                    "justifications": justifications or [],
+                },
+            ))
+            if notify.verdict != "NOTIFY":
+                continue
+            try:
+                await bot.send_message(
+                    chat_id=chat_id,
+                    text=notify.params.get("text", ""),
+                    parse_mode=notify.params.get("parse_mode", "HTML"),
+                )
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ [Reproduction] {audience} bildirimi gönderilemedi: {e}"
+                )
+
+    async def _record_reproduction_event(
+        self, pid: str, event_constant: str, event_name: str,
+        description: str, result: str,
+    ) -> None:
+        """Yeniden üretim olayını mevcut anayasal kayıt mekanizmalarına yazar.
+
+        AR-002_73: Olay Kayıt Merkezi (bellek + LAC görünürlüğü) ve
+        Production Package event_logs (kalıcı) — PID alanı zorunlu (AR-002_57).
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            from services.olay_kayit_merkezi import event_registry, EventRecord
+            record = EventRecord(
+                event_id=f"EVT-{pid}-{int(time.time() * 1000)}",
+                event_name=event_name,
+                event_constant=event_constant,
+                event_description=description,
+                source_state="STATE_VIDEO_PRODUCTION",
+                target_state="STATE_VIDEO_PRODUCTION",
+                producer="HLK_RUNTIME",
+                pid=pid,
+                timestamp=now,
+                phase="REPRODUCTION",
+                result=result,
+                category="REPRODUCTION",
+            )
+            event_registry.register(record)
+        except Exception as e:
+            logger.warning(f"⚠️ [Reproduction] Olay kaydedilemedi: {e}")
+
+        # Kalıcı kayıt: Production Package event_logs (mevcut loglar korunur)
+        await self._append_package_list_section(pid, "event_logs", {
+            "event_type": event_constant,
+            "event_name": event_name,
+            "pid": pid,
+            "description": description,
+            "result": result,
+            "timestamp": now,
+        })
+
+    async def _append_package_list_section(
+        self, pid: str, section: str, entry: dict
+    ) -> None:
+        """Paketin liste tipli bölümüne kayıt EKLER (mevcut kayıtlar korunur).
+
+        15_KARAR_GEREKCESI_STANDARDI.md Bölüm 10: kayıtlar değiştirilemez ve
+        silinemez — bu nedenle bölüm asla üzerine yazılmaz, genişletilir.
+        """
+        try:
+            from services.production_package_runtime import package_runtime
+            pkg = await package_runtime.load(pid)
+            if pkg is None:
+                return
+            current = getattr(pkg, section, None)
+            items = list(current) if isinstance(current, list) else []
+            items.append(entry)
+            await package_runtime.update_section(pid, section, items)
+        except Exception as e:
+            logger.warning(
+                f"⚠️ [Reproduction] '{section}' bölümüne kayıt eklenemedi: {e}"
+            )
+
+    # ═══════════════════════════════════════════════════════════════════════
     # Runtime Heartbeat — Production boyunca runtime aktiflik kanıtı
     # ═══════════════════════════════════════════════════════════════════════
 
@@ -1062,6 +1735,11 @@ class ProductionRuntime:
             "style": ud.get("style", ""),
             "audience": ud.get("audience", ""),
             "voice_language": request.voice_lang,
+            # Kullanıcı kimliği (12/13_DIGITAL_ASSET kayıt standardı ile uyumlu):
+            # AR-002_84 yeniden üretimde ilgili Kullanıcıya bildirim adresi olarak
+            # kullanılır — Production Package kalıcı kaydıdır.
+            "user_id": request.user_id,
+            "chat_id": request.chat_id,
         }
         await package_runtime.update_section(pid, "brief", brief_section)
         await package_runtime.update_section(pid, "video_parameters", {

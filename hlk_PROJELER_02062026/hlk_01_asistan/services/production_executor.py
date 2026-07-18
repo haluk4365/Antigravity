@@ -674,9 +674,17 @@ class ProductionExecutor:
                     "failed_tasks": self._report.failed_tasks,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
+                # AR-002_73 / 15_KARAR Bölüm 10: kayıtlar silinemez —
+                # mevcut event logları KORUNARAK yeni kayıt EKLENİR.
+                pkg = await package_runtime.load(pid)
+                existing_logs = (
+                    list(pkg.event_logs)
+                    if pkg is not None and isinstance(pkg.event_logs, list)
+                    else []
+                )
+                existing_logs.append(event_entry)
                 await package_runtime.update_section(
-                    pid, "event_logs",
-                    [event_entry]  # mevcut loglara eklenir
+                    pid, "event_logs", existing_logs
                 )
         except Exception as e:
             logger.warning(f"⚠️ [Executor] Package durum güncelleme hatası: {e}")
@@ -752,6 +760,12 @@ class ProductionExecutor:
 
                 # Tamamlanmamış task'ları bul
                 all_tasks = await self._load_task_packages(pid)
+
+                # AR-002_79: Recovery raporu YALNIZCA bu PID'nin tamamlanma
+                # durumunu gösterir — aynı süreçte farklı bir PID'den kalan
+                # rapor varsa sıfırlanır (sayaç/sonuç kirliliği önlenir).
+                if self._report is not None and self._report.pid != pid:
+                    self._report = None
 
                 # Restart senaryosu (AR-002_79 — Kaldığı Noktadan Devam):
                 # Yeni Executor instance'ı ile recovery yapıldığında rapor

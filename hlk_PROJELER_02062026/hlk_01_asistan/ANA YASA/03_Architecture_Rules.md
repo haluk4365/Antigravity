@@ -7270,3 +7270,215 @@ Bu mimari sayesinde;
 - Yeni Recovery stratejileri mevcut mimariyi değiştirmeden sisteme eklenebilir.
 - Runtime kararlarının tutarlılığı artar.
 - Mission Persistence ilkesi ile Recovery mekanizması birbirinden ayrılarak mimari sadeleşir.
+
+---
+
+## AR-002_84
+
+### Başlık
+
+**Yönetici Yeniden Üretim Prosedürü Mimarisi — Admin Reproduction Procedure Architecture**
+
+### Amaç
+
+HLK tarafından daha önce oluşturulmuş her Production Package'in, gerektiğinde HLK Anayasasına uygun şekilde yeniden üretilebilmesini standartlaştırmak.
+
+Bu mimari; OLAY-025 (`EVENT_VIDEO_PRODUCTION_FAILED`) kaydında tanımlı **"Tekrar Deneme Politikası: Yönetici onayı gerekir"** hükmünün, AR-002_82 (Mission Persistence) ve AR-002_83 (Recovery Policy) çerçevesindeki resmi runtime uygulamasıdır.
+
+### Kural
+
+Üretimi başarısız olan veya yarım kalan bir PID'nin yeniden üretimi yalnızca **Yönetici** tarafından başlatılabilir.
+
+Bu işlem **kullanıcı tarafından başlatılamaz.**
+
+Yeniden üretim, yeni bir üretim türü değildir; mevcut üretimin AR-002_79 (Üretim Sürekliliği), AR-002_82 (Mission Persistence) ve AR-002_83 (Recovery Policy) kapsamındaki anayasal devamıdır. Bu nedenle;
+
+* Yeni PID **oluşturulmaz** — mevcut PID korunur (AR-002_57 PID Tekillik Kuralı).
+* Yeni Production Package **oluşturulmaz** — mevcut paket kullanılır (AR-002_58, PID↔Package 1:1).
+* Üretim sonucunda oluşan yeni dijital varlıklar mevcut Production Package ile ilişkilendirilir ve sürüm geçmişi (`revision_history`) korunur (12_DIGITAL_ASSET_ARCHIVE.md Revizyon Standardı: mevcut varlıklar değiştirilmez).
+
+---
+
+### Yönetici İş Akışı
+
+Yönetici sisteme yalnızca aşağıdaki bilgilerden birini verir:
+
+* **PID** veya **Ürün Adı**
+
+HLK ilgili Production Package'i mevcut arama mimarisiyle otomatik olarak bulur (AR-002_72; arama sınırları `GC_REPRODUCE_SEARCH_LIMIT` ve `GC_REPRODUCE_MAX_CANDIDATES` parametreleriyle yönetilir).
+
+HLK aşağıdaki bilgileri Yöneticiye gösterir:
+
+* PID
+* Ürün Adı
+* Marka
+* Üretim Tarihi
+* Mevcut Üretim Durumu
+
+Ardından anayasal onay ekranı gösterilir:
+
+> HLK Anayasasına göre bu üretim için yeniden üretim prosedürü uygulanacaktır.
+>
+> HLK;
+> • Production Package'i inceleyecektir.
+> • Üretim durumunu analiz edecektir.
+> • Üretimin kaldığı yerden devam edip edemeyeceğini değerlendirecektir.
+> • Gerekli olması halinde yeniden üretim prosedürünü uygulayacaktır.
+> • Tüm işlemleri HLK Anayasasına uygun şekilde yönetecektir.
+>
+> Yeniden üretim prosedürünü başlatmak istiyor musunuz?
+>
+> [ Evet, Başlat ]   [ İptal ]
+
+Bu onay ekranı, AR-002_56 (Yönetici Video Üretim Onay Katmanı) ile aynı anayasal deseni izler: üretim öncesi zorunlu insan kontrol katmanı.
+
+---
+
+### Anayasal Yeniden Üretim Prosedürü (Yönetici Onayı Sonrası)
+
+Yönetici onay verdikten sonra HLK Runtime aşağıdaki prosedürü otomatik olarak işletir:
+
+1. PID doğrulanır (AR-002_57, AR-002_71).
+2. PID'ye bağlı Production Package bulunur (AR-002_72).
+3. Production Package yüklenir.
+4. Production Package'e bağlı Workflow bilgileri (Task Package listesi) yüklenir (AR-002_74).
+5. State Engine kayıtları yüklenir (07_HLK_STATE_ENGINE.md).
+6. Olay Kayıt Merkezi kayıtları yüklenir (14_OLAY_KAYIT_MERKEZI.md).
+7. Dijital Varlık Arşivi kayıtları yüklenir (12_DIGITAL_ASSET_ARCHIVE.md).
+8. Dijital Varlık Kataloğu kayıtları yüklenir (13_DIGITAL_ASSET_CATALOG.md).
+9. Sahne Kayıt Defteri kayıtları (senaryo/storyboard) yüklenir (17_SAHNE_KAYIT_DEFTERİ.md).
+10. Karar Gerekçesi kayıtları yüklenir (15_KARAR_GEREKCESI_STANDARDI.md).
+11. Yeniden üretim için gerekli tüm anayasal bileşenlerin bütünlüğü doğrulanır (SHA-256 — 16_PRODUCTION_PACKAGE_STANDARD.md).
+12. Son başarılı aşama belirlenir (Task Package checkpoint kayıtları — AR-002_76).
+13. Başarısız olan aşama belirlenir.
+14. HLK Runtime, üretimin kaldığı yerden devam edip edemeyeceğini değerlendirir (MASTER-013, AR-002_81 Karar Talep Protokolü — REPRODUCTION kategorisi).
+15. Gerekli yeniden üretim stratejisi belirlenir (aşağıdaki Prosedür Kararları tablosu).
+16. Gerekli Runtime kararları oluşturulur ve Decision History'ye kaydedilir.
+17. Üretim otomatik olarak başlatılır (Production Package hazırlanır, Decision Engine servis seçimini yeniden değerlendirir — AR-002_75, AR-002_82 Adım 7).
+18. Üretim tamamlanıncaya veya anayasal olarak sonlandırılıncaya kadar süreç HLK Runtime tarafından yönetilir (AR-002_79, `GC_PRODUCTION_TIMEOUT`, `GC_MAX_RE_EVALUATION_COUNT`).
+19. Üretim boyunca oluşan tüm olaylar mevcut anayasal kayıt mekanizmalarına kaydedilir (EEC, Olay Kayıt Merkezi, LAC, Production Package Event Logları).
+20. Üretim sonucunda oluşan yeni dijital varlıklar ilgili Production Package ile ilişkilendirilir ve sürüm geçmişi korunur.
+21. Üretim tamamlandığında sonuç, anayasal bildirim kurallarına uygun şekilde Telegram üzerinden hem **Yöneticiye** hem de ilgili **Kullanıcıya** otomatik olarak bildirilir:
+    * Üretim başarılıysa ilgili çıktılar teslim edilir (AR-002_36 Delivery).
+    * Üretim başarısızsa üretim durumu ve anayasal karar gerekçesi bildirilir (EEC-001 Fake Progress yasağı).
+
+Bu adımların hiçbiri atlanamaz. Bildirim içerikleri dahil tüm süreç mesajları yalnızca HLK Runtime USER_NOTIFICATION kararı ile üretilir (MASTER-013, OR-004_12, GK-001_5).
+
+---
+
+### Prosedür Kararları
+
+HLK Runtime, REPRODUCTION Karar Talebini aşağıdaki anayasal çerçevede karara bağlar:
+
+| Package Durumu | Karar | Uygulama | Referans |
+|---|---|---|---|
+| `FAILED` veya başarısız task var | **RETRY** | Yalnızca başarısız/zaman aşımına uğrayan task'lar yeniden yürütülür; tamamlanmış task'lar checkpoint'ten korunur | AR-002_83, AR-002_76 |
+| `READY` / `BUILDING` / `PRODUCING` (yarım kalmış) | **RESUME** | Kaldığı noktadan devam edilir | AR-002_79 |
+| `CREATED` (üretim hiç başlamamış) | **START_AS_NEW** | Mevcut PID korunarak normal üretim akışı başlatılır | AR-002_57 |
+| `COMPLETED` | **REPLAY** | Yalnızca açık Yönetici talebiyle; mevcut dijital varlıklar korunarak yeni üretim sürümü oluşturulur | AR-002_82, 12_DAA Revizyon Standardı |
+| `ARCHIVED` | **REJECT** | Arşivlenmiş paket immutable'dır; yeniden üretilemez | AR-002_58 |
+| HLK Runtime aktif değil / tanımsız durum | **REJECT** | Güvenli sonlandırma (tereddüt halinde karar üretilmez) | MASTER-013, AR-002_62 |
+
+Karar; gerekçeleri, alternatifleri ve sonuçlarıyla birlikte Production Package Decision History'ye kaydedilir (15_KARAR_GEREKCESI_STANDARDI.md — kayıtlar silinemez, yalnızca eklenir).
+
+---
+
+### İstisna Durumları
+
+PID doğrulanamazsa **veya** Production Package bulunamazsa:
+
+* HLK yeniden üretim prosedürünü **başlatmaz**.
+* Durum, anayasal gerekçesiyle Yöneticiye bildirilir (OLAY-109).
+* İşlem güvenli şekilde sonlandırılır.
+
+---
+
+### Yetki
+
+Yönetici **yalnızca** yeniden üretim prosedürünü başlatır.
+
+Aşağıdaki kararların tamamı yalnızca HLK Runtime tarafından HLK Anayasasına göre otomatik olarak alınır (MASTER-013, AR-002_81):
+
+* Üretimin devam ettirilmesi
+* Yeniden üretim kararı
+* Runtime kararları
+* Kurtarma kararları
+* Sağlayıcı seçimleri
+* Model seçimleri
+* Üretim stratejileri
+* Diğer tüm teknik kararlar
+
+Yönetici teknik karar vermez.
+
+Yönetici kimliği `TELEGRAM_ADMIN_USER_ID` yapılandırması ile doğrulanır; bu değer tanımlı değilse hiçbir kullanıcı Yönetici kabul edilmez (güvenli varsayılan).
+
+---
+
+### Olay Kayıtları
+
+| Olay | Teknik Sabit | An |
+|---|---|---|
+| OLAY-107 | `EVENT_REPRODUCTION_REQUESTED` | Yönetici onayı alındığında |
+| OLAY-108 | `EVENT_REPRODUCTION_STARTED` | HLK Runtime prosedür kararı üretip üretimi başlattığında |
+| OLAY-109 | `EVENT_REPRODUCTION_REJECTED` | PID/paket doğrulanamadığında veya karar REJECT olduğunda |
+| OLAY-024 | `EVENT_VIDEO_PRODUCTION_COMPLETED` | Yeniden üretim başarıyla tamamlandığında (yeniden kullanım) |
+| OLAY-025 | `EVENT_VIDEO_PRODUCTION_FAILED` | Yeniden üretim başarısız olduğunda (yeniden kullanım) |
+
+Tüm olaylarda PID alanı zorunludur (AR-002_57).
+
+---
+
+### Sınırlar ve Kapsam
+
+Bu mimari;
+
+* Yeni bir karar motoru **oluşturmaz** — kararlar HLK Runtime'ındır (MASTER-013).
+* Yeni bir kurtarma mekanizması **oluşturmaz** — AR-002_79/82/83'te tanımlı mevcut süreklilik ve recovery mimarilerini Yönetici girişiyle tetiklenebilir hale getirir.
+* Yeni PID veya yeni Production Package **oluşturmaz** (AR-002_57/58).
+* State Engine'e yeni kullanıcı state'i **eklemez** — prosedür, kullanıcı konuşma akışı dışında, Production Runtime seviyesinde çalışır (SE-007_3 kullanıcı state makinesi değişmez).
+* AR-002_80 Üretim Kapanış Mimarisini **değiştirmez** — anayasal kapanışı tamamlanmış bir Production Runtime yeniden açılmaz; yeniden üretim, aynı PID'ye bağlı **yeni bir yürütme döngüsü** başlatır.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | Karar Hiyerarşisi — prosedür ANA YASA'ya tabidir |
+| **MASTER** | MASTER-003 | ANA YASA/Kod Uyumluluk — prosedür denetlenebilir |
+| **MASTER** | MASTER-004 | Karar Mekanizması — nihai karar HLK'nındır |
+| **MASTER** | MASTER-013 | HLK Runtime tek karar otoritesi; Yönetici teknik karar vermez |
+| **AR** | AR-002_56 | Yönetici onay katmanı deseni (üretim öncesi insan kontrolü) |
+| **AR** | AR-002_57 | PID standardı — PID korunur, yeni PID üretilmez |
+| **AR** | AR-002_58 | Production Package — mevcut paket kullanılır |
+| **AR** | AR-002_70 | Production Runtime tek giriş noktası — prosedür Production Runtime'a devredilir |
+| **AR** | AR-002_72 | Production Package Runtime — paket arama/yükleme/hazırlama |
+| **AR** | AR-002_73 | Production Event Runtime — olay kayıtları |
+| **AR** | AR-002_76 | Production Execution — checkpoint'li yürütme |
+| **AR** | AR-002_79 | Üretim Sürekliliği — "Kaldığı Noktadan Devam" aksiyonu |
+| **AR** | AR-002_81 | Karar Talep Protokolü — REPRODUCTION kategorisi |
+| **AR** | AR-002_82 | Mission Persistence — başarısızlık sonrası 8 adımlı değerlendirme |
+| **AR** | AR-002_83 | Recovery Policy — üst politika katmanı |
+| **OR** | OR-004_12 | Üretim sırasında Karar Talebi operasyon kuralı |
+| **GK** | GK-001_5 | Bildirim metinlerinin sistem kurallarına göre üretilmesi |
+| **GC** | GC_REPRODUCE_SEARCH_LIMIT, GC_REPRODUCE_MAX_CANDIDATES | Paket arama sınırları |
+| **GC** | GC_PRODUCTION_TIMEOUT, GC_MAX_RE_EVALUATION_COUNT | Üretim ve yeniden değerlendirme sınırları |
+| **OLAY** | OLAY-025 | "Tekrar Deneme Politikası: Yönetici onayı gerekir" — bu mimarinin doğrudan dayanağı |
+| **OLAY** | OLAY-107, OLAY-108, OLAY-109 | Yeniden üretim olayları |
+| **KARAR** | 15_KARAR_GEREKCESI_STANDARDI.md | Kararların gerekçeleriyle kaydı |
+| **PKG** | 16_PRODUCTION_PACKAGE_STANDARD.md | Paket bütünlüğü ve revizyon geçmişi |
+| **VARLIK** | 12/13_DIGITAL_ASSET | Varlık ilişkilendirme ve sürüm koruması |
+
+---
+
+### Beklenen Sonuç
+
+* Yönetici yalnızca PID veya Ürün Adını girer.
+* HLK ilgili Production Package'i otomatik olarak bulur.
+* HLK yeniden üretim için gerekli tüm anayasal kayıtları ve üretim bileşenlerini otomatik olarak yükler.
+* HLK üretimin kaldığı yerden devam edilip edilemeyeceğini değerlendirir.
+* Gerekli yeniden üretim prosedürünü otomatik olarak uygular.
+* Yönetici yalnızca üretimi başlatma onayı verir.
+* Teknik kararların tamamı HLK Runtime tarafından alınır.
+* Üretim sonucu Telegram üzerinden hem Yöneticiye hem de ilgili Kullanıcıya otomatik olarak bildirilir.
+* Mevcut anayasal mimari korunur.

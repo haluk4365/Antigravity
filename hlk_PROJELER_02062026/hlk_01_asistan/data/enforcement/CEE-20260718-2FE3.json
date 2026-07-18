@@ -1,0 +1,47 @@
+{
+  "report_id": "CEE-20260718-2FE3",
+  "ctp_id": "CEE-CTP-20260718-2EDD",
+  "executor": "ProductionRuntime",
+  "attempt": 1,
+  "verdict": "FAIL",
+  "code_anayasa_check": false,
+  "flow_compliance": true,
+  "state_compliance": true,
+  "operational_compliance": true,
+  "architectural_integrity": true,
+  "runtime_behavior": false,
+  "deficiencies": [
+    {
+      "type": "VALIDATION_FAILED",
+      "description": "Constitutional Validator: DecisionPacket doğrulaması başarısız",
+      "ana_yasa_ref": "AR-002_22, MASTER-003"
+    }
+  ],
+  "violations": [],
+  "justification": {
+    "DecisionID": "DEC-20260718-96F4",
+    "DecisionName": "CEE Enforcement FAIL",
+    "DecisionDescription": "CEE POST-CHECK denetimi başarısız. Başarısız denetimler: Kod-Anayasa uyumsuzluğu, Runtime davranış uyumsuzluğu. Toplam 1 eksik/ihlal tespit edildi.",
+    "DecisionMaker": "CEE",
+    "DecisionTimestamp": "2026-07-18T13:51:43.350012+00:00",
+    "SourceState": "STATE_VIDEO_PRODUCTION",
+    "WorkflowID": "WF-008",
+    "FeatureID": "FEAT-019",
+    "Justifications": [
+      "Denetim başarısız: Kod-Anayasa uyumsuzluğu",
+      "Denetim başarısız: Runtime davranış uyumsuzluğu"
+    ],
+    "Alternatives": [
+      "Eksikler giderilip yeniden POST-CHECK'e gönderilmeli",
+      "Maksimum 3 deneme sonrası eskalasyon"
+    ],
+    "ConfidenceLevel": "HIGH",
+    "DecisionOutcomes": [
+      "Executor eksikleri gidermek üzere geri çağrılır",
+      "Deneme 1/3"
+    ],
+    "PID": "PID-20260718-0002"
+  },
+  "created_at": "2026-07-18T13:51:43.349956+00:00",
+  "pid": "PID-20260718-0002"
+}

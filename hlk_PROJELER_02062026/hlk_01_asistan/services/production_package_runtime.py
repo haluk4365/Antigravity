@@ -59,6 +59,12 @@ _GC_PACKAGE_ARCHIVE_DIR_NAME = os.getenv(
 _GC_PACKAGE_HASH_ALGORITHM = os.getenv(
     "GC_PACKAGE_HASH_ALGORITHM", "sha256"
 )
+_GC_REPRODUCE_SEARCH_LIMIT = int(
+    os.getenv("GC_REPRODUCE_SEARCH_LIMIT", "20")
+)
+_GC_REPRODUCE_MAX_CANDIDATES = int(
+    os.getenv("GC_REPRODUCE_MAX_CANDIDATES", "5")
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -724,10 +730,11 @@ class ProductionPackageRuntime:
             package.metadata.updated_at = now
             package._integrity_hash = package.compute_hash()
 
-            # Arşiv dizinine kaydet
+            # Arşiv dizinine kaydet (_save_to_disk ile aynı format —
+            # to_dict + _integrity_hash; _load_from_disk bunu bekler)
             archive_path = self._archive_path(pid)
             archive_path.parent.mkdir(parents=True, exist_ok=True)
-            data = json.dumps(package.to_dict(), ensure_ascii=False, indent=2)
+            data = package.to_dict()
             data["_integrity_hash"] = package._integrity_hash
             archive_path.write_text(
                 json.dumps(data, ensure_ascii=False, indent=2),
@@ -809,6 +816,260 @@ class ProductionPackageRuntime:
                 f"({old_status} → {status.value})"
             )
             return True
+
+    # ── Yeniden Üretim (Re-Production) İşlemleri ───────────────────────────
+
+    async def find_package(self, query: str) -> Optional[ProductionPackage]:
+        """PID veya ürün adına göre Production Package bulur.
+
+        Yönetici tarafından başlatılan yeniden üretim prosedüründe kullanılır.
+        Önce query'yi PID olarak doğrular; değilse aktif ve arşivlenmiş
+        package'ların brief/scenario alanlarında arama yapar.
+
+        Args:
+            query: PID veya ürün adı/marka/senaryo başlığı parçası.
+
+        Returns:
+            En uygun ProductionPackage veya None.
+        """
+        if not query or not query.strip():
+            return None
+
+        query_clean = query.strip()
+
+        # Adım 1: PID olarak doğrula (kilit almadan — deadlock önlemi)
+        from services.pid_runtime import pid_runtime
+
+        pid_validation = await pid_runtime.validate(query_clean)
+        if pid_validation.is_valid:
+            package = await self.load(query_clean)
+            if package is not None:
+                return package
+
+        # Adım 2: Ürün adı / marka / senaryo başlığında ara
+        query_lower = query_clean.lower()
+        candidates: list[tuple[ProductionPackage, str]] = []
+
+        search_dirs = [
+            _GC_PACKAGE_STORAGE_DIR,
+            _GC_PACKAGE_STORAGE_DIR / _GC_PACKAGE_ARCHIVE_DIR_NAME,
+        ]
+
+        async with self._lock:
+            searched = 0
+            for directory in search_dirs:
+                if not directory.exists():
+                    continue
+                for path in directory.glob("*.json"):
+                    if searched >= _GC_REPRODUCE_SEARCH_LIMIT:
+                        break
+                    searched += 1
+                    package = self._load_from_disk(path)
+                    if package is None:
+                        continue
+
+                    # Eşleşme skoru: product_name > brand > scenario.title
+                    score = 0
+                    brief = package.brief or {}
+                    scenario = package.scenario or {}
+                    product_name = str(brief.get("product_name", "")).lower()
+                    brand = str(brief.get("brand", "")).lower()
+                    scenario_title = str(scenario.get("title", "")).lower()
+
+                    if product_name and query_lower in product_name:
+                        score = 3
+                    elif brand and query_lower in brand:
+                        score = 2
+                    elif scenario_title and query_lower in scenario_title:
+                        score = 1
+
+                    if score > 0:
+                        candidates.append((package, package.metadata.updated_at))
+
+        if not candidates:
+            return None
+
+        # En güncel adayı döndür
+        candidates.sort(key=lambda x: x[1] or "", reverse=True)
+        return candidates[0][0]
+
+    async def prepare_for_reproduction(
+        self, pid: str, procedure: str
+    ) -> bool:
+        """Production Package'i yeniden üretim için hazırlar.
+
+        Prosedüre göre package durumunu ve task'ları ayarlar;
+        revision_history'ye kayıt ekler.
+
+        Args:
+            pid: Production ID.
+            procedure: HLK Runtime tarafından belirlenen prosedür.
+                       RESUME | RETRY | REPLAY | START_AS_NEW
+
+        Returns:
+            True: Hazırlık başarılı.
+            False: Package bulunamadı veya arşivlenmiş.
+        """
+        from services.pid_runtime import pid_runtime
+
+        procedure = (procedure or "RESUME").upper()
+        now = datetime.now(timezone.utc).isoformat()
+
+        async with self._lock:
+            package = self._packages.get(pid)
+            if package is None:
+                package = self._load_from_disk(self._package_path(pid))
+                if package is None:
+                    package = self._load_from_disk(self._archive_path(pid))
+                if package:
+                    self._packages[pid] = package
+
+            if package is None:
+                logger.warning(
+                    f"⚠️ [Package Runtime] Reproduction hazırlığı başarısız — "
+                    f"PID bulunamadı: {pid}"
+                )
+                return False
+
+            if package.metadata.status == PackageStatus.ARCHIVED.value:
+                logger.warning(
+                    f"⚠️ [Package Runtime] Arşivlenmiş package yeniden "
+                    f"üretilemez: {pid}"
+                )
+                return False
+
+            previous_status = package.metadata.status
+
+            # Revision history kaydı
+            revision_entry = {
+                "type": "reproduction",
+                "procedure": procedure,
+                "timestamp": now,
+                "previous_status": previous_status,
+            }
+            if not isinstance(package.revision_history, list):
+                package.revision_history = []
+            package.revision_history.append(revision_entry)
+
+            # Metadata güncelle
+            package.metadata.production_type = "reproduction"
+            package.metadata.updated_at = now
+
+            # Task'ları prosedüre göre ayarla
+            task_packages = package.task_packages or []
+            for task in task_packages:
+                if not isinstance(task, dict):
+                    continue
+                if procedure == "REPLAY":
+                    task["status"] = "PENDING"
+                    task["completed_at"] = ""
+                    task["error_detail"] = ""
+                elif procedure == "RETRY":
+                    if task.get("status") in ("FAILED", "TIMEOUT"):
+                        task["status"] = "PENDING"
+                        task["completed_at"] = ""
+                        task["error_detail"] = ""
+                # RESUME / START_AS_NEW: task'lar dokunulmaz
+
+            # REPLAY durumunda final/delivery geçici temizlik
+            if procedure == "REPLAY":
+                package.metadata.status = PackageStatus.READY.value
+                package.final_video = {}
+                package.delivery_info = {}
+            else:
+                package.metadata.status = PackageStatus.PRODUCING.value
+
+            package._integrity_hash = package.compute_hash()
+            self._save_to_disk(package)
+
+            logger.info(
+                f"🔄 [Package Runtime] Reproduction hazır: {pid} "
+                f"({previous_status} → {package.metadata.status}, "
+                f"procedure={procedure})"
+            )
+            return True
+
+    async def load_full_production_context(self, pid: str) -> dict:
+        """Yeniden üretim için gerekli anayasal kayıtları toplar.
+
+        Production Package, Workflow, State Engine kayıtları, Olay Kayıt
+        Merkezi, Dijital Varlık Arşivi/Katalog, Sahne Kayıt Defteri ve
+        Karar Gerekçesi kayıtlarını birleştirir.
+
+        Args:
+            pid: Production ID.
+
+        Returns:
+            HLK Runtime değerlendirmesi için context sözlüğü.
+        """
+        package = await self.load(pid)
+        if package is None:
+            return {"pid": pid, "error": "Production Package bulunamadı"}
+
+        # Task durumlarını analiz et
+        task_packages = package.task_packages or []
+        total_tasks = len(task_packages)
+        completed_tasks = sum(
+            1 for t in task_packages
+            if isinstance(t, dict) and t.get("status") in ("COMPLETED", "SUCCESS")
+        )
+        failed_tasks = sum(
+            1 for t in task_packages
+            if isinstance(t, dict) and t.get("status") in ("FAILED", "TIMEOUT")
+        )
+        pending_tasks = total_tasks - completed_tasks - failed_tasks
+
+        last_error = ""
+        failed_step = ""
+        for task in task_packages:
+            if isinstance(task, dict) and task.get("status") in ("FAILED", "TIMEOUT"):
+                last_error = task.get("error_detail", "")
+                failed_step = task.get("task_id", "")
+                break
+
+        last_successful_step = ""
+        for task in reversed(task_packages):
+            if isinstance(task, dict) and task.get("status") in ("COMPLETED", "SUCCESS"):
+                last_successful_step = task.get("task_id", "")
+                break
+
+        brief = package.brief or {}
+        scenario = package.scenario or {}
+        metadata = package.metadata or ProductionMetadata()
+
+        return {
+            "pid": pid,
+            "package_status": metadata.status,
+            "production_type": metadata.production_type,
+            "product_name": brief.get("product_name", ""),
+            "brand": brief.get("brand", ""),
+            "created_at": metadata.created_at,
+            "updated_at": metadata.updated_at,
+            "completed_at": metadata.completed_at,
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "failed_tasks": failed_tasks,
+            "pending_tasks": pending_tasks,
+            "last_error": last_error,
+            "failed_step": failed_step,
+            "last_successful_step": last_successful_step,
+            # Anayasal kayıt mekanizmaları
+            "workflow": {
+                "task_packages": task_packages,
+            },
+            "state_engine_records": {
+                "package_status": metadata.status,
+            },
+            "event_logs": package.event_logs or [],
+            "digital_asset_archive": package.digital_assets or [],
+            "digital_asset_catalog": package.digital_assets or [],
+            "scene_registry": {
+                "scenario": scenario,
+                "storyboard": package.storyboard or {},
+            },
+            "decision_history": package.decision_history or [],
+            "revision_history": package.revision_history or [],
+        }
 
     # ── Bütünlük Doğrulama ───────────────────────────────────────────────
 

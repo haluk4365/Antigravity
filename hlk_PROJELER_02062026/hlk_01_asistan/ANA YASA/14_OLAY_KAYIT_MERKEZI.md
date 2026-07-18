@@ -1880,6 +1880,98 @@ Tüm alanlar Olay Veri Standardı bölümünde tanımlanan kurallara uygun olara
 
 ---
 
+### Yeniden Üretim Olayları (AR-002_84 — Yönetici Yeniden Üretim Prosedürü)
+
+> Bu olay grubu, OLAY-025 (`EVENT_VIDEO_PRODUCTION_FAILED`) kaydında tanımlı
+> **"Tekrar Deneme Politikası: Yönetici onayı gerekir"** hükmünün runtime
+> uygulamasıdır. Yeniden üretimin tamamlanması ve başarısızlığı için yeni olay
+> tanımlanmaz; mevcut OLAY-024 (`EVENT_VIDEO_PRODUCTION_COMPLETED`) ve
+> OLAY-025 (`EVENT_VIDEO_PRODUCTION_FAILED`) olayları kullanılır
+> (Single Source of Truth — MASTER-001).
+
+---
+
+### OLAY-107 — EVENT_REPRODUCTION_REQUESTED
+
+| Alan | Değer |
+|------|-------|
+| Olay Kimliği | OLAY-107 |
+| Teknik Sabit | `EVENT_REPRODUCTION_REQUESTED` |
+| Olay Adı | Yeniden Üretim Talep Edildi |
+| Açıklama | Yönetici, başarısız veya yarım kalmış bir üretim için yeniden üretim prosedürünü onayladı. Prosedür yalnızca Yönetici tarafından başlatılabilir; kullanıcı başlatamaz (AR-002_84). |
+| PID | Zorunlu — `PID-YYYYMMDD-NNNN` |
+| Üreten Bileşen | HLK |
+| Kullanan Bileşenler | Production Runtime, HLK Runtime, Log Sistemi, Operasyon Hafızası, LAC |
+| Kaynak Durum | `STATE_VIDEO_PRODUCTION` |
+| Hedef Durum | `STATE_VIDEO_PRODUCTION` |
+| İlgili Workflow | WF-008, WF-017 |
+| İlgili Feature | FEAT-002, FEAT-014 |
+| Tetikleyici | Yönetici onayı ([Evet, Başlat]) |
+| Oluşturulma Koşulu | Yönetici, yeniden üretim onay ekranını onayladığında |
+| Öncelik | `PRIORITY_HIGH` |
+| Olay Çıktıları | PID doğrulanır → Anayasal kayıtlar yüklenir → HLK Runtime REPRODUCTION kararı istenir |
+| Sonraki Olay | EVENT_REPRODUCTION_STARTED veya EVENT_REPRODUCTION_REJECTED |
+| Tekrar Deneme Politikası | Yok |
+| Bildirim Hedefleri | Log Sistemi, Operasyon Hafızası, LAC |
+| Kayıt Politikası | Loglanır, Production Package Event Loglarına yazılır, Operasyon Hafızasına yazılır |
+| Sonuç | Yeniden üretim değerlendirme süreci başlatıldı |
+
+---
+
+### OLAY-108 — EVENT_REPRODUCTION_STARTED
+
+| Alan | Değer |
+|------|-------|
+| Olay Kimliği | OLAY-108 |
+| Teknik Sabit | `EVENT_REPRODUCTION_STARTED` |
+| Olay Adı | Yeniden Üretim Başlatıldı |
+| Açıklama | HLK Runtime, REPRODUCTION kararını (RESUME / RETRY / REPLAY / START_AS_NEW) üretti ve yeniden üretim süreci mevcut PID ve Production Package üzerinde başlatıldı (AR-002_57 PID tekilliği korunur). |
+| PID | Zorunlu — `PID-YYYYMMDD-NNNN` |
+| Üreten Bileşen | HLK |
+| Kullanan Bileşenler | Production Runtime, Production Executor, Decision Engine, Log Sistemi, Operasyon Hafızası, LAC |
+| Kaynak Durum | `STATE_VIDEO_PRODUCTION` |
+| Hedef Durum | `STATE_VIDEO_PRODUCTION` |
+| İlgili Workflow | WF-008, WF-017 |
+| İlgili Feature | FEAT-002, FEAT-008, FEAT-009, FEAT-014 |
+| Tetikleyici | HLK Runtime REPRODUCTION kararı (REJECT dışında) |
+| Oluşturulma Koşulu | Production Package yeniden üretime hazırlandığında |
+| Öncelik | `PRIORITY_HIGH` |
+| Olay Çıktıları | Üretim görevleri checkpoint'ten devam eder → Servis sağlayıcılar Decision Packet'e göre devreye alınır |
+| Sonraki Olay | EVENT_VIDEO_PRODUCTION_COMPLETED (OLAY-024) veya EVENT_VIDEO_PRODUCTION_FAILED (OLAY-025) |
+| Tekrar Deneme Politikası | AR-002_79 / AR-002_83 Recovery Policy kapsamında HLK Runtime yönetir |
+| Bildirim Hedefleri | Log Sistemi, Telegram Yönetici, Operasyon Hafızası, LAC |
+| Kayıt Politikası | Loglanır, Production Package Event Loglarına yazılır, Operasyon Hafızasına yazılır, Raporlamaya dahil edilir |
+| Sonuç | Yeniden üretim süreci başlatıldı |
+
+---
+
+### OLAY-109 — EVENT_REPRODUCTION_REJECTED
+
+| Alan | Değer |
+|------|-------|
+| Olay Kimliği | OLAY-109 |
+| Teknik Sabit | `EVENT_REPRODUCTION_REJECTED` |
+| Olay Adı | Yeniden Üretim Reddedildi |
+| Açıklama | PID doğrulanamadı, Production Package bulunamadı/arşivlenmiş veya HLK Runtime REPRODUCTION kararı REJECT üretti. Prosedür başlatılmaz; durum anayasal gerekçesiyle Yöneticiye bildirilir ve işlem güvenli şekilde sonlandırılır (AR-002_84 İstisna Akışı). |
+| PID | Zorunlu — `PID-YYYYMMDD-NNNN` (sorgulanan değer) |
+| Üreten Bileşen | HLK |
+| Kullanan Bileşenler | HLK Runtime, Log Sistemi, Operasyon Hafızası, Yönetici Bildirim Sistemi |
+| Kaynak Durum | `STATE_VIDEO_PRODUCTION` |
+| Hedef Durum | `STATE_VIDEO_PRODUCTION` |
+| İlgili Workflow | WF-017 |
+| İlgili Feature | FEAT-002 |
+| Tetikleyici | HLK Runtime REPRODUCTION kararı: REJECT |
+| Oluşturulma Koşulu | Yeniden üretim ön koşulları sağlanamadığında |
+| Öncelik | `PRIORITY_HIGH` |
+| Olay Çıktıları | Karar gerekçesi Decision History'ye yazılır → Yönetici bilgilendirilir → Güvenli sonlandırma |
+| Sonraki Olay | Yok (güvenli sonlandırma) |
+| Tekrar Deneme Politikası | Yok — Yönetici yeni bir talep başlatabilir |
+| Bildirim Hedefleri | Log Sistemi, Telegram Yönetici, Operasyon Hafızası |
+| Kayıt Politikası | Loglanır, Production Package Event Loglarına yazılır (paket mevcutsa), Operasyon Hafızasına yazılır |
+| Sonuç | Yeniden üretim başlatılmadı, işlem güvenli şekilde sonlandırıldı |
+
+---
+
 ## 21. Temel İlke
 
 Bu dosya;
