@@ -283,7 +283,7 @@ class ProductionExecutor:
                 self._report.completed_at = datetime.now(timezone.utc).isoformat()
 
                 # Production Package durumunu güncelle
-                await self._update_package_status(pid)
+                await self._record_execution_result(pid)
 
                 logger.info(
                     f"✅ [Executor] Yürütme tamamlandı: {pid} "
@@ -645,33 +645,44 @@ class ProductionExecutor:
             )
 
     # ═══════════════════════════════════════════════════════════════════════
-    # FAZ 4: Sonuç Kaydetme ve Durum Güncelleme
+    # FAZ 4: Yürütme Sonuçlarını Kaydetme
     # ═══════════════════════════════════════════════════════════════════════
+    # AR-002_88: Executor yalnızca teknik Event ve veri kaydeder.
+    # PackageStatus (COMPLETED/FAILED) bir anayasal karardır —
+    # Executor'un yetkisinde DEĞİLDİR. Bu karar zinciri:
+    #   Executor → Production Runtime → Decision Request → HLK Runtime
+    #   → CEE → Package Status Update
+    # Executor bu zincirde yalnızca ilk halkadır.
 
-    async def _update_package_status(self, pid: str) -> None:
-        """Production Package durumunu günceller.
+    async def _record_execution_result(self, pid: str) -> None:
+        """Yürütme sonuçlarını Package event_logs'a kaydeder.
 
-        Tüm task'lar tamamlandığında package durumu güncellenir.
-        Başarısız task varsa package durumu FAILED olarak işaretlenir.
+        AR-002_88: Executor PackageStatus DEĞİŞTİREMEZ.
+        Yalnızca EXECUTION_FINISHED event'ini ve teknik sonuçları yazar.
+        COMPLETED/FAILED kararı Production Runtime → HLK Runtime zincirine aittir.
         """
-        from services.production_package_runtime import (
-            package_runtime, PackageStatus
-        )
+        from services.production_package_runtime import package_runtime
 
         try:
-            if self._report and self._report.failed_tasks > 0:
-                await package_runtime.update_status(pid, PackageStatus.FAILED)
-            else:
-                await package_runtime.update_status(pid, PackageStatus.COMPLETED)
-
-            # Execution sonuçlarını event_logs'a kaydet
             if self._report:
+                total = self._report.total_tasks
+                completed = self._report.completed_tasks
+                failed = self._report.failed_tasks
+
+                # Teknik yürütme sonucunu logla — karar DEĞİL
+                logger.info(
+                    f"📊 [Executor] EXECUTION_FINISHED: {pid} — "
+                    f"tamamlanan={completed}/{total}, "
+                    f"başarısız={failed}/{total}"
+                )
+
+                # Execution sonuçlarını event_logs'a kaydet
                 event_entry = {
-                    "event_type": "EXECUTION_COMPLETED",
+                    "event_type": "EXECUTION_FINISHED",
                     "pid": pid,
-                    "total_tasks": self._report.total_tasks,
-                    "completed_tasks": self._report.completed_tasks,
-                    "failed_tasks": self._report.failed_tasks,
+                    "total_tasks": total,
+                    "completed_tasks": completed,
+                    "failed_tasks": failed,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
                 # AR-002_73 / 15_KARAR Bölüm 10: kayıtlar silinemez —
@@ -686,8 +697,13 @@ class ProductionExecutor:
                 await package_runtime.update_section(
                     pid, "event_logs", existing_logs
                 )
+
+                logger.info(
+                    f"📝 [Executor] Execution sonucu event_logs'a yazıldı: {pid} "
+                    f"(PackageStatus kararı Production Runtime'a aittir)"
+                )
         except Exception as e:
-            logger.warning(f"⚠️ [Executor] Package durum güncelleme hatası: {e}")
+            logger.warning(f"⚠️ [Executor] Execution sonucu kaydedilemedi: {e}")
 
     # ═══════════════════════════════════════════════════════════════════════
     # Durum Raporlama
@@ -819,7 +835,7 @@ class ProductionExecutor:
 
                 self._state = ExecutorState.COMPLETED
                 self._report.completed_at = datetime.now(timezone.utc).isoformat()
-                await self._update_package_status(pid)
+                await self._record_execution_result(pid)
 
                 logger.info(
                     f"✅ [Executor] Recovery tamamlandı: {pid} "
