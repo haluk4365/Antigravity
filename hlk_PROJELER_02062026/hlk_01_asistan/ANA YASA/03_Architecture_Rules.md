@@ -5669,6 +5669,61 @@ gerçekleştirilir. Böylece her Agent, görevlendirilmeden önce hangi servis s
 
 ---
 
+### Primary Candidate ve Backup Candidate Havuzu
+
+HLK, üretime başlamadan önce ilgili harici kaynak kategorisi için aday havuzunu oluşturmak zorundadır.
+
+Her aday havuzu aşağıdaki yapılardan oluşur:
+
+* **Primary Candidate** — Üretimde ilk kullanılacak adaydır.
+* **Backup Candidate** — Primary Candidate kullanılamaz hale geldiğinde veya anayasal olarak değiştirilmesi gerektiğinde kullanılmak üzere önceden belirlenen alternatif adaylardır.
+
+Aday havuzu oluşturulmadan Production Runtime başlatılamaz.
+
+Aday havuzu oluşturulduktan sonra;
+
+* Puanlama,
+* Öncelik sıralaması,
+* API doğrulaması,
+* Kredi doğrulaması,
+* Kota doğrulaması,
+* Servis sağlık doğrulaması,
+* Operasyonel doğrulamalar
+
+bu aday havuzu üzerinden gerçekleştirilir.
+
+Production Runtime başladıktan sonra aday havuzu yeniden rastgele oluşturulamaz.
+
+Yeni aday oluşturulması yalnızca mevcut anayasal karar mekanizmaları kapsamında gerçekleştirilebilir:
+
+* AR-002_19 — Ajan Sürekliliği ve Operasyonel Eskalasyon (başarısızlık durumunda sıradaki adaya geçiş),
+* AR-002_21 — Ajan Değiştirme ve Yeniden Seçim (değişen koşullarda yeni aday seçimi),
+* AR-002_22 — Constitutional Feedback Loop (yeniden değerlendirme ve karar güncelleme),
+* AR-002_75 — Decision Engine (alternatif servis seçimi),
+* AR-002_76 — Production Execution (retry ve checkpoint mekanizması),
+* AR-002_87 — External Resource Recovery Protocol (anayasal recovery yaşam döngüsü).
+
+Primary Candidate ve Backup Candidate sayıları anayasa içerisinde sabit yazılmaz.
+
+Bu değerler yalnızca Global Configuration üzerinden yönetilir:
+
+* `GC_PRIMARY_CANDIDATE_COUNT` — Primary Candidate sayısı,
+* `GC_BACKUP_CANDIDATE_COUNT` — Backup Candidate sayısı.
+
+Bu mimari;
+
+* Video Provider,
+* Image Provider,
+* Voice Provider,
+* LLM Provider,
+* Agent,
+* API,
+* ve gelecekte sisteme eklenecek tüm harici kaynak kategorileri
+
+için ortak anayasal standarttır.
+
+---
+
 ### Değerlendirme Kriterleri
 
 Servis seçimi tek bir kritere göre yapılmaz.
@@ -7726,3 +7781,163 @@ Pasif anayasa maddeleri tespit edilirse;
 * Anayasa ihlalleri insan müdahalesi olmadan tespit edilir ve engellenir.
 * HLK Runtime yalnızca CEE onaylı kararları uygular.
 * Anayasa dışı hiçbir "Başarılı", "Tamamlandı", "Teslim Edildi" kararı üretilemez.
+
+---
+
+## AR-002_87
+
+### Madde Adı
+
+**HARİCİ KAYNAK KURTARMA PROTOKOLÜ — External Resource Recovery Protocol**
+
+### Kural
+
+HLK, tüm harici kaynaklar (External Resources) için anayasal düzeyde tanımlanmış ortak bir Kurtarma Protokolü (External Resource Recovery Protocol) uygular.
+
+Harici kaynak kavramı en az aşağıdaki bileşenleri kapsar;
+
+* Servis Sağlayıcılar (Provider)
+* AI Modelleri
+* Agent'lar
+* API Servisleri
+* Harici Araçlar
+* Harici Sistemler
+* Gelecekte sisteme eklenecek tüm dış bağımlılıklar
+
+HLK hiçbir harici kaynak türü için farklı anayasal Recovery mantığı oluşturmaz.
+
+Tüm harici kaynaklar aynı anayasal Recovery yaşam döngüsünü kullanır.
+
+---
+
+### Anayasal Recovery Yaşam Döngüsü
+
+Bu yaşam döngüsü en az aşağıdaki anayasal aşamalardan oluşur;
+
+1. **Kaynağın sınıflandırılması** — Harici kaynağın türü, önceliği ve kritiklik seviyesi belirlenir.
+2. **Hata türünün belirlenmesi** — HTTP hatası, timeout, yetkilendirme, kota, format, bağlantı gibi kategorize edilir.
+3. **Hatanın geçici veya kalıcı olduğunun değerlendirilmesi** — Geçici hatalar (timeout, rate-limit) ile kalıcı hatalar (auth, quota) ayrıştırılır.
+4. **Recovery sürecinin başlatılması** — Geçici hatalar için anayasal bekleme ve yeniden deneme; kalıcı hatalar için doğrudan alternatif kaynağa geçiş.
+5. **Kaynağın durumunun yeniden doğrulanması** — Recovery sonrası kaynağın çalışır durumda olup olmadığı test edilir.
+6. **Gerekirse kontrollü yeniden deneme (Retry)** — AR-002_76 kapsamında GC parametreleriyle sınırlandırılmış retry.
+7. **Gerekirse anayasal bekleme stratejisinin uygulanması (Backoff)** — Exponential backoff veya sabit aralıklı bekleme, GC parametrelerine göre.
+8. **Recovery limitlerinin değerlendirilmesi** — `GC_EXECUTOR_MAX_RETRY`, `GC_MAX_RE_EVALUATION_COUNT` sınırları aşıldı mı?
+9. **Kaynağın başarısız ilan edilmesi** — Tüm recovery adımları başarısız olduğunda, kanıt temelli olarak FAILED işaretlenir.
+10. **Decision Engine'e devredilmesi** — Başarısız kaynak Decision Engine'e bildirilir; yeniden değerlendirme başlatılır (AR-002_75).
+11. **Alternatif kaynağın anayasal kurallara göre seçilmesi** — Selection Architecture öncelik sıralamasına göre bir sonraki aday seçilir (AR-002_19, AR-002_21).
+
+---
+
+### Başarısızlık Kriterleri
+
+HLK yalnızca Timeout oluştuğu için bir harici kaynağı başarısız kabul etmez.
+
+Bir harici kaynağın başarısız ilan edilmesi yalnızca anayasal olarak tanımlanmış başarısızlık kriterlerinin oluşması halinde mümkündür:
+
+* Tüm retry denemeleri tükenmiştir (AR-002_76).
+* Anayasal bekleme stratejisi eksiksiz uygulanmıştır.
+* Kaynak doğrulama testi başarısız olmuştur.
+* Kalıcı hata tespit edilmiştir (auth, quota, invalid_config).
+* Recovery limitleri aşılmıştır (AR-002_22, AR-002_79).
+
+---
+
+### Kanıt ve Kayıt Zorunluluğu
+
+Recovery süreci boyunca alınan tüm kararlar kanıt temelli olmak zorundadır.
+
+Recovery sürecinde verilen tüm kararlar;
+
+* Event Log (EEC + Olay Kayıt Merkezi),
+* Decision Log (15_KARAR_GEREKCESI_STANDARDI.md),
+* Production Package Event Logları
+
+üzerinden izlenebilir şekilde kaydedilir.
+
+---
+
+### Durum Kodu Standardı
+
+Her harici kaynak kendi teknik durum kodlarını (Status) kullanabilir.
+
+Örneğin;
+
+* Provider: `COMPLETED`, `PROCESSING`, `QUEUED`, `FAILED`
+* Agent: `AGENT_SUCCESS`, `AGENT_FAILED`, `AGENT_TIMEOUT`
+* API: HTTP durum kodları (200, 429, 503, vb.)
+* AI Modeli: `completed`, `running`, `failed`, `queued`
+
+Ancak HLK'nın bu durumlara vereceği anayasal Recovery davranışı tüm harici kaynaklar için ortak olmak zorundadır.
+
+HLK, kaynağa özgü durum kodunu anayasal Recovery yaşam döngüsündeki karşılığına eşler:
+
+| Kaynak Durumu | Anayasal Sınıflandırma | Recovery Davranışı |
+|---|---|---|
+| `COMPLETED` / `success` | Başarılı | Recovery gerekmez |
+| `PROCESSING` / `QUEUED` / `running` | Geçici — işlem devam ediyor | Durum sorgulamasına devam et |
+| `FAILED` / `AGENT_FAILED` | Kalıcı | Doğrudan alternatif kaynağa geç |
+| Timeout | Geçici | Retry + backoff |
+| HTTP 429 (Rate Limit) | Geçici | Backoff + retry |
+| HTTP 401/403 (Auth) | Kalıcı | Doğrudan alternatif kaynağa geç |
+| HTTP 5xx (Server Error) | Geçici | Retry + backoff |
+
+---
+
+### Zorunluluk ve Kapsam
+
+Bu mimari, HLK sistemindeki tüm modüller için zorunlu anayasal davranış standardıdır.
+
+Hiçbir modül;
+
+* Bu mimariyi devre dışı bırakamaz.
+* Kendi alternatif Recovery Protokolünü oluşturamaz.
+* Anayasal Recovery yaşam döngüsünü atlayamaz.
+* Decision Engine onayı olmadan farklı bir kurtarma stratejisi uygulayamaz.
+
+Kaynak türüne özgü teknik uygulamalar farklı olabilir.
+
+Ancak tüm modüller anayasal olarak tanımlanan External Resource Recovery Protocol'ünü uygulamak zorundadır.
+
+---
+
+### Temel İlke
+
+HLK'nın başarı kriteri, ilk hatada kaynağı değiştirmek değil; anayasal Recovery Protokolünü eksiksiz uyguladıktan sonra en doğru anayasal kararı vermektir.
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **MASTER** | MASTER-001 | ANA YASA üstünlüğü — bu protokol tüm modülleri bağlar |
+| **MASTER** | MASTER-004 | HLK Karar Mekanizması — kaynak değiştirme kararı HLK'ya aittir |
+| **MASTER** | MASTER-013 | HLK Runtime tek karar otoritesi — recovery kararları HLK Runtime'dadır |
+| **AR** | AR-002_19 | Selection Architecture — alternatif kaynak öncelik sıralaması |
+| **AR** | AR-002_21 | Provider Switching — sıradaki adaya geçiş kararı |
+| **AR** | AR-002_22 | Feedback Loop — yeniden değerlendirme mekanizması |
+| **AR** | AR-002_57 | PID Standardı — recovery kayıtlarında PID zorunluluğu |
+| **AR** | AR-002_60 | Constitution Enforcement Engine — recovery kararlarının denetimi |
+| **AR** | AR-002_70 | Production Runtime — recovery'nin tek giriş noktası |
+| **AR** | AR-002_75 | Decision Engine — alternatif kaynak seçimi |
+| **AR** | AR-002_76 | Production Execution — retry ve checkpoint mekanizması |
+| **AR** | AR-002_79 | Üretim Sürekliliği — başarısızlık sonrası devam |
+| **AR** | AR-002_81 | Karar Talep Protokolü — PROVIDER_RESULT, EXECUTION_FAILURE |
+| **AR** | AR-002_82 | Mission Persistence — 8 adımlı başarısızlık değerlendirmesi |
+| **AR** | AR-002_83 | Recovery Policy — üst politika katmanı |
+| **AR** | AR-002_86 | Anayasal Yürütme İlkesi — protokolün aktif denetimi |
+| **GC** | GC_EXECUTOR_MAX_RETRY | Maksimum yeniden deneme sayısı |
+| **GC** | GC_EXECUTOR_RETRY_DELAY | Denemeler arası bekleme süresi |
+| **GC** | GC_MAX_RE_EVALUATION_COUNT | Maksimum yeniden değerlendirme sayısı |
+
+---
+
+### Beklenen Sonuç
+
+* Tüm harici kaynaklar aynı anayasal Recovery yaşam döngüsünü kullanır.
+* Hiçbir modül kendi alternatif recovery protokolü oluşturamaz.
+* Recovery kararları kanıt temelli ve izlenebilirdir.
+* Kaynak değiştirme yalnızca anayasal kriterler sağlandığında yapılır.
+* İlk hatada kaynak değiştirilmez — önce anayasal recovery uygulanır.
+* Tüm recovery süreci Event Log ve Decision Log'a kaydedilir.
+* Decision Engine onayı olmadan alternatif kaynağa geçilmez.

@@ -36,6 +36,8 @@ Proje genelinde geçerli yapılandırma kuralları.
 | `GC_PROVIDER_POLL_COUNT` | 10 | Provider sonuç bekleme maksimum durum sorgusu sayısı (AR-002_81) |
 | `GC_IMAGE_POLL_INTERVAL` | 3 saniye | Görsel üretim durum sorgusu aralığı (AR-002_81) |
 | `GC_VIDEO_POLL_INTERVAL` | 5 saniye | Video üretim durum sorgusu aralığı (AR-002_81) |
+| `GC_PRIMARY_CANDIDATE_COUNT` | 1 | Primary Candidate sayısı — üretimde ilk kullanılacak aday (AR-002_75) |
+| `GC_BACKUP_CANDIDATE_COUNT` | 3 | Backup Candidate sayısı — alternatif aday havuzu büyüklüğü (AR-002_75) |
 | `GC_REPRODUCE_SEARCH_LIMIT` | 20 | Yeniden üretim paket aramasında taranacak maksimum package dosyası sayısı (AR-002_84) |
 | `GC_REPRODUCE_MAX_CANDIDATES` | 5 | Yeniden üretim paket aramasında değerlendirilecek maksimum aday sayısı (AR-002_84) |
 
