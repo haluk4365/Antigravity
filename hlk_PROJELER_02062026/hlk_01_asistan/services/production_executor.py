@@ -570,6 +570,18 @@ class ProductionExecutor:
             output["agent"] = agent
             output["executed_at"] = datetime.now(timezone.utc).isoformat()
 
+            # AR-002_84: yalnızca gerçek üretim başarı sayılır. Handler
+            # çıktısındaki başarı kanıtı (generated/delivered) False ise
+            # COMPLETED checkpoint'i YAZILMAZ — aksi halde sahte COMPLETED
+            # kalıcı pakete işlenir ve sonraki recovery/yeniden üretim
+            # 0 pending task bulup üretim yapılmadan FAIL üretir.
+            proof_keys = [k for k in ("generated", "delivered") if k in output]
+            if proof_keys and not all(bool(output[k]) for k in proof_keys):
+                detail = ", ".join(f"{k}={output[k]}" for k in proof_keys)
+                raise RuntimeError(
+                    f"Üretim kanıtı yok: {agent} — {detail} (AR-002_84)"
+                )
+
             # Task Checkpoint: status'u COMPLETED olarak persist et
             await self._checkpoint_task_completion(task_id, pid)
             return output
