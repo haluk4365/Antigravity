@@ -1,0 +1,20 @@
+[Script Info]
+Title: HLK Karaoke V1
+ScriptType: v4.00+
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+PlayResX: 832
+PlayResY: 1088
+
+[V4+ Styles]
+Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding
+Style: Bub,Arial,24,&H00FFFFFF,&H00666666,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,8,30,30,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.000,0:00:00.366,Bub,,0,0,0,,{\an8}{\pos(416,947)}{\c&H00FFFFFF}Harika...\N {\c&H00666666}Ihtiyacim {\c&H00666666}olan {\c&H00666666}tum {\c&H00666666}bilgileri {\c&H00666666}basariyla
+Dialogue: 0,0:00:00.366,0:00:00.636,Bub,,0,0,0,,{\an8}{\pos(416,947)}{\c&H00666666}Harika...\N {\c&H00FFFFFF}Ihtiyacim {\c&H00666666}olan {\c&H00666666}tum {\c&H00666666}bilgileri {\c&H00666666}basariyla
+Dialogue: 0,0:00:00.636,0:00:00.781,Bub,,0,0,0,,{\an8}{\pos(416,947)}{\c&H00666666}Harika...\N {\c&H00666666}Ihtiyacim {\c&H00FFFFFF}olan {\c&H00666666}tum {\c&H00666666}bilgileri {\c&H00666666}basariyla
+Dialogue: 0,0:00:00.781,0:00:01.150,Bub,,0,0,0,,{\an8}{\pos(416,947)}{\c&H00666666}Harika...\N {\c&H00666666}Ihtiyacim {\c&H00666666}olan {\c&H00FFFFFF}tum {\c&H00666666}bilgileri {\c&H00666666}basariyla
+Dialogue: 0,0:00:01.150,0:00:01.900,Bub,,0,0,0,,{\an8}{\pos(416,947)}{\c&H00666666}Harika...\N {\c&H00666666}Ihtiyacim {\c&H00666666}olan {\c&H00666666}tum {\c&H00FFFFFF}bilgileri {\c&H00666666}basariyla
+Dialogue: 0,0:00:01.900,0:00:03.240,Bub,,0,0,0,,{\an8}{\pos(416,947)}{\c&H00666666}Harika...\N {\c&H00666666}Ihtiyacim {\c&H00666666}olan {\c&H00666666}tum {\c&H00666666}bilgileri {\c&H00FFFFFF}basariyla

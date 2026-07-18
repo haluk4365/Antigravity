@@ -1,0 +1,12 @@
+{
+  "escalation_id": "ESC-20260717-9C5B",
+  "pid": "PID-20260717-0003",
+  "reason": "ALL_PROVIDERS_FAILED",
+  "detail": "Production Failed: RuntimeError: Package oluşturma zaman aşımı (15.0s)",
+  "failed_providers": [],
+  "retry_count": 0,
+  "requires_manual_intervention": true,
+  "created_at": "2026-07-17T15:53:37.233230+00:00",
+  "resolved": false,
+  "resolved_at": ""
+}
