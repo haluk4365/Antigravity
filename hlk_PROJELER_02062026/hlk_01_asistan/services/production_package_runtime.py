@@ -981,129 +981,137 @@ class ProductionPackageRuntime:
                         task["error_detail"] = ""
                 # RESUME / START_AS_NEW: task'lar dokunulmaz
 
-            # ── AR-002_84 RETRY: Çıktı bazlı task reset ──────────────────
-            # MASTER-013: RETRY yeni bir üretimdir. Eski COMPLETED task
-            # status'ları yeni üretimi ENGELLEYEMEZ.
+            # ── AR-002_88 RETRY: Proof bazlı task reset ─────────────────
+            # MASTER-013: RETRY yeni bir üretimdir. Status'a değil
+            # proof'a (kanıta) güvenilir.
             #
-            # RETRY'de teslim zinciri şu kuralla resetlenir:
-            #   1. final_video dosyası diskte yoksa → VideoRenderer PENDING
-            #   2. delivery_info.delivered != True ise → DeliveryAgent PENDING
-            #   3. Package durumu FAILED ise → en az DeliveryAgent PENDING
-            #      (eski COMPLETED status'a bakılmaksızın)
+            # Her task için anayasal proof doğrulaması:
+            #   TASK-001 ImageGenerator: generated=True, artifact!="", file exists
+            #   TASK-002 VoiceGenerator:  generated=True, artifact!="", file exists
+            #   TASK-003 VideoRenderer:   generated=True, artifact!="", file exists
+            #   TASK-004 DeliveryAgent:   delivered=True, telegram_message_id exists
             #
-            # Bu kurallar, pending_tasks=[] oluşarak üretim başlamadan
-            # FAIL verilmesini anayasal olarak ENGELLER.
+            # Status=COMPLETED ama proof INVALID → PENDING yapılır.
+            # Output KORUNUR (tarihçe için) — executor yeni çıktıyı üretir.
+            # Hiçbir task'ın output'u silinmez.
             if procedure == "RETRY":
-                import os as _os_ck
-                di = package.delivery_info or {}
-                fv = package.final_video or {}
+                import os as _os_proof
 
-                _video_path = fv.get("path", "")
-                _video_file_exists = bool(
-                    _video_path and _os_ck.path.exists(_video_path)
-                )
-                _need_video = not _video_file_exists or not di.get("video")
-                _need_delivery = not di.get("delivered")
+                def _validate_proof(_task: dict, _pkg) -> tuple:
+                    """Task proof'unu doğrular. (is_valid, reason, detail) döndürür."""
+                    _agent = _task.get("agent", "")
+                    _out = _task.get("output") or {}
+                    _di = _pkg.delivery_info or {}
+                    _fv = _pkg.final_video or {}
 
-                # RETRY güvenlik kilidi: Package FAILED ise teslim
-                # gerçekleşmemiş demektir — delivery_info'ya bakmaksızın
-                # DeliveryAgent resetlenir.
-                _package_failed = (previous_status == "FAILED")
+                    if _agent == "ImageGenerator":
+                        _gen = _out.get("generated")
+                        _art = _out.get("artifact") or _out.get("img_path") or ""
+                        if not _gen:
+                            return False, f"generated={_gen}", ""
+                        if not _art:
+                            return False, "artifact boş", ""
+                        if not _os_proof.path.exists(str(_art)):
+                            return False, f"dosya yok", str(_art)
+                        return True, "generated=True", str(_art)
 
-                if _need_video or _need_delivery or _package_failed:
-                    reset_count = 0
-                    for task in task_packages:
-                        if not isinstance(task, dict):
-                            continue
-                        agent = task.get("agent", "")
-                        current_status = task.get("status", "")
-                        task_id = task.get("task_id", "?")
+                    elif _agent == "VoiceGenerator":
+                        _gen = _out.get("generated")
+                        _art = _out.get("artifact") or _out.get("voice_path") or ""
+                        if not _gen:
+                            return False, f"generated={_gen}", ""
+                        if not _art:
+                            return False, "artifact boş", ""
+                        if not _os_proof.path.exists(str(_art)):
+                            return False, f"dosya yok", str(_art)
+                        return True, "generated=True", str(_art)
 
-                        # Video eksik → VideoRenderer yeniden çalışsın
-                        if (_need_video or _package_failed) and agent == "VideoRenderer":
-                            if current_status not in ("PENDING",):
-                                task["status"] = "PENDING"
-                                task["completed_at"] = ""
-                                task["error_detail"] = ""
-                                # Çıktıyı temizle — yeni üretim kendi çıktısını üretir
-                                if "output" in task:
-                                    del task["output"]
-                                reset_count += 1
-                                logger.info(
-                                    f"🔧 [Package Runtime] RETRY reset: "
-                                    f"{task_id} (VideoRenderer) — "
-                                    f"final_video eksik veya package FAILED"
-                                )
+                    elif _agent == "VideoRenderer":
+                        _gen = _out.get("generated")
+                        _art = _out.get("artifact") or _out.get("video_path") or ""
+                        _fv_path = _fv.get("path", "")
+                        # Önce task output artifact, yoksa final_video path
+                        _best_path = _art or _fv_path
+                        if not _gen:
+                            return False, f"generated={_gen}", ""
+                        if not _best_path:
+                            return False, "artifact ve final_video.path boş", ""
+                        if not _os_proof.path.exists(str(_best_path)):
+                            return False, f"dosya yok", str(_best_path)
+                        return True, "generated=True", str(_best_path)
 
-                        # Teslim gerçekleşmemiş → DeliveryAgent yeniden çalışsın
-                        if (_need_delivery or _package_failed) and agent == "DeliveryAgent":
-                            if current_status not in ("PENDING",):
-                                task["status"] = "PENDING"
-                                task["completed_at"] = ""
-                                task["error_detail"] = ""
-                                if "output" in task:
-                                    del task["output"]
-                                reset_count += 1
-                                logger.info(
-                                    f"🔧 [Package Runtime] RETRY reset: "
-                                    f"{task_id} (DeliveryAgent) — "
-                                    f"delivered=False veya package FAILED"
-                                )
+                    elif _agent == "DeliveryAgent":
+                        _delivered = _out.get("delivered")
+                        _msg_id = _out.get("telegram_message_id")
+                        # delivery_info'dan da bak (checkpoint yedeği)
+                        _di_delivered = _di.get("delivered")
+                        _di_msg_id = _di.get("telegram_message_id")
+                        _eff_delivered = _delivered or _di_delivered
+                        _eff_msg_id = _msg_id or _di_msg_id
+                        if not _eff_delivered:
+                            return False, f"delivered={_eff_delivered}", ""
+                        if not _eff_msg_id:
+                            return False, "telegram_message_id yok", ""
+                        return True, f"delivered=True msg_id={_eff_msg_id}", ""
 
-                        # Task çıktısı generated=False → reset
-                        # ── AR-002_87 KORUMA ──────────────────────────
-                        # ImageGenerator ve VoiceGenerator artifact'leri
-                        # ASLA silinmez. VideoRenderer'ın çalışması için
-                        # ctx.img_path ve ctx.voice_path zorunludur.
-                        # Bu task'ların output'u korunur; yalnızca
-                        # VideoRenderer / DeliveryAgent çıktıları temizlenir.
-                        _task_output = task.get("output") or {}
-                        _task_generated = _task_output.get("generated")
-                        if (
-                            _task_generated is False
-                            and current_status not in ("PENDING",)
-                            and agent not in ("ImageGenerator", "VoiceGenerator")
-                        ):
-                            task["status"] = "PENDING"
-                            task["completed_at"] = ""
-                            task["error_detail"] = ""
-                            if "output" in task:
-                                del task["output"]
-                            reset_count += 1
-                            logger.info(
-                                f"🔧 [Package Runtime] RETRY reset: "
-                                f"{task_id} ({agent}) — "
-                                f"çıktı generated=False"
-                            )
-                        elif (
-                            _task_generated is False
-                            and agent in ("ImageGenerator", "VoiceGenerator")
-                        ):
-                            # AR-002_87: Artifact KORUNDU — silme
-                            _artifact_key = (
-                                "img_path" if agent == "ImageGenerator"
-                                else "voice_path"
-                            )
-                            _artifact_val = (
-                                _task_output.get("artifact")
-                                or _task_output.get(_artifact_key)
-                            )
-                            logger.info(
-                                f"🛡️ [Package Runtime] RETRY KORUNDU: "
-                                f"{task_id} ({agent}) artifact={_artifact_val} "
-                                f"— VideoRenderer için zorunlu, silinmedi"
-                            )
+                    # Bilinmeyen agent — proof atlanır
+                    return True, f"bilinmeyen agent", ""
 
-                    if reset_count > 0:
+                reset_count = 0
+                for task in task_packages:
+                    if not isinstance(task, dict):
+                        continue
+                    agent = task.get("agent", "")
+                    current_status = task.get("status", "")
+                    task_id = task.get("task_id", "?")
+
+                    # ── Proof doğrulaması ──────────────────────────────
+                    proof_valid, proof_reason, proof_detail = (
+                        _validate_proof(task, package)
+                    )
+
+                    # ── RETRY kararı ───────────────────────────────────
+                    if current_status in ("COMPLETED", "SUCCESS") and not proof_valid:
+                        task["status"] = "PENDING"
+                        task["completed_at"] = ""
+                        task["error_detail"] = ""
+                        # output KORUNUR — tarihçe için. Executor yeni çıktıyı üretir.
+                        reset_count += 1
+                        _detail_suffix = f" [{proof_detail}]" if proof_detail else ""
                         logger.info(
-                            f"🔧 [Package Runtime] RETRY: {reset_count} task "
-                            f"PENDING yapıldı | PID={pid}"
+                            f"🔧 [Package Runtime] RETRY proof FAIL: "
+                            f"{task_id} ({agent}) — {proof_reason}{_detail_suffix}"
+                            f" → PENDING"
                         )
-                    else:
+                    elif current_status in ("COMPLETED", "SUCCESS") and proof_valid:
+                        _detail_suffix = f" [{proof_detail[:80]}]" if proof_detail else ""
                         logger.info(
-                            f"✅ [Package Runtime] RETRY: tüm task'lar zaten "
-                            f"PENDING veya üretim tamamlanmış | PID={pid}"
+                            f"✅ [Package Runtime] RETRY proof OK: "
+                            f"{task_id} ({agent}) — {proof_reason}{_detail_suffix}"
                         )
+                    elif current_status in ("PENDING",):
+                        logger.info(
+                            f"⏳ [Package Runtime] RETRY: "
+                            f"{task_id} ({agent}) — zaten PENDING"
+                        )
+                    elif current_status in ("FAILED", "TIMEOUT"):
+                        # Genel RETRY'de PENDING yapıldı (yukarıdaki blok)
+                        logger.info(
+                            f"🔧 [Package Runtime] RETRY: "
+                            f"{task_id} ({agent}) — status={current_status}"
+                            f" → PENDING"
+                        )
+
+                if reset_count > 0:
+                    logger.info(
+                        f"🔧 [Package Runtime] RETRY proof: {reset_count} task "
+                        f"PENDING yapıldı | PID={pid}"
+                    )
+                else:
+                    logger.info(
+                        f"✅ [Package Runtime] RETRY proof: tüm task'lar "
+                        f"PENDING veya proof geçerli | PID={pid}"
+                    )
 
             # REPLAY durumunda final/delivery geçici temizlik
             if procedure == "REPLAY":
