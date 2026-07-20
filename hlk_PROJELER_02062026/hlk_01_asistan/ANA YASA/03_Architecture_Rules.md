@@ -8142,3 +8142,126 @@ Aşağıdaki işlemler anayasal olarak yasaktır:
 * Package Status yalnızca anayasal zincir tamamlandıktan sonra güncellenir.
 * Hiçbir modül yetki zincirini atlayarak doğrudan Package Status değiştiremez.
 * Teknik Event ile anayasal karar birbirine karıştırılamaz.
+
+---
+
+## AR-002_89
+
+### Madde Adı
+
+**PROVIDER DURUM SORGULAMA MİMARİSİ — Provider Polling Architecture**
+
+### Amaç
+
+HLK'nın harici üretim servis sağlayıcılarını (Provider) sabit zaman aşımı (Fixed Timeout) mantığı ile yönetmesini engellemek; Provider yönetimini anayasal karar mekanizmasına bağlı, gerçek zamanlı geri bildirim ve üretim yaşam döngüsü esaslı standart bir polling mimarisine oturtmak.
+
+### Kural
+
+HLK, harici üretim servis sağlayıcılarını sabit zaman aşımı mantığı ile yönetmez. Provider yönetimi anayasal karar mekanizması tarafından yürütülür ve Provider'ın canlı durumu (State), gerçek zamanlı geri bildirimi ve üretim yaşam döngüsü esas alınır.
+
+---
+
+### Anayasal Polling Parametreleri
+
+Provider bekleme politikası aşağıdaki anayasal parametreler kullanılarak yürütülür:
+
+| Parametre | Değer | Açıklama |
+|---|---|---|
+| `GC_PROVIDER_POLL_INTERVAL` | 50 | Her Provider durum sorgulaması (Poll) arasındaki bekleme süresi (saniye). |
+| `GC_PROVIDER_MAX_POLL_COUNT` | 5 | Bir Provider için gerçekleştirilecek en fazla durum sorgulama (Poll) sayısı. |
+
+Bu parametreler `01_Global_Configuration.md` içerisinde tanımlıdır ve sistem genelinde tüm Provider'lar için ortak anayasal standarttır.
+
+---
+
+### Polling Çalışma Kuralları
+
+HLK aşağıdaki kuralları uygular:
+
+1. Provider üretim isteğini kabul ettikten sonra durum sorgulamaları `GC_PROVIDER_POLL_INTERVAL` değerine göre gerçekleştirilir.
+
+2. HLK en fazla `GC_PROVIDER_MAX_POLL_COUNT` kadar durum sorgulaması yapar.
+
+3. Aşağıdaki Provider durumları **aktif üretim** olarak kabul edilir:
+   - `QUEUED`
+   - `WAITING`
+   - `GENERATING`
+
+   Provider bu durumlardan birini döndürdüğü sürece HLK üretimin devam ettiğini kabul eder ve bir sonraki durum sorgulamasına kadar bekler.
+
+4. Provider aşağıdaki durumlardan herhangi birini döndürürse bekleme **derhal** sonlandırılır:
+   - `FAILED`
+   - `ERROR`
+   - `REJECTED`
+   - `CANCELLED`
+
+   Bu durumda:
+   - HLK kalan Poll haklarını kullanmaz.
+   - Provider anayasal olarak başarısız kabul edilir.
+   - HLK anayasal Provider seçim mekanizmasına göre hemen bir sonraki uygun Provider'a geçer (AR-002_75, AR-002_21).
+
+5. Provider, `GC_PROVIDER_MAX_POLL_COUNT` sınırına ulaştığı halde `COMPLETED` durumuna geçmemişse ilgili Provider **TIMEOUT** olarak değerlendirilir ve anayasal Provider seçim mekanizmasına göre bir sonraki Provider'a geçilir (AR-002_75, AR-002_79).
+
+6. Provider `COMPLETED` durumuna geçtiğinde yalnızca durum bilgisi başarı kabul edilmez. Üretilen çıktı anayasal Artifact doğrulama mekanizmasından geçirilir (AR-002_85). Artifact doğrulaması başarısız ise üretim başarılı sayılmaz.
+
+---
+
+### Provider Değişim Kaydı
+
+Her Provider değişiminde HLK aşağıdaki bilgileri Event Collector (AR-002_73) ve Karar Gerekçesi (15_KARAR_GEREKCESI_STANDARDI.md) kayıtlarına işler:
+
+| Kayıt Alanı | Açıklama |
+|---|---|
+| Provider Adı | Değiştirilen Provider'ın kimliği |
+| Son Provider Durumu | Değişim anındaki Provider state değeri |
+| Toplam Bekleme Süresi | Provider için harcanan toplam süre |
+| Yapılan Poll Sayısı | Gerçekleştirilen durum sorgulama sayısı |
+| Provider Değiştirme Gerekçesi | Değişimin anayasal nedeni |
+| Verilen Anayasal Karar | HLK Runtime karar kimliği |
+
+---
+
+### Anayasal Sınırlar
+
+HLK hiçbir koşulda:
+
+* tek bir Provider nedeniyle üretim sürecini durduramaz,
+* sonsuz bekleme durumuna giremez,
+* anayasal karar mekanizmasını devre dışı bırakamaz.
+
+Bu sınırlar sistemdeki tüm harici üretim servis sağlayıcıları için mutlak anayasal güvencedir.
+
+---
+
+### Temel İlke
+
+**Provider yönetimi sabit timeout değil, anayasal karar mekanizması tarafından yürütülen dinamik bir polling mimarisidir. Provider'a özel implementasyonlar bu mimari standardı ihlal edemez.**
+
+---
+
+### Anayasal Dayanak
+
+| Katman | Referans | Dayanak Açıklaması |
+|---|---|---|
+| **GC** | `GC_PROVIDER_POLL_INTERVAL` | Provider durum sorgulama aralığı (50 saniye) |
+| **GC** | `GC_PROVIDER_MAX_POLL_COUNT` | Maksimum durum sorgulama sayısı (5) |
+| **AR** | AR-002_21 | Provider Switching — sıradaki adaya geçiş kararı |
+| **AR** | AR-002_73 | Production Event Runtime — Provider değişim Event kaydı |
+| **AR** | AR-002_75 | Production Service Selection — aday havuzu ve seçim |
+| **AR** | AR-002_79 | Production Continuity — TIMEOUT sonrası süreklilik |
+| **AR** | AR-002_85 | Video Üretim Başarı İlkesi — Artifact doğrulama zorunluluğu |
+| **AR** | AR-002_87 | External Resource Recovery — başarısızlık sonrası kurtarma |
+
+---
+
+### Beklenen Sonuç
+
+* Tüm Provider'lar aynı anayasal polling standardını kullanır.
+* Hiçbir Provider sabit timeout ile yönetilmez; karar her zaman HLK Runtime'a aittir.
+* Aktif üretim durumları (QUEUED, WAITING, GENERATING) ile başarısız durumlar (FAILED, ERROR, REJECTED, CANCELLED) anayasal olarak ayrıştırılır.
+* Başarısız durum tespitinde kalan Poll hakları kullanılmaz; derhal bir sonraki Provider'a geçilir.
+* Poll sınırı aşımında Provider TIMEOUT kabul edilir ve alternatif Provider'a geçilir.
+* COMPLETED durumu tek başına yeterli değildir; Artifact doğrulaması zorunludur.
+* Tüm Provider değişimleri kanıt temelli ve izlenebilir şekilde kaydedilir.
+* Hiçbir koşulda tek bir Provider için sonsuz bekleme yapılamaz.
+* Provider'a özel implementasyonlar bu mimari standardı ihlal edemez.
