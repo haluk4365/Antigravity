@@ -1095,6 +1095,14 @@ class ProductionRuntime:
                 ctx.voice_path = str(_voice_path)
                 logger.info(f"🔊 [Reproduction] Kayıtlı ses geri yüklendi: {pid}")
 
+            # ── Adım 17.6: Checkpoint üretim durumunu PipelineContext'e ──
+            # geri yükle (AR-002_84 / MASTER-003). Executor recovery
+            # checkpoint'teki tamamlanmış task'ları atlasa bile
+            # PipelineContext anayasal üretim gerçeğini yansıtmalıdır.
+            # delivery_info, final_video, service_usage, task_packages
+            # → ctx.delivered, ctx.video_path, ctx.cost_report, vb.
+            await self._restore_context_from_checkpoint(pid, ctx)
+
             # ── Adım 18: Üretim yönetimi (Executor recovery — AR-002_79) ─
             self._state = ProductionState.EXECUTING
             from services.production_executor import production_executor
@@ -1383,6 +1391,111 @@ class ProductionRuntime:
                 logger.warning(
                     f"⚠️ [Reproduction] {audience} bildirimi gönderilemedi: {e}"
                 )
+
+    async def _restore_context_from_checkpoint(self, pid: str, ctx) -> None:
+        """AR-002_84: Checkpoint'teki anayasal üretim durumunu PipelineContext'e geri yükle.
+
+        Production Package'in delivery_info, final_video, service_usage ve
+        task_packages bölümlerinden üretim durumunu okur ve PipelineContext
+        alanlarını (delivered, video_path, img_path, voice_path, cost_report)
+        günceller.
+
+        MASTER-003 gereği: Executor recovery checkpoint'teki tamamlanmış
+        task'ları atlasa bile PipelineContext anayasal üretim gerçeğini
+        yansıtmak zorundadır. Aksi halde CEE POST-CHECK sıfır ihlalle
+        FAIL üretir (AR-002_86 ihlali).
+
+        Restore yalnızca eksik alanları doldurur — halihazırda set edilmiş
+        PipelineContext değerleri korunur (checkpoint değerleri üzerine yazılmaz).
+        """
+        from services.production_package_runtime import package_runtime
+
+        pkg = await package_runtime.load(pid)
+        if pkg is None:
+            return
+
+        restored: list[str] = []
+
+        # ── delivery_info → delivered ──────────────────────────────────
+        di = pkg.delivery_info or {}
+        if di.get("delivered") and not ctx.delivered:
+            ctx.delivered = True
+            restored.append("delivered")
+
+        # ── final_video → video_path ───────────────────────────────────
+        fv = pkg.final_video or {}
+        _video_path = fv.get("path", "")
+        if _video_path and not ctx.video_path:
+            ctx.video_path = _video_path
+            restored.append("video_path")
+
+        # ── delivery_info.video → video_path (final_video yoksa) ───────
+        if not ctx.video_path and di.get("video"):
+            # Teslim edilmiş video mevcut ancak path kaydedilmemişse
+            # volume'dan geri yüklemeyi dene
+            _assets_dir = (
+                Path(os.getenv("GC_PACKAGE_STORAGE_DIR", "data/production_packages"))
+                .parent / "assets"
+            )
+            _vid_candidate = _assets_dir / f"{pid}_video.mp4"
+            if _vid_candidate.exists():
+                ctx.video_path = str(_vid_candidate)
+                restored.append("video_path (volume)")
+
+        # ── service_usage → cost_report ────────────────────────────────
+        su = pkg.service_usage or {}
+        if su:
+            existing_services = ctx.cost_report.get("services", {})
+            for svc_key, svc_val in su.get("services", {}).items():
+                if svc_key not in existing_services:
+                    existing_services[svc_key] = svc_val
+                    restored.append(f"cost_report.services.{svc_key}")
+            ctx.cost_report["services"] = existing_services
+            # pid/decision_id zaten ctx oluşturulurken set edilir
+            for _meta_key in ("pid", "decision_id", "reproduction"):
+                if _meta_key in su and _meta_key not in ctx.cost_report:
+                    ctx.cost_report[_meta_key] = su[_meta_key]
+
+        # ── task_packages → task çıktı artifact'leri ───────────────────
+        for task in (pkg.task_packages or []):
+            if task.get("status") not in ("COMPLETED", "SUCCESS"):
+                continue
+            agent = task.get("agent", "")
+            task_output = task.get("output") or task.get("result") or {}
+
+            if agent == "ImageGenerator" and not ctx.img_path:
+                _artifact = task_output.get("artifact") or task_output.get("img_path")
+                if _artifact:
+                    ctx.img_path = _artifact
+                    restored.append(f"img_path ({task.get('task_id')})")
+
+            elif agent == "VoiceGenerator" and not ctx.voice_path:
+                _artifact = task_output.get("artifact") or task_output.get("voice_path")
+                if _artifact:
+                    ctx.voice_path = _artifact
+                    restored.append(f"voice_path ({task.get('task_id')})")
+
+            elif agent == "VideoRenderer" and not ctx.video_path:
+                _artifact = task_output.get("artifact") or task_output.get("video_path")
+                if _artifact:
+                    ctx.video_path = _artifact
+                    restored.append(f"video_path ({task.get('task_id')})")
+
+            elif agent == "DeliveryAgent" and not ctx.delivered:
+                if task_output.get("delivered"):
+                    ctx.delivered = True
+                    restored.append(f"delivered ({task.get('task_id')})")
+
+        if restored:
+            logger.info(
+                f"📋 [Reproduction] Checkpoint → PipelineContext restore: "
+                f"{', '.join(restored)} | PID={pid}"
+            )
+        else:
+            logger.debug(
+                f"📋 [Reproduction] Checkpoint restore: geri yüklenecek "
+                f"yeni alan yok | PID={pid}"
+            )
 
     async def _record_reproduction_event(
         self, pid: str, event_constant: str, event_name: str,

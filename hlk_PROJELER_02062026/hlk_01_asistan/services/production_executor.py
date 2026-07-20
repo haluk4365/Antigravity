@@ -610,8 +610,8 @@ class ProductionExecutor:
                     + ", ".join(f"{k}={output[k]}" for k in proof_keys)
                 )
 
-            # Task Checkpoint: status'u COMPLETED olarak persist et
-            await self._checkpoint_task_completion(task_id, pid)
+            # Task Checkpoint: status + output persist (AR-002_84)
+            await self._checkpoint_task_completion(task_id, pid, output)
             return output
 
         # ── Fallback: handler kayıtlı değil (test/simülasyon modu) ──────
@@ -629,28 +629,35 @@ class ProductionExecutor:
         if "input_data" in task:
             task_output["input_used"] = True
 
-        # ── Task Checkpoint: status'u COMPLETED olarak persist et ──────
+        # ── Task Checkpoint: status + output persist (AR-002_84) ──────
         # Recovery sırasında tamamlanan task'lar tekrar yürütülmesin
-        await self._checkpoint_task_completion(task_id, pid)
+        await self._checkpoint_task_completion(task_id, pid, task_output)
 
         return task_output
 
     async def _checkpoint_task_completion(
-        self, task_id: str, pid: str
+        self, task_id: str, pid: str, output: dict | None = None
     ) -> None:
         """Task tamamlanma durumunu Production Package'e yazar.
 
         Production Package Runtime'ın mevcut update_section() mekanizması
         kullanılır. Package atomik olarak diske kaydedilir (tmp + replace).
 
+        AR-002_84: Task çıktısı (output) da checkpoint'e dahil edilir.
+        Bu sayede recovery sırasında tamamlanan task'ların üretim
+        artifact'leri (img_path, voice_path, video_path, delivered)
+        PipelineContext'e geri yüklenebilir (MASTER-003).
+
         Bu checkpoint sayesinde:
         - Recovery'de tamamlanan task'lar atlanır
         - Crash sonrası yalnızca PENDING task'lar yürütülür
         - Gereksiz CPU/I/O/retry önlenir
+        - Task çıktıları (artifact path'leri) kaybolmaz
 
         Args:
             task_id: Tamamlanan task'ın ID'si.
             pid: Production PID'si.
+            output: Task handler çıktısı (opsiyonel, AR-002_84).
         """
         try:
             from services.production_package_runtime import package_runtime
@@ -669,6 +676,9 @@ class ProductionExecutor:
                 if t_updated.get("task_id") == task_id:
                     t_updated["status"] = "COMPLETED"
                     t_updated["completed_at"] = datetime.now(timezone.utc).isoformat()
+                    # AR-002_84: Task çıktısını da checkpoint'e yaz
+                    if output:
+                        t_updated["output"] = output
                 updated_tasks.append(t_updated)
 
             await package_runtime.update_section(
@@ -877,6 +887,13 @@ class ProductionExecutor:
                 self._report.completed_at = datetime.now(timezone.utc).isoformat()
                 await self._record_execution_result(pid)
 
+                # ── AR-002_84: Checkpoint üretim durumunu PipelineContext'e ──
+                # geri yükle. Executor checkpoint'teki tamamlanmış task'ları
+                # atlasa bile PipelineContext anayasal üretim gerçeğini
+                # yansıtmak zorundadır (MASTER-003). Aksi halde CEE POST-CHECK
+                # sıfır ihlalle FAIL üretir (AR-002_86).
+                await self._restore_pipeline_context(pid, pkg, all_tasks)
+
                 logger.info(
                     f"✅ [Executor] Recovery tamamlandı: {pid} "
                     f"({self._report.completed_tasks}/{self._report.total_tasks})"
@@ -888,6 +905,83 @@ class ProductionExecutor:
                 raise
 
             return self._report
+
+    async def _restore_pipeline_context(
+        self, pid: str, pkg, all_tasks: list
+    ) -> None:
+        """AR-002_84: Checkpoint üretim durumunu PipelineContext'e geri yükle.
+
+        Executor recovery checkpoint'teki tamamlanmış task'ları atlasa bile,
+        bu task'ların üretim çıktıları (delivered, video_path, artifact'ler)
+        PipelineContext'e aktarılır.
+
+        MASTER-003: PipelineContext anayasal üretim gerçeğini yansıtmak
+        zorundadır. Checkpoint'te bulunan hiçbir alan kaybedilemez.
+
+        Yalnızca eksik alanları doldurur — halihazırda set edilmiş
+        değerler korunur (çalışan task'ların taze çıktıları önceliklidir).
+        """
+        try:
+            from services.production_pipeline import get_context
+            ctx = get_context(pid)
+            if ctx is None:
+                return
+
+            restored: list[str] = []
+
+            # ── delivery_info → delivered ──────────────────────────────
+            di = pkg.delivery_info or {} if pkg is not None else {}
+            if di.get("delivered") and not ctx.delivered:
+                ctx.delivered = True
+                restored.append("delivered")
+
+            # ── final_video → video_path ───────────────────────────────
+            fv = pkg.final_video or {} if pkg is not None else {}
+            _video_path = fv.get("path", "")
+            if _video_path and not ctx.video_path:
+                ctx.video_path = _video_path
+                restored.append("video_path")
+
+            # ── task_packages → artifact'ler ──────────────────────────
+            for task in all_tasks:
+                if task.get("status") not in ("COMPLETED", "SUCCESS"):
+                    continue
+                agent = task.get("agent", "")
+                output = task.get("output") or task.get("result") or {}
+
+                if agent == "ImageGenerator" and not ctx.img_path:
+                    _artifact = output.get("artifact") or output.get("img_path")
+                    if _artifact:
+                        ctx.img_path = _artifact
+                        restored.append(f"img_path ({task.get('task_id')})")
+
+                elif agent == "VoiceGenerator" and not ctx.voice_path:
+                    _artifact = output.get("artifact") or output.get("voice_path")
+                    if _artifact:
+                        ctx.voice_path = _artifact
+                        restored.append(f"voice_path ({task.get('task_id')})")
+
+                elif agent == "VideoRenderer" and not ctx.video_path:
+                    _artifact = output.get("artifact") or output.get("video_path")
+                    if _artifact:
+                        ctx.video_path = _artifact
+                        restored.append(f"video_path ({task.get('task_id')})")
+
+                elif agent == "DeliveryAgent" and not ctx.delivered:
+                    if output.get("delivered"):
+                        ctx.delivered = True
+                        restored.append(f"delivered ({task.get('task_id')})")
+
+            if restored:
+                logger.info(
+                    f"📋 [Executor] Checkpoint → PipelineContext restore: "
+                    f"{', '.join(restored)} | PID={pid}"
+                )
+
+        except Exception as e:
+            logger.warning(
+                f"⚠️ [Executor] PipelineContext restore hatası: {e}"
+            )
 
     # ═══════════════════════════════════════════════════════════════════════
     # Reset (Test Yardımcısı)
