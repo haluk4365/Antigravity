@@ -148,9 +148,6 @@ class ProductionRuntime:
         # ── Concurrency control ──────────────────────────────────────────
         self._lock = asyncio.Lock()
 
-        # ── MASTER-013: Final karar idempotency ──────────────────────────
-        self._final_notified: set[str] = set()
-
     # ═══════════════════════════════════════════════════════════════════════
     # Ana Akış: Production Başlatma (AR-002_70 — 10 Adım)
     # ═══════════════════════════════════════════════════════════════════════
@@ -1440,21 +1437,7 @@ class ProductionRuntime:
     ) -> None:
         """AR-002_84 Adım 21: Sonuç hem Yöneticiye hem ilgili Kullanıcıya
         anayasal bildirim kurallarına uygun şekilde iletilir (MASTER-013:
-        bildirim içerikleri yalnızca HLK Runtime kararı ile üretilir).
-
-        MASTER-013: Final karar idempotenttir. Aynı PID için ikinci
-        final bildirimi ENGELLENIR.
-        """
-        # ── MASTER-013: Final bildirim idempotency kilidi ──────────────
-        if pid and pid in self._final_notified:
-            logger.warning(
-                f"⛔ [Reproduction] Final bildirim zaten yapıldı, "
-                f"tekrar ENGELLENDI: {pid}"
-            )
-            return
-        if pid:
-            self._final_notified.add(pid)
-
+        bildirim içerikleri yalnızca HLK Runtime kararı ile üretilir)."""
         from services.hlk_runtime import (
             hlk_runtime, DecisionRequest, DecisionCategory,
         )
@@ -2183,6 +2166,38 @@ class ProductionRuntime:
             })
             logger.info(f"📦 [Production Package Updated] {pid} (service_usage, delivery_info)")
 
+            # ── Kullanıcı bildirimi (MASTER-013) ─────────────────────────
+            # Video teslim edilemediyse kullanıcı bilgilendirilir.
+            # task_delivery handler'ı DELIVER_INFO'da mesaj göndermez
+            # (executor retry döngüsünde tekrar tekrar mesaj göndermeyi önlemek için).
+            # Nihai bildirim burada, production akışının sonunda TEK SEFER yapılır.
+            if not ctx.delivered:
+                try:
+                    if request.bot is not None:
+                        from services.hlk_runtime import (
+                            hlk_runtime as _hr_prod,
+                            DecisionRequest as _DR_prod,
+                            DecisionCategory as _DC_prod,
+                        )
+                        prod_notify = _hr_prod.request_decision(_DR_prod(
+                            pid=pid,
+                            category=_DC_prod.USER_NOTIFICATION.value,
+                            requester="production_runtime._run_managed",
+                            context={
+                                "kind": "delivery_info",
+                                "product_name": request.product_name,
+                                "pid": pid,
+                            },
+                        ))
+                        if prod_notify.verdict == "NOTIFY":
+                            await request.bot.send_message(
+                                chat_id=request.chat_id,
+                                text=prod_notify.params.get("text", ""),
+                                parse_mode=prod_notify.params.get("parse_mode", "HTML"),
+                            )
+                except Exception as e:
+                    logger.warning(f"⚠️ [ProductionRuntime] Kullanıcı bildirimi gönderilemedi: {e}")
+
             # ── State Transition (SE-007_4) ──────────────────────────────
             se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
             logger.info(
@@ -2364,10 +2379,8 @@ class ProductionRuntime:
         # Kullanıcıya dürüst bilgilendirme (EEC-001: Fake Progress yasak)
         # MASTER-013 / AR-002_81: Süreç kararı içeren kullanıcı mesajı
         # yürütme katmanında ÜRETİLMEZ; içerik HLK Runtime kararı ile belirlenir.
-        # MASTER-013: Final bildirim idempotenttir — aynı PID tekrar ENGELLENIR.
         try:
-            if request.bot is not None and pid and pid not in self._final_notified:
-                self._final_notified.add(pid)
+            if request.bot is not None:
                 from services.hlk_runtime import (
                     hlk_runtime as _hr_notify,
                     DecisionRequest as _NotifyReq,

@@ -715,19 +715,16 @@ async def task_delivery(task: dict, pid: str) -> dict:
                 parse_mode=delivery_decision.params.get("parse_mode", "HTML"),
             )
         logger.info(f"✅ [Production] VIDEO GONDERILDI: {pid}")
+        ctx.delivered = True
     else:
-        # DELIVER_INFO — ses/video oynaticisi GONDERILMEZ; onaylı metin iletilir
-        await req.bot.send_message(
-            chat_id=req.chat_id,
-            text=delivery_decision.params.get("text", ""),
-            parse_mode=delivery_decision.params.get("parse_mode", "HTML"),
-        )
-        logger.info(f"✅ [Production] BILGILENDIRME: {pid}")
+        # DELIVER_INFO: Video mevcut değil — kullanıcıya mesaj GÖNDERILMEZ.
+        # MASTER-013: Görev yürütücüsü (task_delivery) kullanıcıya süreç
+        # kararı içeren mesaj gönderemez. Nihai bildirim, üretim akışının
+        # sonunda _notify_reproduction_result tarafından TEK SEFER yapılır.
+        # Executor retry döngüsü nedeniyle bu handler 3 kez çağrılabilir —
+        # her çağrıda mesaj göndermek "3 Tamamlandı + 1 FAILED" üretir.
+        logger.info(f"ℹ️ [Production] DELIVER_INFO — video yok, mesaj gonderilmedi: {pid}")
 
-    # Yalnızca gerçek video teslimi yapıldıysa delivered=True
-    # (DELIVER_INFO metin bildirimi teslim sayılmaz — AR-002_84)
-    if delivery_decision.verdict == "DELIVER_VIDEO":
-        ctx.delivered = True  # Teknik sonuç kaydı — karar değildir (AR-002_76 Adım 6)
     return {
         "task_id": task.get("task_id"),
         "delivered": delivery_decision.verdict == "DELIVER_VIDEO",

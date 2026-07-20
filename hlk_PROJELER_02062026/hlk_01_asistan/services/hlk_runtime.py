@@ -1138,6 +1138,25 @@ class HLKRuntime:
                 ],
             )
 
+        if kind == "delivery_info":
+            # Video teslim edilemedi — üretim tamamlandı ancak video
+            # hazırlanamadı. Kullanıcıya dürüst bilgilendirme.
+            product_name = ctx.get("product_name", "urununuz")
+            text = (
+                f"🎬 <b>Uretim Tamamlandi!</b>\n\n"
+                f"📋 PID: <code>{pid}</code>\n"
+                f"Urun: <b>{product_name}</b>\n\n"
+                f"Videonuz hazirlaniyor, en kisa surede gonderilecektir.\n"
+                f"<i>HLK AI Reklam Asistani</i>"
+            )
+            return self._new_decision(
+                request, "NOTIFY", {"text": text, "parse_mode": "HTML"},
+                [
+                    "Video teslim edilemedi — kullanıcı bilgilendirildi",
+                    "Bildirim metni HLK Runtime tarafından onaylandı (OR-004_12)",
+                ],
+            )
+
         return self._new_decision(
             request, "HOLD", {"action": "NONE"},
             [f"Tanımsız bildirim türü: {kind}"],
