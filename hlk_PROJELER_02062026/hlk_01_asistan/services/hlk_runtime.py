@@ -100,6 +100,7 @@ class DecisionCategory(str, Enum):
     USER_NOTIFICATION = "USER_NOTIFICATION"    # Süreç kararı içeren bildirim
     REPRODUCTION = "REPRODUCTION"              # Yeniden üretim prosedürü (AR-002_82/83)
     AMBIGUITY = "AMBIGUITY"                    # Tereddüt — karar üretilemeyen durum
+    TASK_RESULT = "TASK_RESULT"                # MASTER-013: Task SUCCESS/FAIL kararı
 
 
 @dataclass
@@ -574,6 +575,7 @@ class HLKRuntime:
             DecisionCategory.USER_NOTIFICATION.value: self._decide_user_notification,
             DecisionCategory.REPRODUCTION.value: self._decide_reproduction,
             DecisionCategory.AMBIGUITY.value: self._decide_ambiguity,
+            DecisionCategory.TASK_RESULT.value: self._decide_task_result,
         }
         decider = deciders.get(request.category, self._decide_ambiguity)
         decision = decider(request)
@@ -870,6 +872,64 @@ class HLKRuntime:
         return self._new_decision(
             request, "CONFIRM_COMPLETION", {"success": completion_success},
             justifications,
+        )
+
+    def _decide_task_result(self, request: DecisionRequest) -> RuntimeDecision:
+        """TASK_RESULT: Task SUCCESS/FAIL kararı (MASTER-013).
+
+        MASTER-013: Production Executor (Claude) SUCCESS/FAIL kararı veremez.
+        Bu karar yalnızca HLK Runtime tarafından üretilir.
+
+        Executor, task handler tamamlandıktan sonra ham çıktıyı buraya
+        iletir; HLK Runtime çıktıdaki başarı kanıtlarını (proof keys)
+        değerlendirerek TASK_SUCCESS veya TASK_FAILED kararı verir.
+
+        Kanıt: task_id, agent, output (ham handler çıktısı), proof_keys.
+        """
+        ctx = request.context
+        task_id = ctx.get("task_id", "unknown")
+        agent = ctx.get("agent", "unknown")
+        output = ctx.get("output", {})
+        task_input = ctx.get("task", {})
+
+        # AR-002_84: Başarı kanıt anahtarları
+        proof_keys = [k for k in ("generated", "delivered") if k in output]
+        all_proved = all(bool(output.get(k)) for k in proof_keys) if proof_keys else None
+
+        if all_proved is True:
+            return self._new_decision(
+                request, "TASK_SUCCESS",
+                {"task_status": "SUCCESS", "reason": "Tüm başarı kanıtları pozitif"},
+                [
+                    f"Task {task_id} ({agent}): proof_keys={proof_keys}, hepsi True",
+                    "MASTER-013: HLK Runtime task'ı başarılı olarak onayladı",
+                ],
+            )
+
+        if all_proved is False:
+            detail = ", ".join(f"{k}={output.get(k)}" for k in proof_keys)
+            return self._new_decision(
+                request, "TASK_FAILED",
+                {
+                    "task_status": "FAILED",
+                    "reason": f"Başarı kanıtı yok: {detail}",
+                    "should_retry": True,
+                },
+                [
+                    f"Task {task_id} ({agent}): {detail}",
+                    "AR-002_84: Üretim kanıtı olmadan başarı sayılamaz",
+                    "MASTER-013: HLK Runtime task'ı başarısız olarak değerlendirdi",
+                ],
+            )
+
+        # proof_keys yok — handler eski tip çıktı döndürmüş olabilir
+        return self._new_decision(
+            request, "TASK_SUCCESS",
+            {"task_status": "SUCCESS", "reason": "Kanıt anahtarı bulunamadı — varsayılan"},
+            [
+                f"Task {task_id} ({agent}): çıktıda proof_keys yok, "
+                "eski tip handler kabul edildi",
+            ],
         )
 
     def _decide_user_notification(self, request: DecisionRequest) -> RuntimeDecision:

@@ -469,6 +469,34 @@ class ProductionExecutor:
                 elapsed = (time.time() - start_time) * 1000
                 result.duration_ms = elapsed
                 result.output = output if isinstance(output, dict) else {"result": str(output)}
+
+                # MASTER-013: Executor SUCCESS/FAIL kararı veremez.
+                # Ham çıktı HLK Runtime'a iletilir, TASK_RESULT kararı
+                # HLK Runtime tarafından üretilir.
+                from services.hlk_runtime import (
+                    hlk_runtime as _hlk,
+                    DecisionCategory as _DC,
+                    DecisionRequest as _DR,
+                )
+                task_decision = _hlk.request_decision(_DR(
+                    pid=pid,
+                    category=_DC.TASK_RESULT.value,
+                    requester="production_executor._execute_task",
+                    context={
+                        "task_id": task_id,
+                        "agent": task.get("agent", "unknown"),
+                        "task": task,
+                        "output": result.output,
+                    },
+                ))
+
+                if task_decision.verdict == "TASK_FAILED":
+                    task_reason = task_decision.params.get("reason", "")
+                    raise RuntimeError(
+                        f"HLK Runtime TASK_FAILED: {task_id} — {task_reason}"
+                    )
+
+                # HLK Runtime onayladı → TASK_SUCCESS
                 result.status = ExecutionStatus.SUCCESS.value
                 result.completed_at = datetime.now(timezone.utc).isoformat()
 
@@ -570,16 +598,16 @@ class ProductionExecutor:
             output["agent"] = agent
             output["executed_at"] = datetime.now(timezone.utc).isoformat()
 
-            # AR-002_84: yalnızca gerçek üretim başarı sayılır. Handler
-            # çıktısındaki başarı kanıtı (generated/delivered) False ise
-            # COMPLETED checkpoint'i YAZILMAZ — aksi halde sahte COMPLETED
-            # kalıcı pakete işlenir ve sonraki recovery/yeniden üretim
-            # 0 pending task bulup üretim yapılmadan FAIL üretir.
+            # AR-002_84 / MASTER-013: Başarı kanıtı (generated/delivered)
+            # Executor karar vermez — kanıt HLK Runtime'a iletilir,
+            # TASK_RESULT kararı HLK Runtime tarafından verilir.
             proof_keys = [k for k in ("generated", "delivered") if k in output]
-            if proof_keys and not all(bool(output[k]) for k in proof_keys):
-                detail = ", ".join(f"{k}={output[k]}" for k in proof_keys)
-                raise RuntimeError(
-                    f"Üretim kanıtı yok: {agent} — {detail} (AR-002_84)"
+            if proof_keys:
+                output["_proof_keys"] = proof_keys
+                output["_all_proved"] = all(bool(output[k]) for k in proof_keys)
+                logger.info(
+                    f"📎 [Executor] Task proof: {task_id} — "
+                    + ", ".join(f"{k}={output[k]}" for k in proof_keys)
                 )
 
             # Task Checkpoint: status'u COMPLETED olarak persist et
