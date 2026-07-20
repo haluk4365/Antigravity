@@ -148,6 +148,9 @@ class ProductionRuntime:
         # ── Concurrency control ──────────────────────────────────────────
         self._lock = asyncio.Lock()
 
+        # ── MASTER-013: Final karar idempotency ──────────────────────────
+        self._final_notified: set[str] = set()
+
     # ═══════════════════════════════════════════════════════════════════════
     # Ana Akış: Production Başlatma (AR-002_70 — 10 Adım)
     # ═══════════════════════════════════════════════════════════════════════
@@ -1437,7 +1440,21 @@ class ProductionRuntime:
     ) -> None:
         """AR-002_84 Adım 21: Sonuç hem Yöneticiye hem ilgili Kullanıcıya
         anayasal bildirim kurallarına uygun şekilde iletilir (MASTER-013:
-        bildirim içerikleri yalnızca HLK Runtime kararı ile üretilir)."""
+        bildirim içerikleri yalnızca HLK Runtime kararı ile üretilir).
+
+        MASTER-013: Final karar idempotenttir. Aynı PID için ikinci
+        final bildirimi ENGELLENIR.
+        """
+        # ── MASTER-013: Final bildirim idempotency kilidi ──────────────
+        if pid and pid in self._final_notified:
+            logger.warning(
+                f"⛔ [Reproduction] Final bildirim zaten yapıldı, "
+                f"tekrar ENGELLENDI: {pid}"
+            )
+            return
+        if pid:
+            self._final_notified.add(pid)
+
         from services.hlk_runtime import (
             hlk_runtime, DecisionRequest, DecisionCategory,
         )
@@ -2347,8 +2364,10 @@ class ProductionRuntime:
         # Kullanıcıya dürüst bilgilendirme (EEC-001: Fake Progress yasak)
         # MASTER-013 / AR-002_81: Süreç kararı içeren kullanıcı mesajı
         # yürütme katmanında ÜRETİLMEZ; içerik HLK Runtime kararı ile belirlenir.
+        # MASTER-013: Final bildirim idempotenttir — aynı PID tekrar ENGELLENIR.
         try:
-            if request.bot is not None:
+            if request.bot is not None and pid and pid not in self._final_notified:
+                self._final_notified.add(pid)
                 from services.hlk_runtime import (
                     hlk_runtime as _hr_notify,
                     DecisionRequest as _NotifyReq,

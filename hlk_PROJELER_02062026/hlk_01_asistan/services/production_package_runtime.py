@@ -805,7 +805,24 @@ class ProductionPackageRuntime:
                 return False
 
             old_status = package.metadata.status
-            package.metadata.status = status.value
+            new_status = status.value
+
+            # ── MASTER-013: Final durum idempotency kilidi ─────────────────
+            _final_states = (PackageStatus.COMPLETED.value, PackageStatus.FAILED.value)
+
+            if old_status == new_status and old_status in _final_states:
+                logger.info(f"🔄 [Package Runtime] Durum zaten {new_status}, atlanıyor: {pid}")
+                return True
+
+            if old_status == PackageStatus.COMPLETED.value and new_status == PackageStatus.FAILED.value:
+                logger.error(f"🚨 [Package Runtime] ANASAL İHLAL: COMPLETED → FAILED reddedildi: {pid}")
+                return False
+
+            if old_status == PackageStatus.FAILED.value and new_status == PackageStatus.COMPLETED.value:
+                logger.error(f"🚨 [Package Runtime] ANASAL İHLAL: FAILED → COMPLETED reddedildi: {pid}")
+                return False
+
+            package.metadata.status = new_status
             package.metadata.updated_at = datetime.now(timezone.utc).isoformat()
             package._integrity_hash = package.compute_hash()
 
@@ -813,7 +830,7 @@ class ProductionPackageRuntime:
 
             logger.info(
                 f"🔄 [Package Runtime] Durum güncellendi: {pid} "
-                f"({old_status} → {status.value})"
+                f"({old_status} → {new_status})"
             )
             return True
 
