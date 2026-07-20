@@ -982,11 +982,17 @@ class ProductionPackageRuntime:
                 # RESUME / START_AS_NEW: task'lar dokunulmaz
 
             # ── AR-002_84 RETRY: Çıktı bazlı task reset ──────────────────
-            # Task status'u COMPLETED olsa bile üretim çıktısı eksikse
-            # (örn. delivery_info.delivered=False, final_video yok),
-            # ilgili task'lar RETRY'de yeniden çalıştırılır.
-            # MASTER-003: Checkpoint yalnızca task status'unu değil,
-            # üretim çıktılarının varlığını da yansıtmak zorundadır.
+            # MASTER-013: RETRY yeni bir üretimdir. Eski COMPLETED task
+            # status'ları yeni üretimi ENGELLEYEMEZ.
+            #
+            # RETRY'de teslim zinciri şu kuralla resetlenir:
+            #   1. final_video dosyası diskte yoksa → VideoRenderer PENDING
+            #   2. delivery_info.delivered != True ise → DeliveryAgent PENDING
+            #   3. Package durumu FAILED ise → en az DeliveryAgent PENDING
+            #      (eski COMPLETED status'a bakılmaksızın)
+            #
+            # Bu kurallar, pending_tasks=[] oluşarak üretim başlamadan
+            # FAIL verilmesini anayasal olarak ENGELLER.
             if procedure == "RETRY":
                 import os as _os_ck
                 di = package.delivery_info or {}
@@ -996,42 +1002,55 @@ class ProductionPackageRuntime:
                 _video_file_exists = bool(
                     _video_path and _os_ck.path.exists(_video_path)
                 )
-                # Video yok VEYA dosya silinmiş (deploy restart) → yeniden üret
                 _need_video = not _video_file_exists or not di.get("video")
                 _need_delivery = not di.get("delivered")
 
-                if _need_video or _need_delivery:
+                # RETRY güvenlik kilidi: Package FAILED ise teslim
+                # gerçekleşmemiş demektir — delivery_info'ya bakmaksızın
+                # DeliveryAgent resetlenir.
+                _package_failed = (previous_status == "FAILED")
+
+                if _need_video or _need_delivery or _package_failed:
+                    reset_count = 0
                     for task in task_packages:
                         if not isinstance(task, dict):
                             continue
                         agent = task.get("agent", "")
                         current_status = task.get("status", "")
+                        task_id = task.get("task_id", "?")
 
                         # Video eksik → VideoRenderer yeniden çalışsın
-                        if _need_video and agent == "VideoRenderer":
+                        if (_need_video or _package_failed) and agent == "VideoRenderer":
                             if current_status not in ("PENDING",):
                                 task["status"] = "PENDING"
                                 task["completed_at"] = ""
                                 task["error_detail"] = ""
+                                # Çıktıyı temizle — yeni üretim kendi çıktısını üretir
+                                if "output" in task:
+                                    del task["output"]
+                                reset_count += 1
                                 logger.info(
                                     f"🔧 [Package Runtime] RETRY reset: "
-                                    f"{task.get('task_id')} (VideoRenderer) — "
-                                    f"final_video eksik"
+                                    f"{task_id} (VideoRenderer) — "
+                                    f"final_video eksik veya package FAILED"
                                 )
 
                         # Teslim gerçekleşmemiş → DeliveryAgent yeniden çalışsın
-                        if _need_delivery and agent == "DeliveryAgent":
+                        if (_need_delivery or _package_failed) and agent == "DeliveryAgent":
                             if current_status not in ("PENDING",):
                                 task["status"] = "PENDING"
                                 task["completed_at"] = ""
                                 task["error_detail"] = ""
+                                if "output" in task:
+                                    del task["output"]
+                                reset_count += 1
                                 logger.info(
                                     f"🔧 [Package Runtime] RETRY reset: "
-                                    f"{task.get('task_id')} (DeliveryAgent) — "
-                                    f"delivered=False"
+                                    f"{task_id} (DeliveryAgent) — "
+                                    f"delivered=False veya package FAILED"
                                 )
 
-                        # Task çıktısı eksik → ilgili agent reset
+                        # Task çıktısı generated=False → reset
                         _task_output = task.get("output") or {}
                         _task_generated = _task_output.get("generated")
                         if (
@@ -1041,11 +1060,25 @@ class ProductionPackageRuntime:
                             task["status"] = "PENDING"
                             task["completed_at"] = ""
                             task["error_detail"] = ""
+                            if "output" in task:
+                                del task["output"]
+                            reset_count += 1
                             logger.info(
                                 f"🔧 [Package Runtime] RETRY reset: "
-                                f"{task.get('task_id')} ({agent}) — "
+                                f"{task_id} ({agent}) — "
                                 f"çıktı generated=False"
                             )
+
+                    if reset_count > 0:
+                        logger.info(
+                            f"🔧 [Package Runtime] RETRY: {reset_count} task "
+                            f"PENDING yapıldı | PID={pid}"
+                        )
+                    else:
+                        logger.info(
+                            f"✅ [Package Runtime] RETRY: tüm task'lar zaten "
+                            f"PENDING veya üretim tamamlanmış | PID={pid}"
+                        )
 
             # REPLAY durumunda final/delivery geçici temizlik
             if procedure == "REPLAY":

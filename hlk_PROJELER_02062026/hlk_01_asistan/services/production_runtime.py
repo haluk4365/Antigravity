@@ -286,9 +286,32 @@ class ProductionRuntime:
 
             except Exception as e:
                 elapsed = time.time() - start_time
+                # MASTER-013: Terminal durum kararı HLK Runtime'a aittir.
+                # Production Runtime doğrudan FAILED state set EDEMEZ.
+                # HLK Runtime COMPLETION kararı alınır, uygulanır.
+                try:
+                    from services.hlk_runtime import (
+                        hlk_runtime as _hr_sp,
+                        DecisionRequest as _DR_sp,
+                        DecisionCategory as _DC_sp,
+                    )
+                    sp_decision = _hr_sp.request_decision(_DR_sp(
+                        pid=self._current_pid or "PID-UNKNOWN",
+                        category=_DC_sp.COMPLETION.value,
+                        requester="production_runtime.start_production",
+                        context={
+                            "delivered": False, "video": False,
+                            "failed_tasks": 1,
+                            "terminal_reason": "exception",
+                            "error": f"{type(e).__name__}: {e}",
+                        },
+                    ))
+                    sp_success = bool(sp_decision.params.get("success", False))
+                except Exception:
+                    sp_success = False
                 self._state = ProductionState.FAILED
                 self._result.state = ProductionState.FAILED.value
-                self._result.success = False
+                self._result.success = sp_success
                 self._result.error = f"{type(e).__name__}: {e}"
                 self._result.duration_seconds = elapsed
                 self._result.completed_at = datetime.now(timezone.utc).isoformat()
@@ -695,9 +718,30 @@ class ProductionRuntime:
                 return self._result
 
             except Exception as e:
+                # MASTER-013: Terminal durum kararı HLK Runtime'a aittir.
+                try:
+                    from services.hlk_runtime import (
+                        hlk_runtime as _hr_rec,
+                        DecisionRequest as _DR_rec,
+                        DecisionCategory as _DC_rec,
+                    )
+                    rec_decision = _hr_rec.request_decision(_DR_rec(
+                        pid=pid,
+                        category=_DC_rec.COMPLETION.value,
+                        requester="production_runtime.recover",
+                        context={
+                            "delivered": False, "video": False,
+                            "failed_tasks": 1,
+                            "terminal_reason": "exception",
+                            "error": f"Recovery hatası: {e}",
+                        },
+                    ))
+                    rec_success = bool(rec_decision.params.get("success", False))
+                except Exception:
+                    rec_success = False
                 self._state = ProductionState.FAILED
                 self._result.state = ProductionState.FAILED.value
-                self._result.success = False
+                self._result.success = rec_success
                 self._result.error = f"Recovery hatası: {e}"
                 logger.error(f"❌ [Production] Recovery başarısız: {pid} — {e}")
                 return self._result
@@ -757,6 +801,8 @@ class ProductionRuntime:
             logger.error(
                 f"🏁 [Reproduction Timeout] {_GC_PRODUCTION_TIMEOUT}s aşıldı — {pid}"
             )
+            # MASTER-013: Terminal durum kararını HLK Runtime verir.
+            # Production Runtime yalnızca bu kararı uygular.
             return await self._handle_reproduction_failure(
                 pid, bot, admin_chat_id,
                 error=f"Yeniden üretim zaman aşımı ({_GC_PRODUCTION_TIMEOUT}s)",
@@ -766,6 +812,7 @@ class ProductionRuntime:
             logger.error(
                 f"❌ [Reproduction] Yaşam döngüsü hatası: {type(e).__name__}: {e}"
             )
+            # MASTER-013: Terminal durum kararını HLK Runtime verir.
             return await self._handle_reproduction_failure(
                 pid, bot, admin_chat_id,
                 error=f"{type(e).__name__}: {e}",
@@ -1113,10 +1160,8 @@ class ProductionRuntime:
             failed = report_dict.get("failed_tasks", 0)
 
             # ── CEE POST-CHECK ───────────────────────────────────────────
-            # AR-002_84: yalnızca gerçek video teslimi başarı sayılır.
-            # failed==0 tek başına yeterli değildir — task'lar tamamlansa
-            # bile video üretilmemiş olabilir (örn. görsel sağlayıcı
-            # reddettiğinde VideoRenderer atlanır).
+            # CEE anayasal uyumluluğu denetler; PASS/FAIL üretir (CEE-004).
+            # Production Runtime CEE sonucunu bağımsız olarak kaydeder.
             pipeline_success = ctx.delivered and bool(ctx.video_path)
             cee_report = constitution_enforcement.enforce_post_check(
                 pid=pid,
@@ -1129,40 +1174,53 @@ class ProductionRuntime:
                 "verdict": cee_report.verdict.value,
             }
 
-            # AR-002_86: CEE ihlalleri de başarıyı engeller
-            cee_blocked = (
-                cee_report.verdict.value == "FAIL"
-                or len(cee_report.violations) > 0
-            )
-            if failed or not pipeline_success or cee_blocked:
-                # Başarısızlık: durum + anayasal gerekçe bildirilir (Adım 21)
-                errors = report_dict.get("errors", [])
-                if cee_blocked and not failed:
-                    _cee_desc = "; ".join(
-                        v.get("description", "") for v in cee_report.violations[:3]
-                    )
-                    error_msg = (
-                        f"CEE anayasal ihlal tespit etti: {_cee_desc}"
-                        if _cee_desc else "CEE POST-CHECK FAIL (AR-002_86)"
-                    )
-                elif not pipeline_success and not failed:
-                    error_msg = (
-                        "Video teslimi gerceklesmedi — gorsel/ses saglayici "
-                        "basarisiz veya video uretilemedi (AR-002_84)"
-                    )
-                else:
-                    error_msg = "; ".join(errors) or f"{failed} task başarısız"
+            # ── MASTER-013 / AR-002_81: Tamamlanma Kararı ────────────────
+            # Production Runtime KARAR VERMEZ. Tüm teknik kanıtlar (executor
+            # raporu, CEE sonucu, pipeline durumu) HLK Runtime'a iletilir.
+            # COMPLETION kararını HLK Runtime üretir; Production Runtime
+            # yalnızca bu kararı uygular.
+            cee_violations_list = [
+                v.get("description", "") for v in getattr(cee_report, "violations", []) or []
+            ]
+            completion_decision = hlk_runtime.request_decision(DecisionRequest(
+                pid=pid,
+                category=DecisionCategory.COMPLETION.value,
+                requester="production_runtime._run_reproduction",
+                context={
+                    "delivered": ctx.delivered,
+                    "video": bool(ctx.video_path),
+                    "failed_tasks": failed,
+                    "pipeline_success": pipeline_success,
+                    "cee_verdict": cee_report.verdict.value,
+                    "cee_violations": cee_violations_list,
+                    "executor_errors": report_dict.get("errors", []),
+                    "reproduction": True,
+                },
+            ))
+
+            if not completion_decision.params.get("success", False):
+                # HLK Runtime COMPLETION: başarısız — anayasal gerekçe
+                # HLK Runtime kararına dayanır, Production Runtime uygular.
+                cee_fail_reason = (
+                    f"CEE: {cee_report.verdict.value}"
+                    if cee_report.verdict.value == "FAIL" else ""
+                )
+                reason_parts = [
+                    p for p in [
+                        f"{failed} task başarısız" if failed else "",
+                        "Video teslimi gerçekleşmedi" if not pipeline_success else "",
+                        cee_fail_reason if cee_fail_reason else "",
+                    ] if p
+                ]
+                error_msg = "; ".join(reason_parts) or "COMPLETION kararı: başarısız"
                 return await self._handle_reproduction_failure(
                     pid, bot, admin_chat_id,
                     error=error_msg,
                     state=ProductionState.FAILED,
                     user_chat_id=int(user_chat_id),
-                    justifications=[
-                        f"{failed} task başarısız (AR-002_76 Execution Result)",
-                        *errors[:3],
-                    ] if failed else [
-                        "Video teslimi gerceklesmedi (AR-002_84 Adim 18/19)",
-                    ],
+                    justifications=completion_decision.rationale.get(
+                        "Justifications", []
+                    ),
                 )
 
             # ── Adım 20: Dijital varlık ilişkilendirme + sürüm geçmişi ──
@@ -1287,19 +1345,42 @@ class ProductionRuntime:
         error: str, state: "ProductionState",
         user_chat_id: int = 0, justifications: list | None = None,
     ) -> ProductionResult:
-        """AR-002_84 başarısızlık yolu — hiçbir başarısızlık sessiz kalmaz.
+        """AR-002_84 başarısızlık yolu — MASTER-013 uyarınca.
 
-        OLAY-025 (EVENT_VIDEO_PRODUCTION_FAILED) + eskalasyon + paket durumu
-        + Yönetici/Kullanıcı bildirimi (durum + anayasal karar gerekçesi).
+        MASTER-013: Production Runtime KARAR VERMEZ.
+        Terminal durum HLK Runtime COMPLETION kararı ile belirlenir.
+        Production Runtime; OLAY-025 kaydı, eskalasyon, paket durumu
+        ve bildirim görevlerini HLK Runtime kararını uygulayarak yerine getirir.
         """
         from services.hlk_runtime import (
             hlk_runtime, DecisionRequest, DecisionCategory,
         )
         if self._result is None:
             self._result = ProductionResult(pid=pid, total_steps=10)
+
+        # ── MASTER-013: Terminal durum kararı HLK Runtime'a aittir ──────
+        # Production Runtime doğrudan FAILED state set EDEMEZ.
+        try:
+            term_decision = hlk_runtime.request_decision(DecisionRequest(
+                pid=pid,
+                category=DecisionCategory.COMPLETION.value,
+                requester="production_runtime._handle_reproduction_failure",
+                context={
+                    "delivered": False,
+                    "video": False,
+                    "failed_tasks": 1,
+                    "terminal_reason": state.value,
+                    "error": error,
+                    "justifications": justifications or [],
+                },
+            ))
+            term_success = bool(term_decision.params.get("success", False))
+        except Exception:
+            term_success = False
+
         self._state = state
         self._result.state = state.value
-        self._result.success = False
+        self._result.success = term_success
         self._result.error = error
         self._result.completed_at = datetime.now(timezone.utc).isoformat()
         logger.error(f"🏁 [Reproduction Failed] {pid} — {error}")
@@ -1416,11 +1497,12 @@ class ProductionRuntime:
 
         restored: list[str] = []
 
-        # ── delivery_info → delivered ──────────────────────────────────
+        # ── MASTER-013: delivery_info.delivered restore EDILMEZ ──────────
+        # "Checkpoint yalnızca veri taşır. Karar taşıyamaz."
+        # delivered bir karar değeridir — yeni üretim kendi delivery
+        # sonucunu üretmek zorundadır. Eski FAILED state'ten gelen
+        # delivered=False yeni üretime taşınamaz.
         di = pkg.delivery_info or {}
-        if di.get("delivered") and not ctx.delivered:
-            ctx.delivered = True
-            restored.append("delivered")
 
         # ── final_video → video_path ───────────────────────────────────
         fv = pkg.final_video or {}
@@ -1481,10 +1563,9 @@ class ProductionRuntime:
                     ctx.video_path = _artifact
                     restored.append(f"video_path ({task.get('task_id')})")
 
-            elif agent == "DeliveryAgent" and not ctx.delivered:
-                if task_output.get("delivered"):
-                    ctx.delivered = True
-                    restored.append(f"delivered ({task.get('task_id')})")
+            # MASTER-013: DeliveryAgent çıktısından delivered restore EDILMEZ.
+            # delivered bir karar değeridir — yeni üretim kendi delivery
+            # sonucunu üretmek zorundadır.
 
         if restored:
             logger.info(
@@ -1721,6 +1802,9 @@ class ProductionRuntime:
             asyncio.Task — yönetilen üretim görevi.
         """
         # Constitutional Boot Chain doğrulaması
+        # MASTER-013: Bu bir ön-koşul kontrolüdür, üretim kararı değildir.
+        # HLK Runtime / Constitution Runtime aktif değilse Production
+        # BAŞLATILAMAZ — bu bir karar değil, sistem durum tespitidir.
         try:
             from services.hlk_runtime import hlk_runtime as _hr
             if not _hr.authorize_production(request.user_id):
@@ -1728,13 +1812,24 @@ class ProductionRuntime:
                     f"🚨 [Production Runtime] Anayasal yetkilendirme REDDEDILDI — "
                     f"Production BAŞLATILAMIYOR. user={request.user_id}"
                 )
-                # Yetkilendirme başarısız — FAILED task döndür
+                # Yetkilendirme ön-koşulu sağlanamadı — üretim başlatılamaz.
+                # Bu bir sistem durum tespitidir, üretim kararı değildir.
                 async def _unauthorized():
-                    return await self._handle_failure(
-                        request, "",
-                        error="Constitutional Boot Chain: HLK Runtime veya Constitution Runtime aktif değil",
-                        state=ProductionState.FAILED,
+                    if self._result is None:
+                        self._result = ProductionResult(total_steps=10)
+                    self._state = ProductionState.FAILED
+                    self._result.state = ProductionState.FAILED.value
+                    self._result.success = False
+                    self._result.error = (
+                        "Constitutional Boot Chain: HLK Runtime veya "
+                        "Constitution Runtime aktif değil"
                     )
+                    self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                    logger.error(
+                        f"🏁 [Production Start Blocked] Boot chain eksik — "
+                        f"üretim başlatılamadı"
+                    )
+                    return self._result
                 task = asyncio.create_task(_unauthorized())
                 task.add_done_callback(self._on_task_done)
                 return task
@@ -2125,7 +2220,11 @@ class ProductionRuntime:
     async def _handle_failure(
         self, request, pid: str, error: str, state: "ProductionState"
     ) -> ProductionResult:
-        """Anayasal başarısızlık yolu — AR-002_79/80.
+        """Anayasal başarısızlık yolu — MASTER-013 / AR-002_79/80.
+
+        MASTER-013: Production Runtime KARAR VERMEZ.
+        Terminal durum (FAILED/TIMED_OUT/CANCELLED) kararı HLK Runtime'a aittir.
+        Production Runtime yalnızca HLK Runtime kararını uygular.
 
         Hiçbir başarısızlık sessiz kalmaz:
         - EEC fail event'i + Olay Kayıt Merkezi + LAC
@@ -2136,12 +2235,39 @@ class ProductionRuntime:
         """
         if self._result is None:
             self._result = ProductionResult(total_steps=10)
+
+        # ── MASTER-013: Terminal durum kararı HLK Runtime'a aittir ──────
+        # Production Runtime doğrudan FAILED/TIMED_OUT/CANCELLED state
+        # set EDEMEZ. HLK Runtime COMPLETION kararı alınır, uygulanır.
+        pid = pid or "PID-UNKNOWN"
+        try:
+            from services.hlk_runtime import (
+                hlk_runtime as _hr_term,
+                DecisionRequest as _DR_term,
+                DecisionCategory as _DC_term,
+            )
+            term_decision = _hr_term.request_decision(_DR_term(
+                pid=pid,
+                category=_DC_term.COMPLETION.value,
+                requester="production_runtime._handle_failure",
+                context={
+                    "delivered": False,
+                    "video": False,
+                    "failed_tasks": 1,
+                    "terminal_reason": state.value,
+                    "error": error,
+                },
+            ))
+            term_success = bool(term_decision.params.get("success", False))
+        except Exception:
+            # HLK Runtime karar veremezse: en güvenli varsayılan
+            term_success = False
+
         self._state = state
         self._result.state = state.value
-        self._result.success = False
+        self._result.success = term_success
         self._result.error = error
         self._result.completed_at = datetime.now(timezone.utc).isoformat()
-        pid = pid or "PID-UNKNOWN"
         terminal = {
             ProductionState.FAILED: "Production Failed",
             ProductionState.TIMED_OUT: "Production Timeout",

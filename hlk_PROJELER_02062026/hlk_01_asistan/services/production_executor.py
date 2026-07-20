@@ -872,6 +872,20 @@ class ProductionExecutor:
                     f"task kaldı: {pid}"
                 )
 
+                # MASTER-013: RETRY güvenlik kilidi. Eğer pending_tasks=[] ise
+                # ve delivery_info teslimatı doğrulamıyorsa, prepare_for_reproduction
+                # task'ları resetlememiş demektir — anayasal ihlal.
+                if not pending_tasks:
+                    _di = pkg.delivery_info or {} if pkg is not None else {}
+                    _fv = pkg.final_video or {} if pkg is not None else {}
+                    if not _di.get("delivered") or not _fv.get("path"):
+                        logger.warning(
+                            f"⚠️ [Executor] RETRY güvenlik kilidi: "
+                            f"pending_tasks=[] ancak teslimat eksik | "
+                            f"delivered={_di.get('delivered')} "
+                            f"video={bool(_fv.get('path'))} | PID={pid}"
+                        )
+
                 # Kalan task'ları yürüt
                 self._state = ExecutorState.EXECUTING
                 for task in pending_tasks:
@@ -929,11 +943,10 @@ class ProductionExecutor:
 
             restored: list[str] = []
 
-            # ── delivery_info → delivered ──────────────────────────────
-            di = pkg.delivery_info or {} if pkg is not None else {}
-            if di.get("delivered") and not ctx.delivered:
-                ctx.delivered = True
-                restored.append("delivered")
+            # ── MASTER-013: delivery_info.delivered restore EDILMEZ ──────
+            # "Checkpoint yalnızca veri taşır. Karar taşıyamaz."
+            # delivered bir karar değeridir — yeni üretim kendi teslim
+            # sonucunu üretir.
 
             # ── final_video → video_path ───────────────────────────────
             fv = pkg.final_video or {} if pkg is not None else {}
@@ -967,10 +980,9 @@ class ProductionExecutor:
                         ctx.video_path = _artifact
                         restored.append(f"video_path ({task.get('task_id')})")
 
-                elif agent == "DeliveryAgent" and not ctx.delivered:
-                    if output.get("delivered"):
-                        ctx.delivered = True
-                        restored.append(f"delivered ({task.get('task_id')})")
+                # MASTER-013: DeliveryAgent çıktısından delivered restore EDILMEZ.
+                # delivered bir karar değeridir — yeni üretim kendi teslim
+                # sonucunu üretir.
 
             if restored:
                 logger.info(
