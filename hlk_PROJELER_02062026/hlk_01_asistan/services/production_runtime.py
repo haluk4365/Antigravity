@@ -1540,8 +1540,6 @@ class ProductionRuntime:
 
         # ── task_packages → task çıktı artifact'leri ───────────────────
         for task in (pkg.task_packages or []):
-            if task.get("status") not in ("COMPLETED", "SUCCESS"):
-                continue
             agent = task.get("agent", "")
             task_output = task.get("output") or task.get("result") or {}
 
