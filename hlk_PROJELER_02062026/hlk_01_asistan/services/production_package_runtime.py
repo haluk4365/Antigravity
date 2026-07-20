@@ -1051,11 +1051,18 @@ class ProductionPackageRuntime:
                                 )
 
                         # Task çıktısı generated=False → reset
+                        # ── AR-002_87 KORUMA ──────────────────────────
+                        # ImageGenerator ve VoiceGenerator artifact'leri
+                        # ASLA silinmez. VideoRenderer'ın çalışması için
+                        # ctx.img_path ve ctx.voice_path zorunludur.
+                        # Bu task'ların output'u korunur; yalnızca
+                        # VideoRenderer / DeliveryAgent çıktıları temizlenir.
                         _task_output = task.get("output") or {}
                         _task_generated = _task_output.get("generated")
                         if (
                             _task_generated is False
                             and current_status not in ("PENDING",)
+                            and agent not in ("ImageGenerator", "VoiceGenerator")
                         ):
                             task["status"] = "PENDING"
                             task["completed_at"] = ""
@@ -1067,6 +1074,24 @@ class ProductionPackageRuntime:
                                 f"🔧 [Package Runtime] RETRY reset: "
                                 f"{task_id} ({agent}) — "
                                 f"çıktı generated=False"
+                            )
+                        elif (
+                            _task_generated is False
+                            and agent in ("ImageGenerator", "VoiceGenerator")
+                        ):
+                            # AR-002_87: Artifact KORUNDU — silme
+                            _artifact_key = (
+                                "img_path" if agent == "ImageGenerator"
+                                else "voice_path"
+                            )
+                            _artifact_val = (
+                                _task_output.get("artifact")
+                                or _task_output.get(_artifact_key)
+                            )
+                            logger.info(
+                                f"🛡️ [Package Runtime] RETRY KORUNDU: "
+                                f"{task_id} ({agent}) artifact={_artifact_val} "
+                                f"— VideoRenderer için zorunlu, silinmedi"
                             )
 
                     if reset_count > 0:
