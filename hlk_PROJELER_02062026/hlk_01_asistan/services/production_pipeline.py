@@ -60,8 +60,8 @@ logger = logging.getLogger(__name__)
 
 _GC_PROVIDER_HTTP_TIMEOUT = float(os.getenv("GC_PROVIDER_HTTP_TIMEOUT", "30"))
 _GC_PROVIDER_STATUS_TIMEOUT = float(os.getenv("GC_PROVIDER_STATUS_TIMEOUT", "10"))
-_GC_PROVIDER_POLL_COUNT = int(os.getenv("GC_PROVIDER_POLL_COUNT", "10"))
-_GC_IMAGE_POLL_INTERVAL = float(os.getenv("GC_IMAGE_POLL_INTERVAL", "3"))
+_GC_PROVIDER_POLL_COUNT = int(os.getenv("GC_PROVIDER_POLL_COUNT", "20"))
+_GC_IMAGE_POLL_INTERVAL = float(os.getenv("GC_IMAGE_POLL_INTERVAL", "5"))
 _GC_VIDEO_POLL_INTERVAL = float(os.getenv("GC_VIDEO_POLL_INTERVAL", "5"))
 
 
