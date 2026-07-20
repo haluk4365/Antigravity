@@ -447,7 +447,7 @@ async def task_image(task: dict, pid: str) -> dict:
     if not ctx.img_path:
         logger.warning("⚠️ [Production] Gorsel uretilemedi — sesli teslim yapilacak")
         ctx.cost_report["services"]["image"] = "failed"
-        _request_failure_decision(
+        failure_decision = _request_failure_decision(
             pid=pid,
             requester="production_pipeline.task_image",
             decision_packet=decision_packet,
@@ -460,6 +460,18 @@ async def task_image(task: dict, pid: str) -> dict:
             failure_detail="Tüm görsel provider'ları başarısız oldu",
             has_fallback=decision_packet.has_image_fallback,
         )
+        # AR-002_90: RE_EVALUATE yeni DecisionPacket'i ctx'e uygula.
+        # task_video'daki aynı pattern (line 693-697).
+        if failure_decision.verdict == "RE_EVALUATE":
+            new_packet = failure_decision.params.get("new_packet")
+            if new_packet:
+                ctx.decision_packet = new_packet
+                req.user_data["decision_packet"] = new_packet.to_dict()
+                logger.info(
+                    f"🔄 [task_image] DecisionPacket güncellendi: "
+                    f"{new_packet.decision_id} (re-eval of "
+                    f"{decision_packet.decision_id})"
+                )
 
     return {
         "task_id": task.get("task_id"),
