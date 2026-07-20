@@ -550,6 +550,34 @@ async def task_video(task: dict, pid: str) -> dict:
     tmp = tempfile.gettempdir()
     import requests as _r
 
+    # ── RETRY: PipelineContext'te img_path/voice_path yoksa ─────────────
+    # Production Package task çıktılarından geri yükle.
+    # Railway redeploy /tmp dosyalarını siler; checkpoint restore
+    # artifact path'lerini bulamayabilir. Bu durumda ImageGenerator
+    # ve VoiceGenerator task çıktılarındaki path'ler doğrudan okunur.
+    if not ctx.img_path or not ctx.voice_path:
+        try:
+            from services.production_package_runtime import package_runtime
+            pkg = await package_runtime.load(pid)
+            if pkg:
+                for _t in (pkg.task_packages or []):
+                    if _t.get("status") not in ("COMPLETED", "SUCCESS"):
+                        continue
+                    _agent = _t.get("agent", "")
+                    _out = _t.get("output") or _t.get("result") or {}
+                    if _agent == "ImageGenerator" and not ctx.img_path:
+                        _art = _out.get("artifact") or _out.get("img_path")
+                        if _art:
+                            ctx.img_path = _art
+                            logger.info(f"🖼 [VideoRenderer] img_path restore: {_art}")
+                    elif _agent == "VoiceGenerator" and not ctx.voice_path:
+                        _art = _out.get("artifact") or _out.get("voice_path")
+                        if _art:
+                            ctx.voice_path = _art
+                            logger.info(f"🔊 [VideoRenderer] voice_path restore: {_art}")
+        except Exception as _e:
+            logger.warning(f"⚠️ [VideoRenderer] artifact restore basarisiz: {_e}")
+
     if ctx.voice_path and ctx.img_path:
         video_providers = decision_packet.get_provider_list("video")
         for idx, vid_choice in enumerate(video_providers):
