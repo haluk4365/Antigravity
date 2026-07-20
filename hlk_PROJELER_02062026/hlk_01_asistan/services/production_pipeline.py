@@ -252,19 +252,28 @@ async def task_image(task: dict, pid: str) -> dict:
                         headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
                         json={"prompt": f"professional product photo of {req.brand} {req.product_name}, studio lighting, white background, high quality"},
                         timeout=_GC_PROVIDER_HTTP_TIMEOUT)
-                    logger.info(f"🎨 [Production/1] Fal.ai response: {resp.status_code}")
+                    logger.info(
+                        f"🎨 [Production/1] Fal.ai response: HTTP {resp.status_code}, "
+                        f"body={resp.text[:300]}"
+                    )
                     if resp.status_code == 200:
                         data = resp.json()
                         req_id = data.get("request_id")
                         if req_id:
-                            for _ in range(_GC_PROVIDER_POLL_COUNT):
+                            poll_failed = False
+                            for poll_n in range(_GC_PROVIDER_POLL_COUNT):
                                 await asyncio.sleep(_GC_IMAGE_POLL_INTERVAL)
                                 st = _r.get(f"https://queue.fal.run/fal-ai/fast-sdxl/requests/{req_id}/status",
                                     headers={"Authorization": f"Key {fal_key}"},
                                     timeout=_GC_PROVIDER_STATUS_TIMEOUT)
                                 if st.status_code == 200:
                                     st_data = st.json()
-                                    if st_data.get("status") == "COMPLETED":
+                                    fal_status = st_data.get("status", "")
+                                    logger.info(
+                                        f"🎨 [Production/1] Fal.ai poll {poll_n+1}/{_GC_PROVIDER_POLL_COUNT}: "
+                                        f"status={fal_status}"
+                                    )
+                                    if fal_status == "COMPLETED":
                                         images = st_data.get("response", {}).get("images", [])
                                         if images:
                                             img_url = images[0].get("url", "")
@@ -273,9 +282,29 @@ async def task_image(task: dict, pid: str) -> dict:
                                                 urllib.request.urlretrieve(img_url, img_path)
                                                 ctx.img_path = img_path
                                                 ctx.cost_report["services"]["fal.ai"] = "ok"
+                                                logger.info(f"✅ [Production] Fal.ai görsel indirildi: {img_path}")
                                         break
+                                    if fal_status in ("FAILED", "CANCELLED"):
+                                        poll_failed = True
+                                        attempt_error = f"fal.ai status={fal_status}"
+                                        logger.warning(f"⚠️ [Production] Fal.ai {fal_status}")
+                                        break
+                                    # IN_QUEUE, IN_PROGRESS → poll devam
+                            else:
+                                # Poll döngüsü COMPLETED/FAILED olmadan tükendi
+                                if not attempt_error:
+                                    attempt_error = (
+                                        f"fal.ai polling tükendi ({_GC_PROVIDER_POLL_COUNT} deneme), "
+                                        f"son durum COMPLETED değil"
+                                    )
+                        else:
+                            attempt_error = "fal.ai response'da request_id bos"
+                            logger.warning(
+                                f"⚠️ [Production] Fal.ai request_id bos: "
+                                f"body={resp.text[:300]}"
+                            )
                     else:
-                        attempt_error = f"HTTP {resp.status_code}"
+                        attempt_error = f"fal.ai HTTP {resp.status_code}: {resp.text[:200]}"
                 except Exception as e:
                     attempt_error = f"{type(e).__name__}: {e}"
                     logger.warning(f"⚠️ [Production] Fal.ai basarisiz: {e}")
@@ -287,36 +316,100 @@ async def task_image(task: dict, pid: str) -> dict:
                 if not kie_key:
                     attempt_error = "KIE_AI_API_KEY tanımlı değil"
                 else:
+                    # AR-002_88 FIX: kie.ai API request formatı düzeltildi
+                    # prompt → input.prompt, aspect_ratio eklendi (zorunlu alan)
+                    import json as _json
                     resp = _r.post("https://api.kie.ai/api/v1/jobs/createTask",
                         headers={"Authorization": f"Bearer {kie_key}", "Content-Type": "application/json"},
-                        json={"model": "z-image", "prompt": f"{req.brand} {req.product_name} product photo, clean background"},
+                        json={
+                            "model": "z-image",
+                            "input": {
+                                "prompt": f"{req.brand} {req.product_name} product photo, clean background",
+                                "aspect_ratio": "1:1",
+                            },
+                        },
                         timeout=_GC_PROVIDER_HTTP_TIMEOUT)
-                    logger.info(f"🎨 [Production/1] Kie createTask: {resp.status_code}")
+                    logger.info(
+                        f"🎨 [Production/1] Kie createTask: HTTP {resp.status_code}, "
+                        f"body={resp.text[:300]}"
+                    )
                     if resp.status_code == 200:
                         data = resp.json()
-                        task_id = data.get("data", {})
-                        if isinstance(task_id, dict):
-                            task_id = task_id.get("taskId", "")
-                        if task_id:
-                            for _ in range(_GC_PROVIDER_POLL_COUNT):
-                                await asyncio.sleep(_GC_IMAGE_POLL_INTERVAL)
-                                st = _r.get(f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
-                                    headers={"Authorization": f"Bearer {kie_key}"},
-                                    timeout=_GC_PROVIDER_STATUS_TIMEOUT)
-                                if st.status_code == 200:
-                                    st_data = st.json()
-                                    inner = st_data.get("data", {})
-                                    if isinstance(inner, dict):
-                                        status = inner.get("status", "")
-                                        img_url = inner.get("result_url") or inner.get("image_url") or inner.get("output_url", "")
-                                        if status in ("completed", "success") and img_url:
-                                            img_path = os.path.join(tmp, f"hlk_img_{req.user_id}.png")
-                                            urllib.request.urlretrieve(img_url, img_path)
-                                            ctx.img_path = img_path
-                                            ctx.cost_report["services"]["kie.ai"] = "ok"
-                                            break
+                        # AR-002_88 FIX: API body code kontrolü (kie.ai HTTP 200 dönerken body'de hata olabilir)
+                        body_code = data.get("code", 200)
+                        if body_code != 200:
+                            attempt_error = f"kie.ai API error code={body_code} msg={data.get('msg', '')}"
+                            logger.warning(f"⚠️ [Production] Kie AI API hatasi: {attempt_error}")
+                        else:
+                            task_id = data.get("data", {})
+                            if isinstance(task_id, dict):
+                                task_id = task_id.get("taskId", "")
+                            if task_id:
+                                for _ in range(_GC_PROVIDER_POLL_COUNT):
+                                    await asyncio.sleep(_GC_IMAGE_POLL_INTERVAL)
+                                    st = _r.get(
+                                        f"https://api.kie.ai/api/v1/jobs/recordInfo?taskId={task_id}",
+                                        headers={"Authorization": f"Bearer {kie_key}"},
+                                        timeout=_GC_PROVIDER_STATUS_TIMEOUT)
+                                    if st.status_code == 200:
+                                        st_data = st.json()
+                                        inner = st_data.get("data", {})
+                                        if isinstance(inner, dict):
+                                            # AR-002_88 FIX: state alanı (status değil)
+                                            state = inner.get("state", "")
+                                            logger.info(
+                                                f"🎨 [Production/1] Kie poll: "
+                                                f"state={state} progress={inner.get('progress', '?')}% "
+                                                f"taskId={task_id}"
+                                            )
+                                            if state == "fail":
+                                                fail_code = inner.get("failCode", "")
+                                                fail_msg = inner.get("failMsg", "")
+                                                attempt_error = (
+                                                    f"kie.ai generation failed: "
+                                                    f"failCode={fail_code} failMsg={fail_msg}"
+                                                )
+                                                logger.warning(
+                                                    f"⚠️ [Production] Kie AI fail: "
+                                                    f"{attempt_error}"
+                                                )
+                                                break
+                                            if state == "success":
+                                                # AR-002_88 FIX: resultJson parse edilip resultUrls[0] alınır
+                                                result_json_str = inner.get("resultJson", "{}")
+                                                try:
+                                                    result_obj = _json.loads(result_json_str)
+                                                    result_urls = result_obj.get("resultUrls", [])
+                                                    img_url = result_urls[0] if result_urls else ""
+                                                except Exception:
+                                                    img_url = ""
+                                                if img_url:
+                                                    img_path = os.path.join(
+                                                        tmp, f"hlk_img_{req.user_id}.png"
+                                                    )
+                                                    urllib.request.urlretrieve(img_url, img_path)
+                                                    ctx.img_path = img_path
+                                                    ctx.cost_report["services"]["kie.ai"] = "ok"
+                                                    logger.info(
+                                                        f"✅ [Production] Kie AI görsel "
+                                                        f"indirildi: {img_path}"
+                                                    )
+                                                else:
+                                                    attempt_error = (
+                                                        "kie.ai success ama resultUrls bos"
+                                                    )
+                                                break
+                                            # waiting, queuing, generating → poll devam
+                            else:
+                                attempt_error = "kie.ai createTask response'da taskId bos"
+                                logger.warning(
+                                    f"⚠️ [Production] Kie AI taskId bos: "
+                                    f"response={resp.text[:300]}"
+                                )
                     else:
-                        attempt_error = f"HTTP {resp.status_code}"
+                        attempt_error = (
+                            f"kie.ai HTTP {resp.status_code}: {resp.text[:200]}"
+                        )
             except Exception as e:
                 attempt_error = f"{type(e).__name__}: {e}"
                 logger.warning(f"⚠️ [Production] Kie AI basarisiz: {e}")
