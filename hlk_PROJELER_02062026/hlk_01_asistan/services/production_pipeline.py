@@ -725,10 +725,21 @@ async def task_delivery(task: dict, pid: str) -> dict:
         # her çağrıda mesaj göndermek "3 Tamamlandı + 1 FAILED" üretir.
         logger.info(f"ℹ️ [Production] DELIVER_INFO — video yok, mesaj gonderilmedi: {pid}")
 
+    if delivery_decision.verdict == "DELIVER_VIDEO":
+        # Video teslim edildi — proof key "delivered" pozitif
+        return {
+            "task_id": task.get("task_id"),
+            "delivered": True,
+            "video": True,
+        }
+    # DELIVER_INFO — video yok, teslim yapılmadı. Bu bir TASK HATASI DEGILDIR.
+    # DeliveryAgent görevini doğru yaptı: teslim edilecek video olmadığını
+    # tespit etti. "delivered" proof key'i ÇIKARILMAZ — aksi halde
+    # HLK Runtime TASK_FAILED verir ve executor gereksiz yere 3 kez retry yapar.
+    # Sonuç: Her retry'de send_message → 3 Tamamlandı + 1 FAILED.
     return {
         "task_id": task.get("task_id"),
-        "delivered": delivery_decision.verdict == "DELIVER_VIDEO",
-        "video": bool(ctx.video_path),
+        "video": False,
     }
 
 
