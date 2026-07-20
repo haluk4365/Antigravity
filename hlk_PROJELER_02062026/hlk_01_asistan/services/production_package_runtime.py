@@ -981,6 +981,72 @@ class ProductionPackageRuntime:
                         task["error_detail"] = ""
                 # RESUME / START_AS_NEW: task'lar dokunulmaz
 
+            # ── AR-002_84 RETRY: Çıktı bazlı task reset ──────────────────
+            # Task status'u COMPLETED olsa bile üretim çıktısı eksikse
+            # (örn. delivery_info.delivered=False, final_video yok),
+            # ilgili task'lar RETRY'de yeniden çalıştırılır.
+            # MASTER-003: Checkpoint yalnızca task status'unu değil,
+            # üretim çıktılarının varlığını da yansıtmak zorundadır.
+            if procedure == "RETRY":
+                import os as _os_ck
+                di = package.delivery_info or {}
+                fv = package.final_video or {}
+
+                _video_path = fv.get("path", "")
+                _video_file_exists = bool(
+                    _video_path and _os_ck.path.exists(_video_path)
+                )
+                # Video yok VEYA dosya silinmiş (deploy restart) → yeniden üret
+                _need_video = not _video_file_exists or not di.get("video")
+                _need_delivery = not di.get("delivered")
+
+                if _need_video or _need_delivery:
+                    for task in task_packages:
+                        if not isinstance(task, dict):
+                            continue
+                        agent = task.get("agent", "")
+                        current_status = task.get("status", "")
+
+                        # Video eksik → VideoRenderer yeniden çalışsın
+                        if _need_video and agent == "VideoRenderer":
+                            if current_status not in ("PENDING",):
+                                task["status"] = "PENDING"
+                                task["completed_at"] = ""
+                                task["error_detail"] = ""
+                                logger.info(
+                                    f"🔧 [Package Runtime] RETRY reset: "
+                                    f"{task.get('task_id')} (VideoRenderer) — "
+                                    f"final_video eksik"
+                                )
+
+                        # Teslim gerçekleşmemiş → DeliveryAgent yeniden çalışsın
+                        if _need_delivery and agent == "DeliveryAgent":
+                            if current_status not in ("PENDING",):
+                                task["status"] = "PENDING"
+                                task["completed_at"] = ""
+                                task["error_detail"] = ""
+                                logger.info(
+                                    f"🔧 [Package Runtime] RETRY reset: "
+                                    f"{task.get('task_id')} (DeliveryAgent) — "
+                                    f"delivered=False"
+                                )
+
+                        # Task çıktısı eksik → ilgili agent reset
+                        _task_output = task.get("output") or {}
+                        _task_generated = _task_output.get("generated")
+                        if (
+                            _task_generated is False
+                            and current_status not in ("PENDING",)
+                        ):
+                            task["status"] = "PENDING"
+                            task["completed_at"] = ""
+                            task["error_detail"] = ""
+                            logger.info(
+                                f"🔧 [Package Runtime] RETRY reset: "
+                                f"{task.get('task_id')} ({agent}) — "
+                                f"çıktı generated=False"
+                            )
+
             # REPLAY durumunda final/delivery geçici temizlik
             if procedure == "REPLAY":
                 package.metadata.status = PackageStatus.READY.value
