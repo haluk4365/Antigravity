@@ -736,3 +736,79 @@ def remove_breakpoint(pid: str, step_id: str) -> bool:
 
 def has_breakpoint(pid: str, step_id: str) -> bool:
     return step_id in _breakpoints.get(pid, set())
+
+
+def get_evidence_package(pid: str) -> dict:
+    """PID'e ait tüm kanıtları tek bir pakette toplar."""
+    pkg = _read_package(pid)
+    events = get_events(pid=pid, limit=500)
+    return {
+        "pid": pid,
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "package": pkg,
+        "events": events,
+        "breakpoints": list(_get_breakpoints(pid)),
+    }
+
+
+def update_brief(pid: str, data: dict) -> dict:
+    """Package brief'ini günceller (operatör düzeltmesi)."""
+    pkg = _read_package(pid)
+    if not pkg:
+        raise ValueError(f"Package bulunamadı: {pid}")
+
+    brief = pkg.get("brief", {}) or {}
+    allowed = ("product_name", "brand", "platform", "url", "voice_language")
+    for k in allowed:
+        if k in data:
+            brief[k] = data[k]
+
+    pkg["brief"] = brief
+    # Diske yaz
+    _write_package(pid, pkg)
+    return {"ok": True, "brief": brief}
+
+
+def _write_package(pid: str, data: dict) -> bool:
+    """Package'i diske yazar."""
+    path = os.path.join(_PKG_DIR, f"{pid}.json")
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+        os.replace(tmp, path)
+        return True
+    except Exception as e:
+        logger.error(f"Package yazılamadı ({pid}): {e}")
+        return False
+
+
+def rerun_step(pid: str, step_id: str) -> dict:
+    """İlgili adımı yeniden çalıştır (task status'unu PENDING yap)."""
+    step_agent_map = {
+        "08": "ImageGenerator", "09": "ImageGenerator",
+        "10": "VideoRenderer", "11": "VideoRenderer",
+    }
+    agent = step_agent_map.get(step_id)
+    if not agent:
+        raise ValueError(f"Bu adım yeniden çalıştırılamaz: {step_id}")
+
+    pkg = _read_package(pid)
+    if not pkg:
+        raise ValueError(f"Package bulunamadı: {pid}")
+
+    tasks = pkg.get("task_packages", []) or []
+    updated = False
+    for t in tasks:
+        if t.get("agent") == agent and t.get("status") in ("COMPLETED", "SUCCESS", "FAILED"):
+            t["status"] = "PENDING"
+            t.pop("completed_at", None)
+            t.pop("output", None)
+            updated = True
+
+    if updated:
+        pkg["task_packages"] = tasks
+        _write_package(pid, pkg)
+
+    return {"ok": updated, "step_id": step_id, "agent": agent, "message": "Adım PENDING yapıldı" if updated else "Değişiklik yok"}

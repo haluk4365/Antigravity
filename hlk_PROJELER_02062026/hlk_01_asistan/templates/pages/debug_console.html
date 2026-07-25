@@ -42,8 +42,10 @@ pre.debug { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: 8
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
   <a href="/pid/{{ pid }}?token={{ token }}" class="btn-sm">← PID Detay</a>
+  <button class="btn-sm" onclick="downloadEvidence()">📦 Evidence Package İndir</button>
+  <a href="/api/debug/{{ pid }}/evidence?token={{ token }}" class="btn-sm" target="_blank">🔗 Evidence (JSON)</a>
   <span class="auto-refresh" id="refreshNote"></span>
   <label style="font-size:12px;"><input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()"> Otomatik yenile (3sn)</label>
 </div>
@@ -107,6 +109,8 @@ async function load() {
         </div>
         <div class="action-bar">
           <button class="btn-sm breakpoint ${hasBp?'active':''}" id="bpbtn-${s.id}" onclick="toggleBreakpoint('${s.id}')">🔴 ${hasBp?'Breakpoint Kaldır':'Breakpoint Ekle'}</button>
+          ${['08','09','10','11'].includes(s.id) ? `<button class="btn-sm" onclick="rerunStep('${s.id}')">🔄 Adımı Yeniden Çalıştır</button>` : ''}
+          ${['01','02','03'].includes(s.id) ? `<button class="btn-sm" onclick="editBrief('${s.id}')">✏️ Parametre Düzenle</button>` : ''}
           <button class="btn-sm" onclick="copyStepData('${s.id}')">📋 Kopyala</button>
         </div>
       </div>
@@ -183,6 +187,37 @@ function copyStepData(id) {
 
 function toggleAutoRefresh() {
   autoRefresh = document.getElementById('autoRefresh').checked;
+}
+
+async function downloadEvidence() {
+  const data = await api('/debug/' + PID + '/evidence');
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = PID + '_evidence.json'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function rerunStep(stepId) {
+  if (!confirm('Bu adım yeniden çalıştırılacak. Emin misiniz?')) return;
+  const r = await fetch('/api/debug/' + PID + '/rerun/' + stepId + '?token=' + TOKEN, {method:'POST'});
+  const d = await r.json();
+  alert(d.message || (d.ok ? 'Tamam' : 'Hata'));
+  if (d.ok) setTimeout(load, 1000);
+}
+
+async function editBrief(stepId) {
+  const fields = {product_name: 'Ürün Adı', brand: 'Marka', platform: 'Platform', url: 'URL'};
+  const msg = Object.entries(fields).map(([k,v]) => k + ': ' + v).join('\n');
+  const field = prompt('Hangi alanı düzenlemek istersiniz?\n\n' + msg + '\n\nAlan adı (örn: product_name):');
+  if (!field || !fields[field]) return;
+  const value = prompt(fields[field] + ' için yeni değer:');
+  if (value === null) return;
+  const body = {}; body[field] = value;
+  const r = await fetch('/api/pid/' + PID + '/brief?token=' + TOKEN, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if (d.ok) { alert('Güncellendi'); load(); }
+  else alert('Hata: ' + (d.detail || 'Bilinmeyen'));
 }
 
 load();

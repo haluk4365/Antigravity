@@ -225,3 +225,41 @@ async def api_toggle_breakpoint(request: Request, pid: str, step_id: str):
             return {"ok": True, "action": "added", "step_id": step_id}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+
+@router.get("/debug/{pid}/evidence")
+async def api_evidence_package(request: Request, pid: str):
+    """Evidence Package — tüm kanıtları tek JSON'da indir."""
+    _check_auth(request)
+    try:
+        from .data_providers import get_evidence_package
+        return get_evidence_package(pid)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.patch("/pid/{pid}/brief")
+async def api_update_brief(request: Request, pid: str):
+    """Brief düzenleme — operatör product_name vb. düzeltir."""
+    _check_auth(request)
+    try:
+        body = await request.json()
+        from .data_providers import update_brief
+        return update_brief(pid, body)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.post("/debug/{pid}/rerun/{step_id}")
+async def api_rerun_step(request: Request, pid: str, step_id: str):
+    """Adımı yeniden çalıştır — task status'unu PENDING yapar."""
+    _check_auth(request)
+    try:
+        from .data_providers import rerun_step
+        return rerun_step(pid, step_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
