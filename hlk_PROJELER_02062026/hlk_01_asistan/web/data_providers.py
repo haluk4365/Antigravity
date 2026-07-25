@@ -330,7 +330,7 @@ def _is_runtime_connected() -> bool:
     """HLK Runtime aktif mi?"""
     try:
         from services.hlk_runtime import hlk_runtime as hr
-        return getattr(hr, "_constitution_active", False)
+        return bool(getattr(hr, '_sessions', {}))
     except Exception:
         return False
 
