@@ -517,6 +517,9 @@ class ProductionExecutor:
                 result.completed_at = datetime.now(timezone.utc).isoformat()
                 logger.warning(f"⏰ [Executor] {result.error_detail}")
 
+                # AR-002_90 FIX: Timeout sonrası retry için status sıfırla
+                task["status"] = "PENDING"
+
                 if attempt < max_retry:
                     logger.info(f"🔄 [Executor] Retry: {task_id} (deneme {attempt + 1})")
 
@@ -530,6 +533,12 @@ class ProductionExecutor:
                     f"❌ [Executor] Task başarısız: {task_id} "
                     f"(deneme {attempt}/{max_retry}): {e}"
                 )
+
+                # AR-002_90 FIX: TASK_FAILED sonrası retry'de task status
+                # PENDING yapılmazsa, _run_task_handler "zaten COMPLETED"
+                # deyip atlar. Checkpoint COMPLETED yazmış olabilir ama
+                # HLK Runtime TASK_FAILED verdiyse üretim gerçekleşmemiştir.
+                task["status"] = "PENDING"
 
                 if attempt < max_retry:
                     logger.info(f"🔄 [Executor] Retry: {task_id} (deneme {attempt + 1})")
