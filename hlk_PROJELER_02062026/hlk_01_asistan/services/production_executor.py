@@ -969,6 +969,7 @@ class ProductionExecutor:
                 restored.append("video_path")
 
             # ── task_packages → artifact'ler ──────────────────────────
+            import os as _os_restore
             for task in all_tasks:
                 if task.get("status") not in ("COMPLETED", "SUCCESS"):
                     continue
@@ -977,21 +978,37 @@ class ProductionExecutor:
 
                 if agent == "ImageGenerator" and not ctx.img_path:
                     _artifact = output.get("artifact") or output.get("img_path")
-                    if _artifact:
+                    # AR-002_90: Dosya varlığını doğrula — /tmp deploy'da silinir
+                    if _artifact and _os_restore.path.exists(str(_artifact)):
                         ctx.img_path = _artifact
                         restored.append(f"img_path ({task.get('task_id')})")
+                    elif _artifact:
+                        logger.info(
+                            f"📋 [Executor] Checkpoint img_path dosyasi yok, "
+                            f"atlandi: {_artifact} — yeniden uretilecek"
+                        )
 
                 elif agent == "VoiceGenerator" and not ctx.voice_path:
                     _artifact = output.get("artifact") or output.get("voice_path")
-                    if _artifact:
+                    if _artifact and _os_restore.path.exists(str(_artifact)):
                         ctx.voice_path = _artifact
                         restored.append(f"voice_path ({task.get('task_id')})")
+                    elif _artifact:
+                        logger.info(
+                            f"📋 [Executor] Checkpoint voice_path dosyasi yok, "
+                            f"atlandi: {_artifact} — yeniden uretilecek"
+                        )
 
                 elif agent == "VideoRenderer" and not ctx.video_path:
                     _artifact = output.get("artifact") or output.get("video_path")
-                    if _artifact:
+                    if _artifact and _os_restore.path.exists(str(_artifact)):
                         ctx.video_path = _artifact
                         restored.append(f"video_path ({task.get('task_id')})")
+                    elif _artifact:
+                        logger.info(
+                            f"📋 [Executor] Checkpoint video_path dosyasi yok, "
+                            f"atlandi: {_artifact} — yeniden uretilecek"
+                        )
 
                 # MASTER-013: DeliveryAgent çıktısından delivered restore EDILMEZ.
                 # delivered bir karar değeridir — yeni üretim kendi teslim
