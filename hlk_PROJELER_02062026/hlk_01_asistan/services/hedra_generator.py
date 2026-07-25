@@ -79,6 +79,7 @@ class HedraGenerator:
             "type": "video",
             "video": {
                 "generated_video_inputs": {
+                    "type": "lipsync",
                     "model": model_id,
                     "image_asset_id": image_url,
                     "audio_asset_id": audio_url,
