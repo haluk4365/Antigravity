@@ -23,7 +23,7 @@ async def api_dashboard(request: Request):
     _check_auth(request)
     try:
         from .data_providers import get_dashboard_data
-        return get_dashboard_data()
+        return await get_dashboard_data()
     except Exception as e:
         logger.error(f"Dashboard verisi alınamadı: {e}")
         raise HTTPException(500, str(e))

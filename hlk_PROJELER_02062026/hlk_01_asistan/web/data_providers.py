@@ -23,11 +23,11 @@ logger = logging.getLogger(__name__)
 # Dashboard
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def get_dashboard_data() -> dict:
+async def get_dashboard_data() -> dict:
     """Ana sayfa KPI verileri."""
     try:
         from services.pid_runtime import pid_runtime
-        pid_stats = pid_runtime.get_stats()
+        pid_stats = await pid_runtime.get_stats()
     except Exception:
         pid_stats = {"total_pids": 0, "active_pids": 0, "daily_count": 0}
 
