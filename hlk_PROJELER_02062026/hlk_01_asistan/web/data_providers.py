@@ -738,6 +738,54 @@ def has_breakpoint(pid: str, step_id: str) -> bool:
     return step_id in _breakpoints.get(pid, set())
 
 
+def get_health_data(pid: str) -> dict:
+    """Health Panel verisi."""
+    try:
+        from services.hlk_runtime import hlk_runtime as hr
+        sessions = len(getattr(hr, '_sessions', {}))
+        productions = len(getattr(hr, '_production_sessions', {}))
+    except Exception:
+        sessions = productions = 0
+
+    try:
+        from services.provider_priority import provider_priority
+        available = sum(len(provider_priority.get_available(c)) for c in ("image", "voice", "video"))
+        total = sum(len(provider_priority.get_providers(c)) for c in ("image", "voice", "video"))
+    except Exception:
+        available = total = 0
+
+    pkg = _read_package(pid) or {}
+    tasks = pkg.get("task_packages", []) or []
+    failed = sum(1 for t in tasks if t.get("status") == "FAILED")
+    completed = sum(1 for t in tasks if t.get("status") in ("COMPLETED", "SUCCESS"))
+
+    risk = "DÜŞÜK"
+    if failed > 0:
+        risk = "YÜKSEK"
+    elif completed == 0:
+        risk = "ORTA"
+    elif completed < len(tasks):
+        risk = "ORTA"
+
+    bp_count = len(_get_breakpoints(pid))
+
+    return {
+        "production": "AKTİF" if productions > 0 else "PASİF",
+        "production_ok": productions > 0,
+        "runtime": "AKTİF" if sessions > 0 else "PASİF",
+        "runtime_ok": sessions > 0,
+        "provider": f"{available}/{total}",
+        "provider_ok": available > 0,
+        "risk": risk,
+        "risk_level": risk,
+        "pending_interventions": bp_count,
+        "open_errors": failed,
+        "tasks_total": len(tasks),
+        "tasks_completed": completed,
+        "tasks_failed": failed,
+    }
+
+
 def get_evidence_package(pid: str) -> dict:
     """PID'e ait tüm kanıtları tek bir pakette toplar."""
     pkg = _read_package(pid)

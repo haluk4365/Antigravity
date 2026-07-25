@@ -1,56 +1,79 @@
 {% extends "base.html" %}
 {% block title %}Debug Console — {{ pid }}{% endblock %}
-{% block page_title %}🔬 Production Debug Console — <code>{{ pid }}</code>{% endblock %}
+{% block page_title %}🔬 HLK Production Operations Center — <code>{{ pid }}</code>{% endblock %}
 
 {% block extra_head %}
 <style>
+.wrapper { display: flex; gap: 16px; }
+.main-col { flex: 1; min-width: 0; }
+.health-panel { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+.health-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.health-card .hl { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
+.health-card .hv { font-size: 14px; font-weight: 700; }
+.health-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.health-dot.green { background: var(--green); }
+.health-dot.yellow { background: var(--yellow); }
+.health-dot.red { background: var(--red); }
+
 .accordion { display: flex; flex-direction: column; gap: 2px; }
 .step { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card-bg); }
-.step-header { display: flex; align-items: center; padding: 12px 16px; cursor: pointer; gap: 12px; user-select: none; transition: background .1s; }
+.step-header { display: flex; align-items: center; padding: 10px 14px; cursor: pointer; gap: 10px; user-select: none; transition: background .1s; }
 .step-header:hover { background: #f8fafc; }
-.step-num { font-weight: 800; font-size: 13px; color: var(--muted); min-width: 28px; }
-.step-name { flex: 1; font-weight: 600; font-size: 14px; }
-.step-status { font-size: 12px; padding: 2px 10px; border-radius: 8px; font-weight: 700; min-width: 80px; text-align: center; }
-.step-status.completed { background: var(--green-bg); color: var(--green); }
+.step-num { font-weight: 800; font-size: 12px; color: var(--muted); min-width: 24px; }
+.step-name { flex: 1; font-weight: 600; font-size: 13px; }
+.step-status { font-size: 11px; padding: 2px 10px; border-radius: 8px; font-weight: 700; text-align: center; white-space: nowrap; }
+.step-status.ready { background: #f1f5f9; color: #94a3b8; }
 .step-status.running { background: var(--blue-light); color: var(--blue); }
-.step-status.pending { background: #f1f5f9; color: #64748b; }
+.step-status.waiting_operator { background: #fef3c7; color: #d97706; }
+.step-status.paused { background: #fef3c7; color: #d97706; }
+.step-status.retry { background: #ede9fe; color: #7c3aed; }
+.step-status.timeout { background: var(--red-bg); color: var(--red); }
+.step-status.skipped { background: #f1f5f9; color: #94a3b8; text-decoration: line-through; }
+.step-status.completed { background: var(--green-bg); color: var(--green); }
 .step-status.failed { background: var(--red-bg); color: var(--red); }
-.step-status.waiting { background: var(--yellow-bg); color: var(--yellow); }
-.step-time { font-size: 11px; color: var(--muted); min-width: 100px; text-align: right; }
 .step-bp { font-size: 10px; background: var(--red); color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 700; display: none; }
 .step-bp.on { display: inline; }
 .step-body { display: none; border-top: 1px solid var(--border); }
 .step.open .step-body { display: block; }
 .step.open .step-header { background: #f8fafc; border-bottom: 1px solid var(--border); }
-.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: #fafbfc; }
-.tab-btn { padding: 8px 16px; border: none; background: none; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; transition: all .1s; }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: #fafbfc; overflow-x: auto; }
+.tab-btn { padding: 7px 12px; border: none; background: none; cursor: pointer; font-size: 11px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; transition: all .1s; white-space: nowrap; }
 .tab-btn:hover { color: var(--text); }
 .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
-.tab-content { display: none; padding: 16px; }
+.tab-content { display: none; padding: 14px; }
 .tab-content.active { display: block; }
-.info-grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 16px; font-size: 13px; }
+.info-grid { display: grid; grid-template-columns: 130px 1fr; gap: 4px 12px; font-size: 12px; }
 .info-grid .k { color: var(--muted); font-weight: 600; }
-.info-grid .v { word-break: break-all; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; }
-pre.debug { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: 8px; font-size: 11px; overflow-x: auto; max-height: 300px; overflow-y: auto; margin: 0; }
-.action-bar { display: flex; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
-.btn-sm { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; font-size: 11px; font-weight: 600; background: #fff; transition: all .1s; }
+.info-grid .v { word-break: break-all; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; }
+pre.debug { background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 8px; font-size: 11px; overflow-x: auto; max-height: 250px; overflow-y: auto; margin: 0; line-height: 1.5; }
+.action-bar { display: flex; gap: 6px; padding: 8px 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.btn-sm { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; font-size: 10px; font-weight: 600; background: #fff; transition: all .1s; white-space: nowrap; }
 .btn-sm:hover { background: #f1f5f9; }
 .btn-sm.breakpoint { border-color: var(--red); color: var(--red); }
 .btn-sm.breakpoint.active { background: var(--red); color: #fff; }
-.auto-refresh { font-size: 11px; color: var(--muted); margin-left: 12px; }
+.btn-sm.danger { border-color: var(--red); color: var(--red); }
+.btn-sm.primary { border-color: var(--blue); color: var(--blue); }
+.auto-refresh { font-size: 11px; color: var(--muted); margin-left: 8px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+<div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
   <a href="/pid/{{ pid }}?token={{ token }}" class="btn-sm">← PID Detay</a>
-  <button class="btn-sm" onclick="downloadEvidence()">📦 Evidence Package İndir</button>
-  <a href="/api/debug/{{ pid }}/evidence?token={{ token }}" class="btn-sm" target="_blank">🔗 Evidence (JSON)</a>
+  <button class="btn-sm primary" onclick="downloadEvidence()">📦 Evidence İndir</button>
+  <a href="/api/debug/{{ pid }}/evidence?token={{ token }}" class="btn-sm" target="_blank">🔗 JSON</a>
   <span class="auto-refresh" id="refreshNote"></span>
-  <label style="font-size:12px;"><input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()"> Otomatik yenile (3sn)</label>
+  <label style="font-size:11px;"><input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()"> 3sn</label>
 </div>
 
-<div class="accordion" id="accordion"></div>
+<div class="wrapper">
+  <div class="main-col">
+    <div class="accordion" id="accordion"></div>
+  </div>
+  <div class="health-panel" id="healthPanel">
+    <div class="health-card"><div class="hl">Yükleniyor...</div></div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -66,13 +89,22 @@ async function load() {
   const data = await api('/debug/' + PID);
   if (!data || !data.steps) return;
 
+  // Health Panel
+  loadHealth();
+
   const acc = document.getElementById('accordion');
   const breakpoints = data.breakpoints || [];
   let html = '';
 
+  const statusLabels = {
+    ready:'Hazır', running:'Çalışıyor', waiting_operator:'Op. Bekleniyor',
+    paused:'Duraklatıldı', retry:'Retry', timeout:'Timeout',
+    skipped:'Atlandı', completed:'Tamamlandı', failed:'Başarısız',
+    pending:'Bekliyor', waiting:'Bekliyor'
+  };
+
   for (const s of data.steps) {
     const hasBp = breakpoints.includes(s.id);
-    const statusLabels = {completed:'✅ Tamamlandı', running:'⏳ Çalışıyor', pending:'⏸ Bekliyor', failed:'❌ Hata', waiting:'⏳ Bekliyor'};
     html += `<div class="step" id="step-${s.id}">
       <div class="step-header" onclick="toggleStep('${s.id}')">
         <span class="step-num">${s.id}</span>
@@ -109,8 +141,10 @@ async function load() {
         </div>
         <div class="action-bar">
           <button class="btn-sm breakpoint ${hasBp?'active':''}" id="bpbtn-${s.id}" onclick="toggleBreakpoint('${s.id}')">🔴 ${hasBp?'Breakpoint Kaldır':'Breakpoint Ekle'}</button>
-          ${['08','09','10','11'].includes(s.id) ? `<button class="btn-sm" onclick="rerunStep('${s.id}')">🔄 Adımı Yeniden Çalıştır</button>` : ''}
-          ${['01','02','03'].includes(s.id) ? `<button class="btn-sm" onclick="editBrief('${s.id}')">✏️ Parametre Düzenle</button>` : ''}
+          ${['08','09','10','11'].includes(s.id) ? `<button class="btn-sm primary" onclick="rerunStep('${s.id}')">🔄 Yeniden Çalıştır</button>` : ''}
+          ${['08','09','10','11'].includes(s.id) ? `<button class="btn-sm danger" onclick="rollbackStep('${s.id}')">↩ Rollback</button>` : ''}
+          ${['08','09','10','11'].includes(s.id) ? `<button class="btn-sm" onclick="resumeFrom('${s.id}')">▶ Buradan Devam</button>` : ''}
+          ${['01','02','03'].includes(s.id) ? `<button class="btn-sm" onclick="editBrief('${s.id}')">✏️ Düzenle</button>` : ''}
           <button class="btn-sm" onclick="copyStepData('${s.id}')">📋 Kopyala</button>
         </div>
       </div>
@@ -187,6 +221,52 @@ function copyStepData(id) {
 
 function toggleAutoRefresh() {
   autoRefresh = document.getElementById('autoRefresh').checked;
+}
+
+async function loadHealth() {
+  const h = await api('/debug/' + PID + '/health');
+  if (!h) return;
+  document.getElementById('healthPanel').innerHTML = `
+    <div class="health-card">
+      <div class="hl">Production</div>
+      <div class="hv"><span class="health-dot ${h.production_ok?'green':'red'}"></span>${h.production}</div>
+    </div>
+    <div class="health-card">
+      <div class="hl">Runtime</div>
+      <div class="hv"><span class="health-dot ${h.runtime_ok?'green':'red'}"></span>${h.runtime}</div>
+    </div>
+    <div class="health-card">
+      <div class="hl">Provider Sağlığı</div>
+      <div class="hv"><span class="health-dot ${h.provider_ok?'green':'yellow'}"></span>${h.provider}</div>
+    </div>
+    <div class="health-card">
+      <div class="hl">Risk Seviyesi</div>
+      <div class="hv"><span class="health-dot ${h.risk_level==='DÜŞÜK'?'green':h.risk_level==='ORTA'?'yellow':'red'}"></span>${h.risk_level}</div>
+    </div>
+    <div class="health-card">
+      <div class="hl">Bekleyen Müdahale</div>
+      <div class="hv">${h.pending_interventions} breakpoint</div>
+    </div>
+    <div class="health-card">
+      <div class="hl">Açık Hatalar</div>
+      <div class="hv"><span class="health-dot ${h.open_errors?'red':'green'}"></span>${h.open_errors} / ${h.tasks_total} task</div>
+    </div>`;
+}
+
+async function rollbackStep(stepId) {
+  if (!confirm('Bu adım rollback edilecek. Emin misiniz?')) return;
+  const r = await fetch('/api/debug/' + PID + '/rollback/' + stepId + '?token=' + TOKEN, {method:'POST'});
+  const d = await r.json();
+  alert(d.message || (d.ok ? 'Rollback yapıldı' : 'Hata'));
+  if (d.ok) setTimeout(load, 1000);
+}
+
+async function resumeFrom(stepId) {
+  if (!confirm('Bu adımdan itibaren tüm task\'lar PENDING yapılacak. Emin misiniz?')) return;
+  const r = await fetch('/api/debug/' + PID + '/resume-from/' + stepId + '?token=' + TOKEN, {method:'POST'});
+  const d = await r.json();
+  alert(d.message || (d.ok ? 'Tamam' : 'Hata'));
+  if (d.ok) setTimeout(load, 1000);
 }
 
 async function downloadEvidence() {

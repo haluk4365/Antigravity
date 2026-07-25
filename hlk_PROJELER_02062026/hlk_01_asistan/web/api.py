@@ -227,6 +227,59 @@ async def api_toggle_breakpoint(request: Request, pid: str, step_id: str):
         raise HTTPException(500, str(e))
 
 
+@router.get("/debug/{pid}/health")
+async def api_health(request: Request, pid: str):
+    """Health Panel verisi."""
+    _check_auth(request)
+    try:
+        from .data_providers import get_health_data
+        return get_health_data(pid)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.post("/debug/{pid}/rollback/{step_id}")
+async def api_rollback(request: Request, pid: str, step_id: str):
+    """Adımı rollback et."""
+    _check_auth(request)
+    try:
+        from .data_providers import rerun_step
+        return rerun_step(pid, step_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
+@router.post("/debug/{pid}/resume-from/{step_id}")
+async def api_resume_from(request: Request, pid: str, step_id: str):
+    """Seçili adımdan itibaren devam et."""
+    _check_auth(request)
+    try:
+        from .data_providers import _read_package, _write_package
+        step_order = {"08": 0, "09": 1, "10": 2, "11": 3}
+        target = step_order.get(step_id, 0)
+        pkg = _read_package(pid)
+        if not pkg:
+            raise ValueError(f"Package bulunamadı: {pid}")
+        tasks = pkg.get("task_packages", []) or []
+        task_agents = {"08": "ImageGenerator", "09": "ImageGenerator", "10": "VideoRenderer", "11": "VideoRenderer"}
+        for t in tasks:
+            agent = t.get("agent", "")
+            for sid, sagent in task_agents.items():
+                if agent == sagent and step_order.get(sid, 99) >= target:
+                    t["status"] = "PENDING"
+                    t.pop("completed_at", None)
+                    t.pop("output", None)
+        pkg["task_packages"] = tasks
+        _write_package(pid, pkg)
+        return {"ok": True, "message": f"{step_id} ve sonrası PENDING yapıldı"}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @router.get("/debug/{pid}/evidence")
 async def api_evidence_package(request: Request, pid: str):
     """Evidence Package — tüm kanıtları tek JSON'da indir."""
