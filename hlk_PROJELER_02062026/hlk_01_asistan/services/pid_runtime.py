@@ -81,7 +81,7 @@ def _write_lock_info(lock_path: Path) -> None:
             "acquired_iso": datetime.now(timezone.utc).isoformat(),
         })
         lock_path.write_text(info, encoding="utf-8")
-    except Exception:
+    except Exception as _e:
         pass  # info yazılamazsa kilit hâlâ geçerli — best-effort
 
 
@@ -91,7 +91,7 @@ def _read_lock_info(lock_path: Path) -> Optional[dict]:
         if lock_path.exists():
             raw = lock_path.read_text(encoding="utf-8")
             return json.loads(raw)
-    except Exception:
+    except Exception as _e:
         pass
     return None
 
@@ -231,7 +231,7 @@ def _cross_process_lock_acquire(lock_path: Path, timeout: float = None) -> None:
                 if fd:
                     try:
                         fd.close()
-                    except Exception:
+                    except Exception as _e:
                         pass
                 if time.time() > deadline:
                     holder_info = _read_lock_info(lock_path)
@@ -240,11 +240,11 @@ def _cross_process_lock_acquire(lock_path: Path, timeout: float = None) -> None:
                         f"({timeout}s timeout). Holder: {holder_info or 'bilinmiyor'}"
                     )
                 time.sleep(0.05)
-            except Exception:
+            except Exception as _e:
                 if fd:
                     try:
                         fd.close()
-                    except Exception:
+                    except Exception as _e:
                         pass
                 raise
     else:
@@ -311,7 +311,7 @@ def _cross_process_lock_acquire(lock_path: Path, timeout: float = None) -> None:
                 if fd:
                     try:
                         fd.close()
-                    except Exception:
+                    except Exception as _e:
                         pass
                 if time.time() > deadline:
                     holder_info = _read_lock_info(lock_path)
@@ -320,11 +320,11 @@ def _cross_process_lock_acquire(lock_path: Path, timeout: float = None) -> None:
                         f"({timeout}s timeout). Holder: {holder_info or 'bilinmiyor'}"
                     )
                 time.sleep(0.01)  # 10ms — daha hızlı retry
-            except Exception:
+            except Exception as _e:
                 if fd:
                     try:
                         fd.close()
-                    except Exception:
+                    except Exception as _e:
                         pass
                 raise
 
@@ -353,12 +353,12 @@ def _cross_process_lock_release(lock_path: Path, lock_fd=None) -> None:
             import fcntl
             try:
                 fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
-            except Exception:
+            except Exception as _e:
                 pass
             finally:
                 try:
                     lock_fd.close()
-                except Exception:
+                except Exception as _e:
                     pass
     else:
         # ── Windows: fd close → msvcrt lock otomatik serbest ──────────
@@ -368,7 +368,7 @@ def _cross_process_lock_release(lock_path: Path, lock_fd=None) -> None:
         if lock_fd is not None:
             try:
                 lock_fd.close()
-            except Exception:
+            except Exception as _e:
                 pass
 
 
@@ -1012,7 +1012,7 @@ class PIDRuntime:
                             _p.rmdir()
                         else:
                             _p.unlink()
-                except Exception:
+                except Exception as _e:
                     pass
 
 

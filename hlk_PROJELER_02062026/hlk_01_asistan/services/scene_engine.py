@@ -203,7 +203,7 @@ class ConversationSceneEngine:
                 try:
                     await bot.delete_message(chat_id=chat_id, message_id=mid)
                     break
-                except Exception:
+                except Exception as _e:
                     await asyncio.sleep(0.3)
         # 3. Scene Delivery kayıtlı mesajları temizle
         try:
@@ -523,7 +523,7 @@ class ConversationSceneEngine:
                 if fd_entry and fd_entry.content:
                     sys_raw = fd_entry.content
                     scene_text = self._find_event_speech(sys_raw, trigger_event, event_context)
-            except Exception:
+            except Exception as _e:
                 pass
         if scene_text:
             log_entry["steps"].append({

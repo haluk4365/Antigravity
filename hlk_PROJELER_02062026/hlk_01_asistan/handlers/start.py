@@ -74,7 +74,7 @@ def _build_admin_context(user_data: dict, user_msg: str) -> str:
     try:
         from handlers.website import _get_tcmb_kur
         tcmb = _get_tcmb_kur()
-    except Exception:
+    except Exception as _e:
         tcmb = 47.0
 
     try:
@@ -311,7 +311,7 @@ async def _send_intro_video(update: Update, reply_markup: InlineKeyboardMarkup |
         await asyncio.sleep(SAHNE1_SURE)
         try:
             await msg.delete()
-        except Exception:
+        except Exception as _e:
             pass
         return True
     except Exception as e:
@@ -324,7 +324,7 @@ async def _auto_delete_after(message_id: int, chat_id: int, delay: int, bot) -> 
     await asyncio.sleep(delay)
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception:
+    except Exception as _e:
         pass
 
 
@@ -348,7 +348,7 @@ def _measure_mp3_duration(filepath: Path) -> float:
         )
         if result.stdout.strip():
             return float(result.stdout.strip())
-    except Exception:
+    except Exception as _e:
         pass
     return 0.0
 
@@ -380,7 +380,7 @@ async def _scout_all_formats(
     audio_path = None
     try:
         audio_path = ahu_voice_generator.generate(text=text, language=language)
-    except Exception:
+    except Exception as _e:
         pass
 
     if not audio_path:
@@ -736,7 +736,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         await video_msg.delete()
         logger.info(f"🚩 [SCENE_CLEANUP] message_id={actual_msg_id} silindi")
-    except Exception:
+    except Exception as _e:
         logger.warning(f"⚠️ [SCENE_CLEANUP] message_id={actual_msg_id} silinemedi (zaten silinmis)")
         pass
 
@@ -794,7 +794,7 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
 
     try:
         await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception:
+    except Exception as _e:
         pass
 
     sahne2_sure = SAHNE2_SURE_LANG.get(language.upper(), SAHNE2_SURE)
@@ -853,7 +853,7 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
             try:
                 await context.bot.delete_message(chat_id=chat_id, message_id=hint_msg.message_id)
                 logger.info(f"🧹 SAHNE-2 SESLI_HINT 4sn sonra silindi")
-            except Exception:
+            except Exception as _e:
                 pass
         asyncio.create_task(_remove_hint())
     except Exception as e:
@@ -996,7 +996,7 @@ async def handle_devam_button(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
     try:
         await query.message.edit_reply_markup(reply_markup=None)
-    except Exception:
+    except Exception as _e:
         pass
     context.user_data["state"] = "waiting_for_website"
     logger.info(f"▶️ Devam: {query.from_user.id}")
@@ -1034,11 +1034,11 @@ async def handle_scene2_replay(update: Update, context: ContextTypes.DEFAULT_TYP
         if mid:
             try:
                 await context.bot.delete_message(chat_id=chat_id, message_id=mid)
-            except Exception:
+            except Exception as _e:
                 pass
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
 
     # Yeni video gonder (file_id ile, baslangictan)
@@ -1060,7 +1060,7 @@ async def handle_scene2_replay(update: Update, context: ContextTypes.DEFAULT_TYP
         await asyncio.sleep(sure + 0.5)
         try:
             await replay_msg.delete()
-        except Exception:
+        except Exception as _e:
             pass
 
         await typewriter_animation(
@@ -1101,7 +1101,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # FD-008_1: "EKRAN SİLİNİR" — eski formu + prompt'u temizle
         try:
             await update.message.delete()
-        except Exception:
+        except Exception as _e:
             pass
         await scene_delivery.cleanup_chat(chat_id=update.effective_chat.id)
 
@@ -1156,14 +1156,14 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     try:
                         await context.bot.delete_message(chat_id=chat_id, message_id=vmid)
                         logger.info(f"🧹 Validation uyarısı silindi: msg_id={vmid}")
-                    except Exception:
+                    except Exception as _e:
                         pass
                 logger.info(f"🧹 Toplam {len(validation_msg_ids)} validation mesajı temizlendi")
 
                 # Kullanıcının geçerli mesajını sil
                 try:
                     await update.message.delete()
-                except Exception:
+                except Exception as _e:
                     pass
 
                 # EVENT_DURATION_SELECTED ateşle
@@ -1205,7 +1205,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 # Kullanıcının geçersiz mesajını sil
                 try:
                     await update.message.delete()
-                except Exception:
+                except Exception as _e:
                     pass
                 # Uyarı gönder, message_id'yi takip listesine ekle
                 warning_msg = await update.message.reply_text(
@@ -1221,7 +1221,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             # Kullanıcının geçersiz mesajını sil
             try:
                 await update.message.delete()
-            except Exception:
+            except Exception as _e:
                 pass
             # Uyarı gönder, message_id'yi takip listesine ekle
             warning_msg = await update.message.reply_text(
@@ -1348,7 +1348,7 @@ async def handle_duration_hlk(update: Update, context: ContextTypes.DEFAULT_TYPE
     # FD-008_1: EKRAN SİLİNİR
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     from services.scene_delivery import scene_delivery as _sd
     await _sd.cleanup_chat(chat_id)

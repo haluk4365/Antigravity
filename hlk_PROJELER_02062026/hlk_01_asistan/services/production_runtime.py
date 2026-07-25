@@ -253,22 +253,28 @@ class ProductionRuntime:
                 if post_check_report and post_check_report.get("verdict") == "FAIL":
                     logger.warning(
                         f"⚠️ [Production] CEE POST-CHECK FAIL: {pid} "
-                        f"(Production tamamlandı, ancak anayasal uyumsuzluk tespit edildi)"
+                        f"(anayasal uyumsuzluk — Production başarısız sayılacak)"
                     )
-                    # POST-CHECK FAIL, Production sonucunu değiştirmez
-                    # CEE değerlendirmesi ile Production sonucu bağımsız korunur
+                    # AR-002_85/86: CEE POST-CHECK FAIL → Production başarısız.
+                    # Executor task'ları tamamlanmış olsa bile anayasal
+                    # doğrulama olmadan başarı kararı verilemez.
 
                 # ── Tamamlanma ──────────────────────────────────────────
                 elapsed = time.time() - start_time
                 self._state = ProductionState.COMPLETED
                 self._result.state = ProductionState.COMPLETED.value
                 # AR-002_85: başarı kararı yalnızca doğrulanmış sonuçlardan
-                # hesaplanır — executor raporu başarısız task içermemeli.
+                # hesaplanır — executor raporu başarısız task içermemeli
+                # VE CEE POST-CHECK anayasal doğrulamadan geçmeli.
                 _exec_failed = (
                     executor_report.get("failed_tasks", 0)
                     if isinstance(executor_report, dict) else 0
                 )
-                self._result.success = _exec_failed == 0
+                _cee_passed = (
+                    post_check_report.get("verdict") != "FAIL"
+                    if post_check_report else True
+                )
+                self._result.success = (_exec_failed == 0) and _cee_passed
                 self._result.duration_seconds = elapsed
                 self._result.completed_at = datetime.now(timezone.utc).isoformat()
 
@@ -307,7 +313,7 @@ class ProductionRuntime:
                         },
                     ))
                     sp_success = bool(sp_decision.params.get("success", False))
-                except Exception:
+                except Exception as _e:
                     sp_success = False
                 self._state = ProductionState.FAILED
                 self._result.state = ProductionState.FAILED.value
@@ -705,13 +711,32 @@ class ProductionRuntime:
 
                 self._state = ProductionState.COMPLETED
                 self._result.state = ProductionState.COMPLETED.value
+
+                # ── CEE POST-CHECK (Anayasal Doğrulama) ────────────────
+                logger.info(f"🔍 [Production] Recovery CEE POST-CHECK başlıyor: {pid}")
+                from services.constitution_enforcement import constitution_enforcement
+                from services.production_pipeline import get_context as _get_ctx_rec
+                _ctx_rec = _get_ctx_rec(pid)
+                _pipeline_success_rec = (
+                    _ctx_rec.delivered and bool(_ctx_rec.video_path)
+                    if _ctx_rec else False
+                )
+                _cee_report_rec = constitution_enforcement.enforce_post_check(
+                    pid=pid,
+                    decision_packet={},
+                    user_data={},
+                    pipeline_success=_pipeline_success_rec,
+                )
+                _cee_passed_rec = _cee_report_rec.verdict.value != "FAIL"
+
                 # AR-002_85: başarı kararı yalnızca doğrulanmış sonuçlardan
-                # hesaplanır — executor raporu başarısız task içermemeli.
+                # hesaplanır — executor raporu başarısız task içermemeli
+                # VE CEE POST-CHECK anayasal doğrulamadan geçmeli.
                 _exec_failed_rec = (
                     executor_report.get("failed_tasks", 0)
                     if isinstance(executor_report, dict) else 0
                 )
-                self._result.success = _exec_failed_rec == 0
+                self._result.success = (_exec_failed_rec == 0) and _cee_passed_rec
                 self._result.completed_at = datetime.now(timezone.utc).isoformat()
 
                 logger.info(f"✅ [Production] Recovery tamamlandı: {pid}")
@@ -737,7 +762,7 @@ class ProductionRuntime:
                         },
                     ))
                     rec_success = bool(rec_decision.params.get("success", False))
-                except Exception:
+                except Exception as _e:
                     rec_success = False
                 self._state = ProductionState.FAILED
                 self._result.state = ProductionState.FAILED.value
@@ -824,7 +849,7 @@ class ProductionRuntime:
             try:
                 from services.hlk_runtime import hlk_runtime as _hr_term
                 _hr_term.on_production_terminal(admin_user_id)
-            except Exception:
+            except Exception as _e:
                 pass
 
     async def _run_reproduction(
@@ -1039,7 +1064,7 @@ class ProductionRuntime:
         # Production Lifecycle — session PID ile güncellenir
         try:
             hlk_runtime.on_production_start(admin_user_id, pid)
-        except Exception:
+        except Exception as _e:
             pass
 
         # CEE PRE-CHECK (AR-002_60 — anayasal görev paketi)
@@ -1213,6 +1238,13 @@ class ProductionRuntime:
                     ] if p
                 ]
                 error_msg = "; ".join(reason_parts) or "COMPLETION kararı: başarısız"
+                # Başarısız provider'ları cost_report'tan çıkar
+                _failed_providers = [
+                    svc for svc, status in (
+                        ctx.cost_report.get("services", {})
+                    ).items()
+                    if status == "failed"
+                ]
                 return await self._handle_reproduction_failure(
                     pid, bot, admin_chat_id,
                     error=error_msg,
@@ -1221,6 +1253,7 @@ class ProductionRuntime:
                     justifications=completion_decision.rationale.get(
                         "Justifications", []
                     ),
+                    failed_providers=_failed_providers,
                 )
 
             # ── Adım 20: Dijital varlık ilişkilendirme + sürüm geçmişi ──
@@ -1344,6 +1377,7 @@ class ProductionRuntime:
         self, pid: str, bot, admin_chat_id: int,
         error: str, state: "ProductionState",
         user_chat_id: int = 0, justifications: list | None = None,
+        failed_providers: list[str] | None = None,
     ) -> ProductionResult:
         """AR-002_84 başarısızlık yolu — MASTER-013 uyarınca.
 
@@ -1375,7 +1409,7 @@ class ProductionRuntime:
                 },
             ))
             term_success = bool(term_decision.params.get("success", False))
-        except Exception:
+        except Exception as _e:
             term_success = False
 
         self._state = state
@@ -1401,7 +1435,7 @@ class ProductionRuntime:
                 pid=pid,
                 reason=EscalationReason.ALL_PROVIDERS_FAILED.value,
                 detail=f"Reproduction failed: {error}",
-                failed_providers=[],
+                failed_providers=failed_providers or [],
                 retry_count=0,
             )
         except Exception as e:
@@ -1426,7 +1460,7 @@ class ProductionRuntime:
         try:
             from services.production_pipeline import clear_context
             clear_context(pid)
-        except Exception:
+        except Exception as _e:
             pass
         return self._result
 
@@ -1683,7 +1717,7 @@ class ProductionRuntime:
 
         try:
             return asyncio.create_task(_beat())
-        except Exception:
+        except Exception as _e:
             return None
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -1770,7 +1804,7 @@ class ProductionRuntime:
                         self._result.duration_seconds = (
                             datetime.now(timezone.utc) - start.replace(tzinfo=timezone.utc)
                         ).total_seconds()
-                    except Exception:
+                    except Exception as _e:
                         pass
 
             logger.info(f"📊 [ProductionRuntime] {pid}: {self._state.value}")
@@ -1909,7 +1943,7 @@ class ProductionRuntime:
             try:
                 from services.hlk_runtime import hlk_runtime as _hr2
                 _hr2.on_production_terminal(request.user_id)
-            except Exception:
+            except Exception as _e:
                 pass
 
     async def _run_managed(self, request) -> ProductionResult:
@@ -1946,7 +1980,7 @@ class ProductionRuntime:
         try:
             from services.hlk_runtime import hlk_runtime as _guard_hr
             _guard_hr.guard_check(request.user_id)
-        except Exception:
+        except Exception as _e:
             pass
         await self._validate_prerequisites()
         self._result.completed_steps = 4
@@ -1985,7 +2019,7 @@ class ProductionRuntime:
         try:
             from services.hlk_runtime import hlk_runtime as _hr_pl
             _hr_pl.on_production_start(request.user_id, pid)
-        except Exception:
+        except Exception as _e:
             pass
 
         # EEC LISTEN + başlangıç event'i (EEC-002: PID zorunlu)
@@ -2009,7 +2043,7 @@ class ProductionRuntime:
         try:
             from services.hlk_runtime import hlk_runtime as _guard_hr2
             _guard_hr2.guard_check(request.user_id)
-        except Exception:
+        except Exception as _e:
             pass
         self._result.completed_steps = 8
 
@@ -2083,7 +2117,7 @@ class ProductionRuntime:
         try:
             from services.hlk_runtime import hlk_runtime as _guard_hr3
             _guard_hr3.guard_check(request.user_id)
-        except Exception:
+        except Exception as _e:
             pass
         self._result.completed_steps = 9
 
@@ -2248,7 +2282,8 @@ class ProductionRuntime:
             clear_context(pid)
 
     async def _handle_failure(
-        self, request, pid: str, error: str, state: "ProductionState"
+        self, request, pid: str, error: str, state: "ProductionState",
+        failed_providers: list[str] | None = None,
     ) -> ProductionResult:
         """Anayasal başarısızlık yolu — MASTER-013 / AR-002_79/80.
 
@@ -2289,7 +2324,7 @@ class ProductionRuntime:
                 },
             ))
             term_success = bool(term_decision.params.get("success", False))
-        except Exception:
+        except Exception as _e:
             # HLK Runtime karar veremezse: en güvenli varsayılan
             term_success = False
 
@@ -2347,7 +2382,7 @@ class ProductionRuntime:
                 pid=pid,
                 reason=EscalationReason.ALL_PROVIDERS_FAILED.value,
                 detail=f"{terminal}: {error}",
-                failed_providers=[],
+                failed_providers=failed_providers or [],
                 retry_count=0,
             )
         except Exception as e:
@@ -2403,7 +2438,7 @@ class ProductionRuntime:
         try:
             from services.production_pipeline import clear_context
             clear_context(pid)
-        except Exception:
+        except Exception as _e:
             pass
 
         return self._result

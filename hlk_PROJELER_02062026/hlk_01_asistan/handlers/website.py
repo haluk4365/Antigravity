@@ -236,26 +236,26 @@ async def _process_link_background(
         # Eski içerikleri temizle
         try:
             await bot.delete_message(chat_id=chat_id, message_id=link_msg_id)
-        except Exception:
+        except Exception as _e:
             pass
         link_req_id = user_data.pop("last_typewriter_msg_id", None)
         if link_req_id:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=link_req_id)
-            except Exception:
+            except Exception as _e:
                 pass
         post_id = user_data.pop("post_bubble_msg_id", None)
         if post_id:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=post_id)
-            except Exception:
+            except Exception as _e:
                 pass
         # "Linkiniz alındı" geçici mesajını temizle
         link_ack_id = user_data.pop("_link_ack_msg_id", None)
         if link_ack_id:
             try:
                 await bot.delete_message(chat_id=chat_id, message_id=link_ack_id)
-            except Exception:
+            except Exception as _e:
                 pass
         await scene_delivery.cleanup_chat(chat_id)
         logger.info(f"🧹 Eski mesajlar temizlendi")
@@ -282,7 +282,7 @@ async def _process_link_background(
                 text=t("link.error", lang),
                 parse_mode="HTML",
             )
-        except Exception:
+        except Exception as _e:
             pass
 
 
@@ -303,7 +303,7 @@ async def handle_material_choice(update: Update, context: ContextTypes.DEFAULT_T
         # OR-003_3: Ekrani temizle (önceki SAHNE mesajları)
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-        except Exception:
+        except Exception as _e:
             pass
         await scene_delivery.cleanup_chat(chat_id)
         logger.info(f"🧹 Temizlik tamamlandi, materyal bilgi mesaji gonderiliyor...")
@@ -443,7 +443,7 @@ async def handle_format_selection(update: Update, context: ContextTypes.DEFAULT_
     # FD-008_1: "EKRAN SİLİNİR" — önceki sahneyi temizle
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -491,7 +491,7 @@ async def handle_resolution_selection(update: Update, context: ContextTypes.DEFA
     # FD-008_1: "EKRAN SİLİNİR" — önceki sahneyi temizle
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -549,7 +549,7 @@ async def handle_platform_selection(update: Update, context: ContextTypes.DEFAUL
     # FD-008_1: "EKRAN SİLİNİR" — önceki sahneyi temizle
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -745,7 +745,7 @@ async def handle_audio_devam(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ── EKRAN TEMİZLİĞİ (FD-008_1: "EKRAN SİLİNİR") ──
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -805,11 +805,11 @@ async def handle_material_upload(update: Update, context: ContextTypes.DEFAULT_T
     if onceki_msg_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=onceki_msg_id)
-        except Exception:
+        except Exception as _e:
             pass
     try:
         await update.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
 
     # Materyal türüne göre emoji
@@ -901,7 +901,7 @@ async def handle_style_selection(update: Update, context: ContextTypes.DEFAULT_T
             new_kbd.append(new_row)
         await query.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(new_kbd))
         await asyncio.sleep(0.4)
-    except Exception:
+    except Exception as _e:
         pass
 
     se = StateEngine(context.user_data)
@@ -909,7 +909,7 @@ async def handle_style_selection(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -953,7 +953,7 @@ async def handle_audience_selection(update: Update, context: ContextTypes.DEFAUL
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -1005,7 +1005,7 @@ async def handle_voice_language(update: Update, context: ContextTypes.DEFAULT_TY
     # Ekran temizliği + SAHNE-10 teslim
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -1049,7 +1049,7 @@ async def handle_voice_character(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -1181,7 +1181,7 @@ async def _handle_custom_emphasis_text(update: Update, context: ContextTypes.DEF
     # Kullanıcının mesajını sil
     try:
         await update.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
 
     # "Özel Vurgu" bilgi mesajını sil
@@ -1189,7 +1189,7 @@ async def _handle_custom_emphasis_text(update: Update, context: ContextTypes.DEF
     if prompt_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=prompt_id)
-        except Exception:
+        except Exception as _e:
             pass
 
     # Onay mesajı (geçici, otomatik temizlenir)
@@ -1215,7 +1215,7 @@ async def _handle_custom_emphasis_text(update: Update, context: ContextTypes.DEF
     if ack_msg_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=ack_msg_id)
-        except Exception:
+        except Exception as _e:
             pass
 
 
@@ -1233,7 +1233,7 @@ async def handle_emphasis_done(update: Update, context: ContextTypes.DEFAULT_TYP
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -1494,7 +1494,7 @@ async def handle_brief_approve(update: Update, context: ContextTypes.DEFAULT_TYP
     # Eski mesajları temizle
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -1542,7 +1542,7 @@ async def handle_brief_edit(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -1588,7 +1588,7 @@ async def handle_brief_edit_field(update: Update, context: ContextTypes.DEFAULT_
     # Eski mesajları temizle
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -1709,7 +1709,7 @@ async def _run_sahne13_flow(
         try:
             await bot.delete_message(chat_id=chat_id, message_id=hint_msg.message_id)
             logger.info(f"🧹 SAHNE-13 SESLI_HINT 4sn sonra otomatik silindi")
-        except Exception:
+        except Exception as _e:
             pass
     asyncio.create_task(_remove_sahne13_hint())
 
@@ -1721,7 +1721,7 @@ async def _run_sahne13_flow(
         try:
             await bot.delete_message(chat_id=chat_id, message_id=sahne13_msg.message_id)
             logger.info(f"🧹 SAHNE-13 video silindi")
-        except Exception:
+        except Exception as _e:
             pass
 
     # "Senaryo hazır, form hazırlanıyor..." daktilo (HLK dil uyumlu)
@@ -1735,7 +1735,7 @@ async def _run_sahne13_flow(
     if tw_msg_id:
         try:
             await bot.delete_message(chat_id=chat_id, message_id=tw_msg_id)
-        except Exception:
+        except Exception as _e:
             pass
 
     # State: BRIEF_COMPLETED → SCENARIO_APPROVAL
@@ -2069,7 +2069,7 @@ async def handle_scenario_approve(update: Update, context: ContextTypes.DEFAULT_
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -2110,7 +2110,7 @@ async def handle_scenario_reject(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -2121,7 +2121,7 @@ async def handle_scenario_reject(update: Update, context: ContextTypes.DEFAULT_T
     if tw_msg_id:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=tw_msg_id)
-        except Exception:
+        except Exception as _e:
             pass
 
 
@@ -2242,7 +2242,7 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
         # FD-008_1: "EKRAN SİLİNİR" — admin formunu temizle, sadece prompt kalır
         try:
             await query.message.delete()
-        except Exception:
+        except Exception as _e:
             pass
         await scene_delivery.cleanup_chat(chat_id)
         prompt_msg = await context.bot.send_message(
@@ -2259,7 +2259,7 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
         # FD-008_1: "EKRAN SİLİNİR" — admin formunu temizle
         try:
             await query.message.delete()
-        except Exception:
+        except Exception as _e:
             pass
         await scene_delivery.cleanup_chat(chat_id)
         chat_msg = await context.bot.send_message(
@@ -2332,7 +2332,7 @@ async def handle_admin_pricing_submit(update: Update, context: ContextTypes.DEFA
         await query.answer("❌ Fiyatlandırma iptal edildi")
         try:
             await query.message.delete()
-        except Exception:
+        except Exception as _e:
             pass
         return
 
@@ -2508,7 +2508,7 @@ async def handle_pricing_approve(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -2545,7 +2545,7 @@ async def handle_pricing_reject(update: Update, context: ContextTypes.DEFAULT_TY
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -2631,7 +2631,7 @@ async def handle_payment_declared(update: Update, context: ContextTypes.DEFAULT_
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -2667,7 +2667,7 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -2788,7 +2788,7 @@ async def handle_admin_payment_ret(update: Update, context: ContextTypes.DEFAULT
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 
@@ -2815,7 +2815,7 @@ async def handle_payment_cancel(update: Update, context: ContextTypes.DEFAULT_TY
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
     await scene_delivery.cleanup_chat(chat_id)
 

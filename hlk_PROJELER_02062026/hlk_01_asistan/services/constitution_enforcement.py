@@ -517,8 +517,9 @@ class ConstitutionEnforcementEngine:
                 constitution_index, "get_all_rules"
             ) else []
             for rule in _all:
-                ref = rule.get("ref", "")
-                enforced = rule.get("enforced", False)
+                # IndexedRule bir @dataclass'tır, dict değil — attribute erişimi kullanılır
+                ref = rule.rule_id
+                enforced = bool(rule.constraint_level)
                 if not enforced:
                     passive.append(ref)
         except ImportError:
@@ -706,8 +707,8 @@ class ConstitutionEnforcementEngine:
             else:
                 # POST-CHECK'te index hatasını daha toleranslı değerlendir
                 index_passed = True
-        except Exception:
-            index_passed = True  # Index kullanılamazsa skip
+        except Exception as _e:
+            index_passed = True  # Index kullanılamazsa skip — best-effort
 
         report = self.post_check(
             code_anayasa_ok=not has_violations and index_passed,

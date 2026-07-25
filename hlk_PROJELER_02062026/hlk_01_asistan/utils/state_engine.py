@@ -350,6 +350,9 @@ STATE_TRANSITIONS: dict[UserState, dict[UserEvent, UserState]] = {
         UserEvent.VIDEO_PRODUCTION_COMPLETED: UserState.VIDEO_PRODUCTION,
         UserEvent.VIDEO_PRODUCTION_DONE: UserState.VIDEO_PRODUCTION,
         UserEvent.BRIEF_INCOMPLETE: UserState.ACTIVE_CONVERSATION,
+        # Ses seçimi ve timeout (log'da tanımsız geçiş hatası veriyordu):
+        UserEvent.AUDIO_OPTION_SELECTED: UserState.VOICE_LANGUAGE,
+        UserEvent.TIMEOUT_REACHED: UserState.SESSION_TIMEOUT,
     },
 
     UserState.SCENARIO_APPROVAL: {

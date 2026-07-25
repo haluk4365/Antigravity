@@ -101,7 +101,7 @@ async def typewriter_animation(
             # Son çare: yeni bir mesaj gönder, eskiyi sil
             try:
                 await msg.delete()
-            except Exception:
+            except Exception as _e:
                 pass
             try:
                 new_msg = await bot.send_message(
@@ -128,5 +128,5 @@ async def typewriter_animation(
             )
             logger.info(f"✅ [Typewriter] Fallback mesaj: msg:{fallback.message_id}")
             return fallback.message_id
-        except Exception:
+        except Exception as _e:
             return None

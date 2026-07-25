@@ -612,6 +612,14 @@ class ProductionExecutor:
 
             # Task Checkpoint: status + output persist (AR-002_84)
             await self._checkpoint_task_completion(task_id, pid, output)
+
+            # MASTER-013: In-memory task status güncellemesi.
+            # Checkpoint diske yazar ama memory'deki task dict'ini
+            # güncellemez. Retry loop'ta _run_task_handler tekrar
+            # çağrıldığında task["status"] hâlâ "PENDING" olduğu için
+            # handler tekrar çalışır → send_message() mükerrer çağrılır.
+            # Bu güncelleme line 581'deki early-return guard'ı aktif eder.
+            task["status"] = "COMPLETED"
             return output
 
         # ── Fallback: handler kayıtlı değil (test/simülasyon modu) ──────
@@ -633,6 +641,11 @@ class ProductionExecutor:
         # Recovery sırasında tamamlanan task'lar tekrar yürütülmesin
         await self._checkpoint_task_completion(task_id, pid, task_output)
 
+        # MASTER-013: In-memory task status güncellemesi (fallback path).
+        # Checkpoint diske yazar ama memory'deki task dict'ini güncellemez.
+        # handler path ile aynı sebep — line 581'deki early-return guard'ı
+        # aktif etmek için gerekli.
+        task["status"] = "COMPLETED"
         return task_output
 
     async def _checkpoint_task_completion(

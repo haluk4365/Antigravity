@@ -636,7 +636,7 @@ async def run_research_task(url: str, user_id: int | None = None) -> dict:
                                 "gorev_sonucu": str(res)[:200],
                             }
                             logger.info(f"✅  [{code}] → sonuç üretti: {str(res)[:100]}")
-                    except Exception:
+                    except Exception as _e:
                         record = {
                             "modul": code, "karar": "KARŞILANAMADI",
                             "gerekce": "Tüm adaylar denendi; hiçbiri sonuç üretemedi",

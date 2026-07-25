@@ -189,19 +189,22 @@ class DecisionEngine:
         )
 
         # Selection Architecture cache'ini temizle — güncel koşulları yansıt
+        excluded: dict[str, set[str]] = {}
         if context.failed_provider:
             # Hangi kategoride başarısız olduysa o kategorinin cache'ini temizle
+            # ve başarısız provider'ı bu re-eval'de hariç tut
             from services.provider_priority import provider_priority
             failed_record = provider_priority.get_provider(context.failed_provider)
             if failed_record:
                 selection_architecture.invalidate_cache(failed_record.category)
+                excluded[failed_record.category] = {context.failed_provider}
                 logger.info(
-                    f"🔄 [DecisionEngine] Cache temizlendi: "
+                    f"🔄 [DecisionEngine] Cache temizlendi + provider hariç: "
                     f"{failed_record.category} (başarısız: {context.failed_provider})"
                 )
 
-        # Tüm kategoriler için yeniden seçim yap
-        selections = selection_architecture.select_all()
+        # Tüm kategoriler için yeniden seçim yap (başarısız provider hariç)
+        selections = selection_architecture.select_all(excluded)
 
         image_refs = selections.get("image").to_provider_refs() if selections.get("image") else ()
         voice_refs = selections.get("voice").to_provider_refs() if selections.get("voice") else ()

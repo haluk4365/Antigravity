@@ -90,8 +90,8 @@ class FileEntry:
             # Derin kontrol: hash karşılaştır
             current_hash = hashlib.sha256(self.path.read_bytes()).hexdigest()
             return current_hash != self.sha256
-        except Exception:
-            return True
+        except Exception as _e:
+            return True  # hash alınamazsa değişmiş varsay (güvenli tarafta kal)
 
 
 @dataclass

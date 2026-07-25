@@ -96,7 +96,7 @@ async def render_form_png(form_name: str, data: dict) -> bytes | None:
             try:
                 if p.exists():
                     p.unlink()
-            except Exception:
+            except Exception as _e:
                 pass
 
 

@@ -26,7 +26,7 @@ def is_valid_url(url: str) -> bool:
 
         return bool(url_pattern.match(url))
 
-    except Exception:
+    except Exception as _e:
         return False
 
 

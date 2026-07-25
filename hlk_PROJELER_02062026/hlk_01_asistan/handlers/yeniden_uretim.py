@@ -242,7 +242,7 @@ async def handle_yeniden_uretim_onay(
     # Onay ekranı kaldırılır (FD-008_1 ekran temizliği ilkesi)
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
 
     # ── Constitutional Boot Chain (AR-002_62/70) ─────────────────────────
@@ -307,7 +307,7 @@ async def handle_yeniden_uretim_iptal(
 
     try:
         await query.message.delete()
-    except Exception:
+    except Exception as _e:
         pass
 
     await context.bot.send_message(

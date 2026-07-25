@@ -213,8 +213,8 @@ class LiveActivityCenter:
                     f"değişen: {cache_status.changed_files}"
                 )
                 lines.append("")
-        except Exception:
-            pass
+        except Exception as _e:
+            pass  # özet gösterimi best-effort, hata sessizce geçilir
 
         if summary.categories:
             lines.append("<b>📂 Kategoriler:</b>")

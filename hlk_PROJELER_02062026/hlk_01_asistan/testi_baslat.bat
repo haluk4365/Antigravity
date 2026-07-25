@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 :: HLK AI Reklam Asistani — TEST BASLAT (HLK_01_asistan surumu)
-:: DUZELTILMIS: py launcher kullanir, PowerShell uyumlu
+:: Windows 11 uyumlu — py launcher kullanir, PowerShell destekler
 
 :: Eski python process'lerini oldur
 echo Eski bot process'leri kapatiliyor...
@@ -12,22 +12,12 @@ timeout /t 2 /nobreak >nul
 taskkill /F /FI "WINDOWTITLE eq HLK TEST MODU" >nul 2>&1
 timeout /t 1 /nobreak >nul
 
-:: .env dosyasi bu dizinde yoksa ARSIV'den oku
-if not exist ".env" (
-    if exist "..\ARSIV\HLK-AI-Reklam-Asistani\.env" (
-        copy "..\ARSIV\HLK-AI-Reklam-Asistani\.env" ".env" >nul
-        echo .env ARSIV'den kopyalandi
-    )
-)
-
-:: Venv aktif et (ARSIV'deki venv kullanilir)
-set VENV_PATH=..\ARSIV\HLK-AI-Reklam-Asistani\venv
-if exist "%VENV_PATH%\Scripts\python.exe" (
-    set PYTHON_EXE=%VENV_PATH%\Scripts\python.exe
-    echo Venv Python kullaniliyor: %PYTHON_EXE%
+:: Python bul: once .venv, sonra py launcher
+set PYTHON_EXE=py
+if exist ".venv\Scripts\python.exe" (
+    set PYTHON_EXE=.venv\Scripts\python.exe
+    echo .venv Python kullaniliyor: %PYTHON_EXE%
 ) else (
-    :: py launcher kullan (Windows'ta her zaman mevcuttur)
-    set PYTHON_EXE=py
     echo py launcher kullaniliyor
 )
 
@@ -38,7 +28,8 @@ set PYTHONIOENCODING=utf-8
 
 :: Botu baslat
 echo Bot baslatiliyor...
-start "%PYTHON_EXE%" main.py
+:: start komutu: ilk tirnakli arguman pencere basligidir
+start "HLK TEST MODU" %PYTHON_EXE% main.py
 
 echo.
 echo =====================

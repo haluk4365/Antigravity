@@ -119,11 +119,11 @@ class SceneDeliveryModule:
                 )
                 logger.debug(f"🔄 [UI] Yerinde güncellendi: msg_id={old_msg_id}")
                 return old_msg_id
-            except Exception:
+            except Exception as _e:
                 # Yerinde güncelleme başarısız → sil + yeniden gönder
                 try:
                     await self._bot.delete_message(chat_id=chat_id, message_id=old_msg_id)
-                except Exception:
+                except Exception as _e:
                     pass
         # 2. Yeni bileşen gönder (fallback)
         new_msg = await self._bot.send_message(

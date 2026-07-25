@@ -22,9 +22,9 @@ try:
 except Exception:
     pass
 
-# Python 3.14+: asyncio.get_event_loop() otomatik loop yaratmıyor
+# Python 3.14+: asyncio.get_event_loop() deprecated — get_running_loop() kullan
 try:
-    asyncio.get_event_loop()
+    asyncio.get_running_loop()
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 

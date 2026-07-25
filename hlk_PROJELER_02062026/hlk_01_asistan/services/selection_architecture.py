@@ -103,25 +103,32 @@ class SelectionArchitecture:
     # Adım 1-2: Görev Analizi + Aday Belirleme
     # ═══════════════════════════════════════════════════════════════════════
 
-    def select_providers(self, category: str) -> SelectionResult:
+    def select_providers(
+        self, category: str, excluded_providers: set[str] | None = None,
+    ) -> SelectionResult:
         """AR-002_49 Adım 1-5: Bir kategori için provider seçimi yapar.
 
         Args:
             category: "image", "voice", veya "video"
+            excluded_providers: Bu seçimde hariç tutulacak provider isimleri
+                (örn. yeni başarısız olmuş provider'lar).
 
         Returns:
             SelectionResult — birincil ve yedek provider'ları içerir.
         """
         from services.provider_priority import provider_priority
 
-        # Adım 6: Cache kontrolü
-        cached = self._get_cached(category)
-        if cached is not None:
-            logger.info(
-                f"📋 [Selection] Cache hit: {category} → "
-                f"birincil={cached.primary.provider if cached.primary else 'yok'}"
-            )
-            return cached
+        excluded = excluded_providers or set()
+
+        # Adım 6: Cache kontrolü — hariç tutulan provider varsa cache atlanır
+        if not excluded:
+            cached = self._get_cached(category)
+            if cached is not None:
+                logger.info(
+                    f"📋 [Selection] Cache hit: {category} → "
+                    f"birincil={cached.primary.provider if cached.primary else 'yok'}"
+                )
+                return cached
 
         # Adım 2: Aday listesini al
         priority_map = provider_priority.get_priority_map(category)
@@ -130,16 +137,18 @@ class SelectionArchitecture:
             logger.warning(f"⚠️ [Selection] {category}: hiç aday yok")
             return SelectionResult(category=category)
 
-        # Adım 3-4: Değerlendir ve seç
-        result = self._evaluate_and_select(category, priority_map)
+        # Adım 3-4: Değerlendir ve seç (hariç tutulanları filtrele)
+        result = self._evaluate_and_select(category, priority_map, excluded)
 
-        # Adım 5: Kayıt altına al
-        self._cache_result(category, result)
+        # Adım 5: Kayıt altına al (hariç tutma varsa cache'leme)
+        if not excluded:
+            self._cache_result(category, result)
 
         logger.info(
             f"✅ [Selection] {category}: "
             f"birincil={result.primary.provider if result.primary else 'yok'}, "
             f"yedek={result.fallback.provider if result.fallback else 'yok'}"
+            f"{' (excluded: ' + ','.join(sorted(excluded)) + ')' if excluded else ''}"
         )
 
         return result
@@ -149,7 +158,8 @@ class SelectionArchitecture:
     # ═══════════════════════════════════════════════════════════════════════
 
     def _evaluate_and_select(
-        self, category: str, priority_map: list[dict]
+        self, category: str, priority_map: list[dict],
+        excluded_providers: set[str] | None = None,
     ) -> SelectionResult:
         """AR-002_49 Adım 3-4: Adayları değerlendir, en uygun olanı seç.
 
@@ -162,7 +172,11 @@ class SelectionArchitecture:
         Provider Priority List'in sıralaması esas alınır.
         Selection Architecture yeni bir sıralama algoritması ÇALIŞTIRMAZ.
         """
-        available = [p for p in priority_map if p["status"] == "AVAILABLE"]
+        excluded = excluded_providers or set()
+        available = [
+            p for p in priority_map
+            if p["status"] == "AVAILABLE" and p["provider"] not in excluded
+        ]
 
         if not available:
             # Hiçbir provider kullanılabilir değil
@@ -243,15 +257,21 @@ class SelectionArchitecture:
     # Tüm kategoriler için toplu seçim
     # ═══════════════════════════════════════════════════════════════════════
 
-    def select_all(self) -> dict[str, SelectionResult]:
+    def select_all(
+        self, excluded: dict[str, set[str]] | None = None,
+    ) -> dict[str, SelectionResult]:
         """Tüm kategoriler (image, voice, video) için provider seçimi yapar.
 
         Decision Engine'in ana giriş noktası.
+
+        Args:
+            excluded: Kategori → hariç tutulacak provider isimleri mapping'i.
         """
+        _ex = excluded or {}
         return {
-            "image": self.select_providers("image"),
-            "voice": self.select_providers("voice"),
-            "video": self.select_providers("video"),
+            "image": self.select_providers("image", _ex.get("image")),
+            "voice": self.select_providers("voice", _ex.get("voice")),
+            "video": self.select_providers("video", _ex.get("video")),
         }
 
 

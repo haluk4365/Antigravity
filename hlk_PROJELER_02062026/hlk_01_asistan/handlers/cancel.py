@@ -38,7 +38,7 @@ async def handle_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             bot=context.bot,
             trigger_event="SESSION_CANCELLED",
         )
-    except Exception:
+    except Exception as _e:
         # Fallback — Scene Engine çalışmazsa
         await context.bot.send_message(
             chat_id=chat_id,

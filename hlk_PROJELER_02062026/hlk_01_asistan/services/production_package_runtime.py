@@ -1264,7 +1264,7 @@ class ProductionPackageRuntime:
                         counts["by_status"][status] = (
                             counts["by_status"].get(status, 0) + 1
                         )
-                    except Exception:
+                    except Exception as _e:
                         counts["by_status"]["CORRUPT"] = (
                             counts["by_status"].get("CORRUPT", 0) + 1
                         )
