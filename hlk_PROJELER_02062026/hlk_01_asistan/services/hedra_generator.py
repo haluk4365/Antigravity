@@ -73,20 +73,14 @@ class HedraGenerator:
 
     def generate(self, image_url: str, audio_url: str, model_id: str = "omnia") -> str | None:
         """Video üretim isteği gönder, generation_id döndür."""
-        # AR-002_90: Hedra API yeni body yapisi
-        # video.generated_video_inputs wrapper zorunlu
+        # AR-002_90: Hedra API yeni body yapisi — flat structure
         payload = {
             "type": "video",
-            "video": {
-                "generated_video_inputs": {
-                    "type": "generated_video",
-                    "model": model_id,
-                    "image_asset_id": image_url,
-                    "audio_asset_id": audio_url,
-                    "aspect_ratio": "9:16",
-                    "resolution": "720p",
-                }
-            }
+            "model": model_id,
+            "image_asset_id": image_url,
+            "audio_asset_id": audio_url,
+            "aspect_ratio": "9:16",
+            "resolution": "720p",
         }
         headers = self._headers()
         headers["Content-Type"] = "application/json"
