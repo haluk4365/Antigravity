@@ -148,7 +148,8 @@ class HedraGenerator:
         return False
 
     def create_lipsync_video(
-        self, image_path: str, audio_path: str, output_path: str, model_id: str = "omnia"
+        self, image_path: str, audio_path: str, output_path: str, model_id: str = "omnia",
+        max_wait: int = 300,
     ) -> bool:
         """Tam pipeline: görsel + ses → lip-sync video. True/False döndür."""
         logger.info("Hedra lip-sync başlıyor...")
@@ -161,8 +162,8 @@ class HedraGenerator:
         job_id = self.generate(image_url, audio_url, model_id)
         if not job_id:
             return False
-        logger.info("Hedra job_id: %s — bekleniyor...", job_id)
-        video_url = self.wait_for_completion(job_id)
+        logger.info("Hedra job_id: %s — bekleniyor (max %ss)...", job_id, max_wait)
+        video_url = self.wait_for_completion(job_id, max_wait=max_wait)
         if not video_url:
             return False
         return self.download_video(video_url, output_path)

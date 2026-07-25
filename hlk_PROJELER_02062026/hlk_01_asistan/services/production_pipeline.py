@@ -702,8 +702,14 @@ async def task_video(task: dict, pid: str) -> dict:
                     from services.hedra_generator import HedraGenerator
                     hedra = HedraGenerator()
                     video_path = os.path.join(tmp, f"hlk_video_{req.user_id}.mp4")
+                    # AR-002_90 FIX: Hedra'ya 300sn yerine 120sn ver ki
+                    # basarisiz olursa Higgsfield'a gecilebilsin.
+                    # Executor 300sn task timeout'u icinde Hedra (120sn) +
+                    # Higgsfield (120sn) + buffer (60sn) sigabilecek sekilde.
                     ok = await asyncio.to_thread(
-                        hedra.create_lipsync_video, ctx.img_path, str(ctx.voice_path), video_path
+                        hedra.create_lipsync_video,
+                        ctx.img_path, str(ctx.voice_path), video_path,
+                        "omnia", 120,
                     )
                     if ok:
                         ctx.video_path = video_path
