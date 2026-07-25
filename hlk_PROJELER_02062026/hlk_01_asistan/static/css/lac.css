@@ -1,0 +1,27 @@
+/* HLK Operasyon Merkezi — Design Tokens (LAC referans tasarımından) */
+:root {
+  --blue: #2453e8;
+  --blue-light: #eef2ff;
+  --green: #16a34a;
+  --green-bg: #eafaf0;
+  --red: #dc2626;
+  --red-bg: #fdf0f0;
+  --yellow: #eab308;
+  --yellow-bg: #fefce8;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e6e9f0;
+  --card-bg: #ffffff;
+  --page-bg: #f7f8fb;
+}
+
+/* Shared badge styles */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.badge.ok { background: var(--green-bg); color: var(--green); }
+.badge.warn { background: var(--yellow-bg); color: var(--yellow); }
+.badge.err { background: var(--red-bg); color: var(--red); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }

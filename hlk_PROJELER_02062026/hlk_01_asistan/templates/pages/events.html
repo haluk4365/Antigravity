@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Olay Kayıtları — HLK Operasyon Merkezi{% endblock %}
+{% block page_title %}📋 Olay Kayıtları{% endblock %}
+{% block content %}
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Zaman</th><th>PID</th><th>Event</th><th>Açıklama</th><th>Durum</th></tr></thead>
+    <tbody id="eventTable"><tr><td colspan="5" class="empty-state">Yükleniyor...</td></tr></tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const TOKEN = '{{ token }}';
+function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(()=>({})); }
+async function load() {
+  const data = await api('/events?limit=100');
+  const events = data.events || [];
+  const tbody = document.getElementById('eventTable');
+  if (!events.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Event kaydı yok</td></tr>'; return; }
+  tbody.innerHTML = events.map(e =>
+    `<tr>
+      <td>${e.zaman}</td><td>${e.pid}</td><td><b>${e.event}</b></td>
+      <td>${e.aciklama || ''}</td>
+      <td><span class="status-badge ${e.durumSinif || 'active'}">${e.durum || 'OK'}</span></td>
+    </tr>`
+  ).join('');
+}
+load(); setInterval(load, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+<div class="sidebar">
+  <div class="logo">⚡ HLK OPS</div>
+  <div class="nav">
+    <a class="nav-item {% if active_page == 'home' %}active{% endif %}" href="/?token={{ token }}">
+      🏠 Ana Sayfa
+    </a>
+    <a class="nav-item {% if active_page == 'sessions' %}active{% endif %}" href="/sessions?token={{ token }}">
+      📡 Canlı Oturumlar
+    </a>
+    <a class="nav-item {% if active_page == 'productions' %}active{% endif %}" href="/productions?token={{ token }}">
+      🎬 Üretimler
+    </a>
+    <a class="nav-item {% if active_page == 'events' %}active{% endif %}" href="/events?token={{ token }}">
+      📋 Olay Kayıtları
+    </a>
+    <a class="nav-item {% if active_page == 'providers' %}active{% endif %}" href="/providers?token={{ token }}">
+      ⚙️ Servis Sağlayıcıları
+    </a>
+    <a class="nav-item {% if active_page == 'packages' %}active{% endif %}" href="/packages?token={{ token }}">
+      📦 Production Package
+    </a>
+    <a class="nav-item {% if active_page == 'stats' %}active{% endif %}" href="/stats?token={{ token }}">
+      📊 İstatistikler
+    </a>
+  </div>
+</div>

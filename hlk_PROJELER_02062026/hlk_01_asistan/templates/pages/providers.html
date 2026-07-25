@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Servis Sağlayıcıları — HLK Operasyon Merkezi{% endblock %}
+{% block page_title %}⚙️ Servis Sağlayıcıları{% endblock %}
+{% block content %}
+<button class="btn yenile" onclick="checkHealth()" style="margin-bottom:16px;">🔍 Canlı Sağlık Kontrolü</button>
+<span id="healthStatus" class="refresh-indicator"></span>
+<div id="providerContent">Yükleniyor...</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const TOKEN = '{{ token }}';
+function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(()=>({})); }
+
+const catLabels = { image: '🖼 GÖRSEL', voice: '🔊 SES', video: '🎬 VİDEO' };
+
+async function loadProviders() {
+  const data = await api('/providers');
+  const providers = data.providers || [];
+  // Kategoriye göre grupla
+  const groups = {};
+  for (const p of providers) {
+    if (!groups[p.category]) groups[p.category] = [];
+    groups[p.category].push(p);
+  }
+  let html = '<div class="provider-grid">';
+  for (const [cat, items] of Object.entries(groups)) {
+    html += `<div style="grid-column:1/-1;"><div class="section-title">${catLabels[cat] || cat.toUpperCase()}</div></div>`;
+    for (const p of items) {
+      const s = p.status === 'AVAILABLE' ? 'active' : 'error';
+      html += `<div class="provider-card">
+        <div class="provider-name">${p.display_name || p.provider}</div>
+        <div class="provider-meta">
+          <span>Kategori: ${p.category}</span>
+          <span>Skor: <b>${p.score || 0}</b></span>
+          <span>Güven: ${(p.confidence*100).toFixed(0) if p.confidence else 0}%</span>
+          <span>Durum: <span class="status-badge ${s}">${p.status}</span></span>
+          <span style="font-size:10px;color:var(--muted)">${p.justification || ''}</span>
+        </div>
+      </div>`;
+    }
+  }
+  html += '</div>';
+  document.getElementById('providerContent').innerHTML = html;
+}
+
+async function checkHealth() {
+  document.getElementById('healthStatus').textContent = 'Kontrol ediliyor...';
+  const data = await api('/providers/health');
+  const results = data.health || [];
+  document.getElementById('healthStatus').textContent = results.map(r =>
+    `${r.provider}: ${r.healthy ? '✅' : '❌'} (${r.status_code || r.error})`
+  ).join(' | ');
+}
+
+loadProviders();
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Production Package — HLK Operasyon Merkezi{% endblock %}
+{% block page_title %}📦 Production Package{% endblock %}
+{% block content %}
+<div style="margin-bottom:16px;">
+  <input type="text" id="pidInput" placeholder="PID girin (örn: PID-20260725-0001)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;width:250px;">
+  <button class="btn yenile" onclick="loadPackage()">Görüntüle</button>
+</div>
+<pre class="json-viewer" id="packageContent">PID girip Görüntüle'ye tıklayın</pre>
+{% endblock %}
+{% block scripts %}
+<script>
+const TOKEN = '{{ token }}';
+async function loadPackage() {
+  const pid = document.getElementById('pidInput').value.trim();
+  if (!pid) return;
+  document.getElementById('packageContent').textContent = 'Yükleniyor...';
+  const resp = await fetch('/api/packages/' + pid + '?token=' + TOKEN);
+  if (!resp.ok) { document.getElementById('packageContent').textContent = 'Hata: ' + resp.status + ' - ' + (await resp.text()); return; }
+  const data = await resp.json();
+  document.getElementById('packageContent').textContent = JSON.stringify(data, null, 2);
+}
+</script>
+{% endblock %}

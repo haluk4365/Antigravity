@@ -549,6 +549,17 @@ def main():
         logger.info("CONSTITUTIONAL BOOT SEQUENCE TAMAMLANDI")
         logger.info("=" * 50)
 
+        # ════════════════════════════════════════════════════════════════
+        # HLK Web Operasyon Merkezi — local dashboard
+        # ════════════════════════════════════════════════════════════════
+        try:
+            from web import start_web_server
+            from web.websocket_manager import install_eec_bridge
+            await start_web_server()
+            install_eec_bridge()
+        except Exception as _web_err:
+            logger.warning(f"Web Ops başlatılamadı (geliştirme ortamı değilse normal): {_web_err}")
+
     app.post_init = post_init
 
     # ══════════════════════════════════════════════════════════════════════
