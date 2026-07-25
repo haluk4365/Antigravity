@@ -970,7 +970,8 @@ class ProductionPackageRuntime:
             for task in task_packages:
                 if not isinstance(task, dict):
                     continue
-                if procedure == "REPLAY":
+                if procedure in ("REPLAY", "START_AS_NEW"):
+                    # REPLAY / START_AS_NEW: tüm task'lar sıfırdan başlar
                     task["status"] = "PENDING"
                     task["completed_at"] = ""
                     task["error_detail"] = ""
@@ -1113,8 +1114,8 @@ class ProductionPackageRuntime:
                         f"PENDING veya proof geçerli | PID={pid}"
                     )
 
-            # REPLAY durumunda final/delivery geçici temizlik
-            if procedure == "REPLAY":
+            # REPLAY / START_AS_NEW durumunda final/delivery temizlik
+            if procedure in ("REPLAY", "START_AS_NEW"):
                 package.metadata.status = PackageStatus.READY.value
                 package.final_video = {}
                 package.delivery_info = {}
