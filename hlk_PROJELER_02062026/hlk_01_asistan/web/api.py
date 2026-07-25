@@ -188,3 +188,40 @@ async def api_controls(request: Request, pid: str, action: str):
     except Exception as e:
         logger.error(f"Kontrol aksiyonu başarısız ({pid}/{action}): {e}")
         raise HTTPException(500, str(e))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Production Debug Console
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/debug/{pid}")
+async def api_debug(request: Request, pid: str):
+    """14 adımlık debug verisi."""
+    _check_auth(request)
+    try:
+        from .data_providers import get_debug_data
+        result = get_debug_data(pid)
+        if result is None:
+            raise HTTPException(404, f"PID bulunamadı: {pid}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Debug verisi alınamadı ({pid}): {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.post("/debug/{pid}/breakpoint/{step_id}")
+async def api_toggle_breakpoint(request: Request, pid: str, step_id: str):
+    """Breakpoint ekle/kaldır."""
+    _check_auth(request)
+    try:
+        from .data_providers import has_breakpoint, set_breakpoint, remove_breakpoint
+        if has_breakpoint(pid, step_id):
+            remove_breakpoint(pid, step_id)
+            return {"ok": True, "action": "removed", "step_id": step_id}
+        else:
+            set_breakpoint(pid, step_id)
+            return {"ok": True, "action": "added", "step_id": step_id}
+    except Exception as e:
+        raise HTTPException(500, str(e))

@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Debug Console — {{ pid }}{% endblock %}
+{% block page_title %}🔬 Production Debug Console — <code>{{ pid }}</code>{% endblock %}
+
+{% block extra_head %}
+<style>
+.accordion { display: flex; flex-direction: column; gap: 2px; }
+.step { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--card-bg); }
+.step-header { display: flex; align-items: center; padding: 12px 16px; cursor: pointer; gap: 12px; user-select: none; transition: background .1s; }
+.step-header:hover { background: #f8fafc; }
+.step-num { font-weight: 800; font-size: 13px; color: var(--muted); min-width: 28px; }
+.step-name { flex: 1; font-weight: 600; font-size: 14px; }
+.step-status { font-size: 12px; padding: 2px 10px; border-radius: 8px; font-weight: 700; min-width: 80px; text-align: center; }
+.step-status.completed { background: var(--green-bg); color: var(--green); }
+.step-status.running { background: var(--blue-light); color: var(--blue); }
+.step-status.pending { background: #f1f5f9; color: #64748b; }
+.step-status.failed { background: var(--red-bg); color: var(--red); }
+.step-status.waiting { background: var(--yellow-bg); color: var(--yellow); }
+.step-time { font-size: 11px; color: var(--muted); min-width: 100px; text-align: right; }
+.step-bp { font-size: 10px; background: var(--red); color: #fff; padding: 1px 6px; border-radius: 4px; font-weight: 700; display: none; }
+.step-bp.on { display: inline; }
+.step-body { display: none; border-top: 1px solid var(--border); }
+.step.open .step-body { display: block; }
+.step.open .step-header { background: #f8fafc; border-bottom: 1px solid var(--border); }
+.tab-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: #fafbfc; }
+.tab-btn { padding: 8px 16px; border: none; background: none; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; transition: all .1s; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-content { display: none; padding: 16px; }
+.tab-content.active { display: block; }
+.info-grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 16px; font-size: 13px; }
+.info-grid .k { color: var(--muted); font-weight: 600; }
+.info-grid .v { word-break: break-all; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; }
+pre.debug { background: #1e293b; color: #e2e8f0; padding: 14px; border-radius: 8px; font-size: 11px; overflow-x: auto; max-height: 300px; overflow-y: auto; margin: 0; }
+.action-bar { display: flex; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.btn-sm { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; font-size: 11px; font-weight: 600; background: #fff; transition: all .1s; }
+.btn-sm:hover { background: #f1f5f9; }
+.btn-sm.breakpoint { border-color: var(--red); color: var(--red); }
+.btn-sm.breakpoint.active { background: var(--red); color: #fff; }
+.auto-refresh { font-size: 11px; color: var(--muted); margin-left: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+  <a href="/pid/{{ pid }}?token={{ token }}" class="btn-sm">← PID Detay</a>
+  <span class="auto-refresh" id="refreshNote"></span>
+  <label style="font-size:12px;"><input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()"> Otomatik yenile (3sn)</label>
+</div>
+
+<div class="accordion" id="accordion"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PID = '{{ pid }}';
+const TOKEN = '{{ token }}';
+let autoRefresh = true;
+let openStep = null;
+
+function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(() => null); }
+
+async function load() {
+  const data = await api('/debug/' + PID);
+  if (!data || !data.steps) return;
+
+  const acc = document.getElementById('accordion');
+  const breakpoints = data.breakpoints || [];
+  let html = '';
+
+  for (const s of data.steps) {
+    const hasBp = breakpoints.includes(s.id);
+    const statusLabels = {completed:'✅ Tamamlandı', running:'⏳ Çalışıyor', pending:'⏸ Bekliyor', failed:'❌ Hata', waiting:'⏳ Bekliyor'};
+    html += `<div class="step" id="step-${s.id}">
+      <div class="step-header" onclick="toggleStep('${s.id}')">
+        <span class="step-num">${s.id}</span>
+        <span class="step-name">${s.name}</span>
+        <span class="step-bp ${hasBp?'on':''}" id="bp-${s.id}">🔴 BP</span>
+        <span class="step-status ${s.status}">${statusLabels[s.status] || s.status}</span>
+      </div>
+      <div class="step-body" id="body-${s.id}">
+        <div class="tab-bar">
+          <button class="tab-btn active" onclick="switchTab('${s.id}','general',event)">GENEL</button>
+          <button class="tab-btn" onclick="switchTab('${s.id}','request',event)">REQUEST</button>
+          <button class="tab-btn" onclick="switchTab('${s.id}','response',event)">RESPONSE</button>
+          <button class="tab-btn" onclick="switchTab('${s.id}','files',event)">DOSYALAR</button>
+          <button class="tab-btn" onclick="switchTab('${s.id}','events',event)">EVENTLER</button>
+          <button class="tab-btn" onclick="switchTab('${s.id}','decision',event)">KARAR GEREKÇESİ</button>
+        </div>
+        <div class="tab-content active" id="tab-${s.id}-general">
+          ${renderGeneral(s)}
+        </div>
+        <div class="tab-content" id="tab-${s.id}-request">
+          ${renderKeyValue(s.request)}
+        </div>
+        <div class="tab-content" id="tab-${s.id}-response">
+          ${renderKeyValue(s.response)}
+        </div>
+        <div class="tab-content" id="tab-${s.id}-files">
+          ${renderFiles(s.files)}
+        </div>
+        <div class="tab-content" id="tab-${s.id}-events">
+          ${renderEvents(s.events)}
+        </div>
+        <div class="tab-content" id="tab-${s.id}-decision">
+          ${s.decision ? '<pre class="debug">'+escHtml(s.decision)+'</pre>' : '<p style="color:var(--muted);font-size:13px;">Bu adım için karar gerekçesi yok</p>'}
+        </div>
+        <div class="action-bar">
+          <button class="btn-sm breakpoint ${hasBp?'active':''}" id="bpbtn-${s.id}" onclick="toggleBreakpoint('${s.id}')">🔴 ${hasBp?'Breakpoint Kaldır':'Breakpoint Ekle'}</button>
+          <button class="btn-sm" onclick="copyStepData('${s.id}')">📋 Kopyala</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  acc.innerHTML = html;
+  document.getElementById('refreshNote').textContent = 'Son: ' + new Date().toLocaleTimeString();
+}
+
+function renderGeneral(s) {
+  const g = s.general || {};
+  if (!Object.keys(g).length) return '<p style="color:var(--muted);font-size:13px;">Veri Bekleniyor</p>';
+  return '<div class="info-grid">' + Object.entries(g).map(([k,v]) =>
+    `<span class="k">${k}</span><span class="v">${escHtml(String(v))}</span>`
+  ).join('') + '</div>';
+}
+
+function renderKeyValue(obj) {
+  if (!obj || !Object.keys(obj).length) return '<p style="color:var(--muted);font-size:13px;">Veri Bekleniyor</p>';
+  if (typeof obj === 'string') return '<pre class="debug">'+escHtml(obj)+'</pre>';
+  return '<pre class="debug">'+escHtml(JSON.stringify(obj, null, 2))+'</pre>';
+}
+
+function renderFiles(files) {
+  if (!files || !files.length) return '<p style="color:var(--muted);font-size:13px;">Dosya yok</p>';
+  return '<div class="info-grid">' + files.map((f,i) =>
+    `<span class="k">${i+1}. ${f.type || 'file'}</span><span class="v">${escHtml(f.path || '')} ${f.size ? '('+f.size+')' : ''}</span>`
+  ).join('') + '</div>';
+}
+
+function renderEvents(events) {
+  if (!events || !events.length) return '<p style="color:var(--muted);font-size:13px;">Event yok</p>';
+  return '<table style="width:100%;font-size:12px;"><thead><tr><th>Zaman</th><th>Event</th><th>Açıklama</th></tr></thead><tbody>' +
+    events.map(e => `<tr><td>${e.zaman||''}</td><td><b>${e.event||''}</b></td><td>${e.aciklama||''}</td></tr>`).join('') +
+    '</tbody></table>';
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleStep(id) {
+  const step = document.getElementById('step-'+id);
+  step.classList.toggle('open');
+  openStep = step.classList.contains('open') ? id : null;
+}
+
+function switchTab(stepId, tab, e) {
+  if (e) e.stopPropagation();
+  const step = document.getElementById('step-'+stepId);
+  step.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  step.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  step.querySelector(`[onclick*="${tab}"]`)?.classList.add('active');
+  const tc = document.getElementById('tab-'+stepId+'-'+tab);
+  if (tc) tc.classList.add('active');
+}
+
+async function toggleBreakpoint(stepId) {
+  const r = await fetch('/api/debug/'+PID+'/breakpoint/'+stepId+'?token='+TOKEN, {method:'POST'});
+  const d = await r.json();
+  if (d.ok) {
+    const bp = document.getElementById('bp-'+stepId);
+    const btn = document.getElementById('bpbtn-'+stepId);
+    if (d.action === 'added') { bp.classList.add('on'); btn.textContent = '🔴 Breakpoint Kaldır'; btn.classList.add('active'); }
+    else { bp.classList.remove('on'); btn.textContent = '🔴 Breakpoint Ekle'; btn.classList.remove('active'); }
+  }
+}
+
+function copyStepData(id) {
+  const step = document.getElementById('step-'+id);
+  const text = step ? step.innerText : '';
+  navigator.clipboard?.writeText(text);
+}
+
+function toggleAutoRefresh() {
+  autoRefresh = document.getElementById('autoRefresh').checked;
+}
+
+load();
+setInterval(() => { if (autoRefresh) load(); }, 3000);
+</script>
+{% endblock %}

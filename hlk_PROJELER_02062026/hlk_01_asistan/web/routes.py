@@ -81,3 +81,10 @@ async def packages_page(request: Request):
 async def stats_page(request: Request):
     require_operator(request)
     return _render("pages/stats.html", request, active_page="stats")
+
+
+@router.get("/debug/{pid}", response_class=HTMLResponse)
+async def debug_console_page(request: Request, pid: str):
+    """Production Debug Console — 14 adım accordion."""
+    require_operator(request)
+    return _render("pages/debug_console.html", request, active_page="productions", pid=pid)

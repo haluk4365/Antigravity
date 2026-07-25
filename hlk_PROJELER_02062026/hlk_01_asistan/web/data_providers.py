@@ -438,3 +438,301 @@ async def execute_control_action(pid: str, action: str) -> dict:
         except Exception as e:
             return {"ok": False, "action": "yenile", "error": str(e)}
     raise ValueError(f"Bilinmeyen aksiyon: {action}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Production Debug Console — 14 adım debug verisi
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_debug_data(pid: str) -> Optional[dict]:
+    """Production Debug Console için 14 adımlık debug verisi.
+    Package, provider list, event registry, decision history'den toplanır.
+    """
+    pkg = _read_package(pid)
+    if not pkg:
+        return None
+
+    brief = pkg.get("brief", {}) or {}
+    meta = pkg.get("metadata", {}) or {}
+    tasks = pkg.get("task_packages", []) or []
+    decisions = pkg.get("decision_history", []) or []
+    events = get_events(pid=pid, limit=200) or []
+    delivery = pkg.get("delivery_info", {}) or {}
+    final_video = pkg.get("final_video", {}) or {}
+
+    # Her task'ın output'unu indeksle
+    task_outputs = {}
+    for t in tasks:
+        tid = t.get("task_id", "")
+        agent = t.get("agent", "")
+        out = t.get("output") or {}
+        task_outputs[agent] = {"task_id": tid, "status": t.get("status", ""),
+                                "output": out, "completed_at": t.get("completed_at", ""),
+                                "description": t.get("description", "")}
+
+    steps = []
+
+    # 01 Ürün Linki
+    url = brief.get("url", "")
+    steps.append(_step("01", "Ürün Linki",
+        status="completed" if url else "pending",
+        general={"modül": "handlers.website", "fonksiyon": "handle_website_link",
+                  "provider": "—", "model": "—", "url": url or "Veri Bekleniyor"},
+        request={"endpoint": url, "method": "Telegram Message"} if url else {},
+        events=_filter_events(events, "LINK", "URL", "WEBSITE")))
+
+    # 02 Ürün Analizi
+    product_name = brief.get("product_name", "")
+    brand = brief.get("brand", "")
+    steps.append(_step("02", "Ürün Analizi",
+        status="completed" if product_name else "pending",
+        general={"modül": "handlers.website", "fonksiyon": "analyze_product",
+                  "ürün": product_name or "Veri Bekleniyor",
+                  "marka": brand or "Veri Bekleniyor",
+                  "platform": brief.get("platform", "")},
+        events=_filter_events(events, "PRODUCT", "ANALYSIS", "ANALIZ")))
+
+    # 03 Görsel Araştırması
+    research = pkg.get("research_results", {}) or {}
+    refs = pkg.get("reference_images", []) or []
+    steps.append(_step("03", "Görsel Araştırması",
+        status="completed" if research or refs else "pending",
+        general={"modül": "services.research", "fonksiyon": "image_research",
+                  "görsel_sayısı": str(len(refs)) if refs else "0"},
+        files=[{"path": r, "type": "image"} for r in (refs if isinstance(refs, list) else [])],
+        events=_filter_events(events, "IMAGE", "RESEARCH", "GORSEL")))
+
+    # 04 Production Package
+    steps.append(_step("04", "Production Package",
+        status="completed" if meta.get("created_at") else "pending",
+        general={"modül": "services.production_package_runtime",
+                  "fonksiyon": "create",
+                  "oluşturma": meta.get("created_at", ""),
+                  "versiyon": meta.get("version", ""),
+                  "tip": meta.get("production_type", "")},
+        decision=_format_decision(decisions[0]) if decisions else "",
+        events=_filter_events(events, "PACKAGE", "CREATE")))
+
+    # 05 Provider Adayları
+    try:
+        from services.provider_priority import provider_priority
+        candidates = provider_priority.evaluate_all()
+    except Exception:
+        candidates = {}
+    steps.append(_step("05", "Provider Adayları",
+        status="completed" if candidates else "pending",
+        general={"modül": "services.provider_priority", "fonksiyon": "evaluate_all",
+                  "adaylar": _format_candidates(candidates)} if candidates else {},
+        events=_filter_events(events, "PROVIDER", "CANDIDATE", "SELECTION")))
+
+    # 06 Provider Puanlaması
+    latest_decision = decisions[-1] if decisions else {}
+    scoring = {}
+    for cat in ("image", "voice", "video"):
+        provs = latest_decision.get(f"{cat}_providers", []) or []
+        for p in provs:
+            scoring[f"{cat}/{p.get('provider','')}"] = {
+                "priority": p.get("priority", 0),
+                "confidence": f"{p.get('confidence', 0)*100:.0f}%",
+                "justification": p.get("justification", "")}
+    steps.append(_step("06", "Provider Puanlaması",
+        status="completed" if scoring else "pending",
+        general={"modül": "services.decision_engine", "fonksiyon": "decide",
+                  "puanlama": scoring} if scoring else {},
+        decision=_format_decision(latest_decision),
+        events=_filter_events(events, "DECISION", "SCORE", "SELECTION")))
+
+    # 07 Provider Seçimi
+    selected = {}
+    for cat in ("image", "voice", "video"):
+        key = f"primary_{cat}_provider"
+        sp = latest_decision.get(key, {}) or {}
+        if isinstance(sp, dict):
+            selected[cat] = sp.get("provider", "") or ""
+    steps.append(_step("07", "Provider Seçimi",
+        status="completed" if any(selected.values()) else "pending",
+        general={"modül": "services.decision_engine", "fonksiyon": "decide",
+                  "seçilen": selected} if selected else {},
+        decision=_format_decision(latest_decision),
+        events=_filter_events(events, "DECISION", "SELECTED")))
+
+    # 08 Provider Request (ImageGenerator task)
+    img = task_outputs.get("ImageGenerator", {})
+    steps.append(_build_task_step("08", "Provider Request (Görsel)", img, events,
+                                   "task_image", "ImageGenerator"))
+
+    # 09 Provider Response (ImageGenerator sonucu)
+    steps.append(_build_task_step("09", "Provider Response (Görsel)", img, events,
+                                   "task_image_result", "ImageGenerator", is_response=True))
+
+    # 10 Video Job Takibi
+    vid = task_outputs.get("VideoRenderer", {})
+    steps.append(_build_task_step("10", "Video Job Takibi", vid, events,
+                                   "task_video", "VideoRenderer"))
+
+    # 11 Video Download
+    steps.append(_step("11", "Video Download",
+        status="completed" if final_video.get("path") else "pending",
+        general={"modül": "services.production_pipeline", "fonksiyon": "task_video",
+                  "video_path": final_video.get("path", "") or "Veri Bekleniyor",
+                  "delivered": str(final_video.get("delivered", False))},
+        files=[{"path": final_video.get("path", ""), "type": "video/mp4"}] if final_video.get("path") else []))
+
+    # 12 Video Doğrulama
+    cee_verdict = ""
+    try:
+        cee = pkg.get("quality_reports", {}) or {}
+        cee_verdict = cee.get("verdict", "") if isinstance(cee, dict) else ""
+    except Exception:
+        pass
+    steps.append(_step("12", "Video Doğrulama",
+        status="completed" if cee_verdict else ("pending" if final_video.get("path") else "waiting"),
+        general={"modül": "services.constitution_enforcement",
+                  "fonksiyon": "enforce_post_check",
+                  "CEE_verdict": cee_verdict or "Veri Bekleniyor"},
+        events=_filter_events(events, "CEE", "POST_CHECK", "ENFORCE")))
+
+    # 13 Telegram Gönderimi
+    steps.append(_step("13", "Telegram Gönderimi",
+        status="completed" if delivery.get("delivered") else "pending",
+        general={"modül": "services.scene_delivery", "fonksiyon": "send_video",
+                  "chat_id": str(delivery.get("chat_id", "")),
+                  "teslim_zamanı": delivery.get("delivered_at", ""),
+                  "video_var": str(delivery.get("video", False))},
+        events=_filter_events(events, "DELIVER", "SEND", "TELEGRAM")))
+
+    # 14 Session Kapatılması
+    steps.append(_step("14", "Session Kapatılması",
+        status="completed" if meta.get("completed_at") else ("pending" if meta.get("created_at") else "waiting"),
+        general={"modül": "services.production_runtime", "fonksiyon": "_run_managed",
+                  "başlangıç": meta.get("created_at", ""),
+                  "bitiş": meta.get("completed_at", ""),
+                  "durum": meta.get("status", ""),
+                  "versiyon": meta.get("version", "")},
+        events=_filter_events(events, "COMPLETED", "SESSION", "TERMINAL")))
+
+    # Breakpoint'leri yükle
+    breakpoints = _get_breakpoints(pid)
+
+    return {"pid": pid, "steps": steps, "breakpoints": list(breakpoints)}
+
+
+def _step(step_id: str, name: str, status: str = "pending",
+          general: dict = None, request: dict = None, response: dict = None,
+          files: list = None, events: list = None, decision: str = "") -> dict:
+    return {
+        "id": step_id, "name": name, "status": status,
+        "general": general or {},
+        "request": request or {},
+        "response": response or {},
+        "files": files or [],
+        "events": events or [],
+        "decision": decision or "",
+        "has_breakpoint": False,
+    }
+
+
+def _build_task_step(step_id: str, name: str, task_info: dict,
+                      events: list, func_name: str, agent: str,
+                      is_response: bool = False) -> dict:
+    """Task bazlı adım oluşturur."""
+    out = task_info.get("output", {}) or {}
+    status = task_info.get("status", "PENDING")
+    if status in ("COMPLETED", "SUCCESS"):
+        step_status = "completed"
+    elif status in ("PRODUCING", "PROCESSING"):
+        step_status = "running"
+    elif status == "FAILED":
+        step_status = "failed"
+    elif status == "PENDING":
+        step_status = "pending"
+    else:
+        step_status = "waiting"
+
+    generated = out.get("generated", None)
+    artifact = out.get("artifact", "") or ""
+
+    general = {
+        "modül": f"services.production_pipeline",
+        "fonksiyon": func_name,
+        "agent": agent,
+        "task_id": task_info.get("task_id", ""),
+        "task_status": status,
+        "generated": str(generated) if generated is not None else "",
+        "artifact": artifact,
+        "tamamlanma": task_info.get("completed_at", ""),
+    }
+
+    req = {}
+    resp = {}
+    if is_response:
+        resp = {"generated": str(generated), "artifact": artifact,
+                 "task_id": task_info.get("task_id", "")}
+    else:
+        req = {"task_id": task_info.get("task_id", ""),
+               "agent": agent, "description": task_info.get("description", "")}
+
+    return _step(step_id, name, status=step_status, general=general,
+                 request=req, response=resp,
+                 files=[{"path": artifact, "type": "output"}] if artifact else [],
+                 events=_filter_events(events, agent.upper(), func_name.upper()))
+
+
+def _filter_events(events: list, *keywords: str) -> list:
+    """Event'leri anahtar kelimelere göre filtrele."""
+    if not events:
+        return []
+    result = []
+    for e in events:
+        text = (e.get("event", "") + " " + e.get("aciklama", "")).upper()
+        if any(kw.upper() in text for kw in keywords):
+            result.append(e)
+    return result[:20]
+
+
+def _format_decision(decision: dict) -> str:
+    """Karar dict'ini okunabilir metne çevir."""
+    if not decision:
+        return ""
+    parts = [f"Decision ID: {decision.get('decision_id', '?')}"]
+    for cat in ("image", "voice", "video"):
+        providers = decision.get(f"{cat}_providers", []) or []
+        names = [p.get("provider", "?") for p in providers]
+        if names:
+            parts.append(f"{cat}: {' → '.join(names)}")
+    return "\n".join(parts)
+
+
+def _format_candidates(candidates: dict) -> str:
+    """Provider adaylarını okunabilir metne çevir."""
+    if not candidates:
+        return ""
+    lines = []
+    for cat, provs in candidates.items():
+        names = [f"{p.get('provider','?')}(skor:{p.get('score',0)})" for p in provs[:3]]
+        lines.append(f"{cat}: {', '.join(names)}")
+    return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Breakpoint Store (in-memory)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_breakpoints: dict[str, set] = {}
+
+def _get_breakpoints(pid: str) -> set:
+    return _breakpoints.get(pid, set())
+
+def set_breakpoint(pid: str, step_id: str) -> bool:
+    if pid not in _breakpoints:
+        _breakpoints[pid] = set()
+    _breakpoints[pid].add(step_id)
+    return True
+
+def remove_breakpoint(pid: str, step_id: str) -> bool:
+    if pid in _breakpoints:
+        _breakpoints[pid].discard(step_id)
+    return True
+
+def has_breakpoint(pid: str, step_id: str) -> bool:
+    return step_id in _breakpoints.get(pid, set())
