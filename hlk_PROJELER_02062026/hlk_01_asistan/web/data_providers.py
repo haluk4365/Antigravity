@@ -15,7 +15,9 @@ import requests as _requests
 
 logger = logging.getLogger(__name__)
 
-_PKG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "production_packages")
+_PKG_DIR = os.getenv("GC_PACKAGE_STORAGE_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "data", "production_packages"
+)
 
 
 def _read_package(pid: str) -> Optional[dict]:
