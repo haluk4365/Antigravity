@@ -73,14 +73,13 @@ class HedraGenerator:
 
     def generate(self, image_url: str, audio_url: str, model_id: str = "omnia") -> str | None:
         """Video üretim isteği gönder, generation_id döndür."""
-        # AR-002_90: Hedra API v2 format
-        # Model slug → ai_model_id mapping
-        _model_map = {
-            "omnia": "ab372b84-432f-44f5-bacc-c2542465f712",
+        # AR-002_90: Hedra API v2 format — model_slug kullan
+        _slug_map = {
+            "omnia": "together/hedra-omnia",
         }
         payload = {
             "type": "video",
-            "ai_model_id": _model_map.get(model_id, model_id),
+            "model_slug": _slug_map.get(model_id, model_id),
             "start_keyframe_id": image_url,
             "audio_id": audio_url,
             "generated_video_inputs": {
