@@ -64,12 +64,12 @@ class HedraGenerator:
         return None
 
     def upload_image(self, image_path: str) -> str | None:
-        """Görsel yükle, asset URL döndür."""
-        return self._upload_asset(image_path, "image/png")
+        """Görsel yükle, asset ID döndür."""
+        return self._upload_asset(image_path, "image")
 
     def upload_audio(self, audio_path: str) -> str | None:
-        """Ses yükle, asset URL döndür."""
-        return self._upload_asset(audio_path, "audio/mpeg")
+        """Ses yükle, asset ID döndür."""
+        return self._upload_asset(audio_path, "audio")
 
     def generate(self, image_url: str, audio_url: str, model_id: str = "omnia") -> str | None:
         """Video üretim isteği gönder, generation_id döndür."""
