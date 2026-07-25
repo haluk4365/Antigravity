@@ -11,8 +11,8 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 logger = logging.getLogger(__name__)
 
-_WEB_PORT = int(os.getenv("HLK_WEB_PORT", "8765"))
-_WEB_HOST = os.getenv("HLK_WEB_HOST", "127.0.0.1")
+_WEB_PORT = int(os.getenv("PORT", os.getenv("HLK_WEB_PORT", "8080")))
+_WEB_HOST = os.getenv("HLK_WEB_HOST", "0.0.0.0")
 _OPERATOR_TOKEN = os.getenv("HLK_WEB_OPS_TOKEN", "")
 
 
@@ -74,7 +74,9 @@ async def start_web_server():
             _app, host=_WEB_HOST, port=_WEB_PORT, log_level="info"
         )
         server = uvicorn.Server(config)
-        logger.info(f"🌐 HLK Web Operasyon Merkezi başlatılıyor: http://{_WEB_HOST}:{_WEB_PORT}")
+        logger.info(f"🌐 HLK Web Operasyon Merkezi: http://{_WEB_HOST}:{_WEB_PORT}")
+        if os.getenv("RAILWAY_PRIVATE_DOMAIN"):
+            logger.info(f"🚅 Railway internal: http://{os.getenv('RAILWAY_PRIVATE_DOMAIN')}:{_WEB_PORT}")
         # Sunucuyu arka planda başlat (aynı event loop'ta)
         asyncio.create_task(server.serve())
     except ImportError:
