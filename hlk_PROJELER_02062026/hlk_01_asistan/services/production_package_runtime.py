@@ -982,20 +982,12 @@ class ProductionPackageRuntime:
                         task["error_detail"] = ""
                 # RESUME / START_AS_NEW: task'lar dokunulmaz
 
-            # ── AR-002_88 RETRY: Proof bazlı task reset ─────────────────
-            # MASTER-013: RETRY yeni bir üretimdir. Status'a değil
-            # proof'a (kanıta) güvenilir.
-            #
-            # Her task için anayasal proof doğrulaması:
-            #   TASK-001 ImageGenerator: generated=True, artifact!="", file exists
-            #   TASK-002 VoiceGenerator:  generated=True, artifact!="", file exists
-            #   TASK-003 VideoRenderer:   generated=True, artifact!="", file exists
-            #   TASK-004 DeliveryAgent:   delivered=True, telegram_message_id exists
-            #
-            # Status=COMPLETED ama proof INVALID → PENDING yapılır.
-            # Output KORUNUR (tarihçe için) — executor yeni çıktıyı üretir.
-            # Hiçbir task'ın output'u silinmez.
-            if procedure == "RETRY":
+            # ── AR-002_90 Proof bazlı task reset (RESUME + RETRY) ──────
+            # Deploy sonrası /tmp silindiği için COMPLETED task'ların
+            # artifact'leri kaybolur. RESUME kararı verilse bile proof
+            # geçersizse task PENDING yapılır. ANA YASA: status'a değil
+            # proof'a (kanıta) güven. Dosya yoksa üretim gerçekleşmemiştir.
+            if procedure in ("RETRY", "RESUME"):
                 import os as _os_proof
 
                 def _validate_proof(_task: dict, _pkg) -> tuple:
