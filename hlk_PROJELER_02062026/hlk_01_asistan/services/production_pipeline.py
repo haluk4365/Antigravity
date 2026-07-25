@@ -226,6 +226,15 @@ async def task_image(task: dict, pid: str) -> dict:
     if ctx is None:
         raise RuntimeError(f"Pipeline context bulunamadı: {pid}")
 
+    # AR-002_90: Checkpoint'ten restore edilen img_path dosyasi
+    # gercekten var mi? Railway deploy'unda /tmp silinir.
+    if ctx.img_path and not os.path.exists(ctx.img_path):
+        logger.info(
+            f"📋 [task_image] Checkpoint img_path dosyasi yok, "
+            f"sifirdan uretilecek: {ctx.img_path}"
+        )
+        ctx.img_path = ""
+
     req = ctx.request
     decision_packet = ctx.decision_packet
     tmp = tempfile.gettempdir()
@@ -452,13 +461,26 @@ async def task_image(task: dict, pid: str) -> dict:
                                                         img_path = os.path.join(
                                                             tmp, f"hlk_img_{req.user_id}.png"
                                                         )
-                                                        urllib.request.urlretrieve(img_url, img_path)
-                                                        ctx.img_path = img_path
-                                                        ctx.cost_report["services"]["kie.ai"] = "ok"
-                                                        logger.info(
-                                                            f"✅ [Production] Kie AI görsel "
-                                                            f"indirildi: {img_path}"
+                                                        # AR-002_90: urllib yerine requests ile indir
+                                                        # (CDN 403 hatasini onlemek icin User-Agent header)
+                                                        _dl_resp = _r.get(
+                                                            img_url,
+                                                            headers={"User-Agent": "HLK/1.0"},
+                                                            timeout=_GC_PROVIDER_HTTP_TIMEOUT,
                                                         )
+                                                        if _dl_resp.status_code == 200:
+                                                            with open(img_path, "wb") as _f:
+                                                                _f.write(_dl_resp.content)
+                                                            ctx.img_path = img_path
+                                                            ctx.cost_report["services"]["kie.ai"] = "ok"
+                                                            logger.info(
+                                                                f"✅ [Production] Kie AI görsel "
+                                                                f"indirildi: {img_path}"
+                                                            )
+                                                        else:
+                                                            attempt_error = (
+                                                                f"kie.ai download HTTP {_dl_resp.status_code}"
+                                                            )
                                                     else:
                                                         attempt_error = (
                                                             "kie.ai success ama resultUrls bos"
