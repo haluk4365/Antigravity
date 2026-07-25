@@ -288,7 +288,24 @@ async def task_image(task: dict, pid: str) -> dict:
                                             f"status={fal_status}"
                                         )
                                         if fal_status == "COMPLETED":
+                                            # AR-002_90: fal.ai API yapisi degisti.
+                                            # /status response'ta "response" key'i olmayabilir.
+                                            # Gorseller response_url endpoint'inde.
                                             images = st_data.get("response", {}).get("images", [])
+                                            if not images:
+                                                # Yeni API: response_url'den gercek veriyi cek
+                                                _resp_url = st_data.get("response_url", "")
+                                                if _resp_url:
+                                                    try:
+                                                        _img_resp = _r.get(
+                                                            _resp_url,
+                                                            headers={"Authorization": f"Key {fal_key}"},
+                                                            timeout=_GC_PROVIDER_STATUS_TIMEOUT)
+                                                        if _img_resp.status_code == 200:
+                                                            _img_data = _img_resp.json()
+                                                            images = _img_data.get("images", [])
+                                                    except Exception:
+                                                        pass
                                             if images:
                                                 img_url = images[0].get("url", "")
                                                 if img_url:
