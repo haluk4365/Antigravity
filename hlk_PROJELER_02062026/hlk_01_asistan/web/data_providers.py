@@ -412,7 +412,26 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
 
     # ── Workflow Node'larını Oluştur ──────────────────────────────────────
     workflows = []
-    root_cause_found = False
+
+    # Tüm event verisini workflow keyword'lerine göre önceden indeksle
+    def _event_matches(event, keywords):
+        text = (event.get("event", "") + " " + event.get("aciklama", "")
+                + " " + event.get("event_name", "") + " " + event.get("event_type", "")).upper()
+        return any(kw.upper() in text for kw in keywords)
+
+    WF_EVENT_KEYWORDS = {
+        "WF-001": ("LINK", "URL", "WEBSITE", "VALIDAT"),
+        "WF-002": ("RESEARCH", "IMAGE", "GORSEL", "BACKGROUND", "REFERENCE"),
+        "WF-003": ("BRIEF", "PRODUCT", "COLLECT"),
+        "WF-004": ("BRIEF", "APPROVAL", "ONAY"),
+        "WF-005": ("SCENARIO", "GENERAT"),
+        "WF-006": ("SCENARIO", "APPROVAL", "ONAY"),
+        "WF-007": ("PRICING", "FIYAT", "TEKLIF", "COST"),
+        "WF-008": ("VIDEO", "PRODUCT", "TASK", "PROVIDER", "RENDER", "EXECUT",
+                   "IMAGE", "VOICE", "REPRODUCTION", "CEE"),
+        "WF-009": ("QUALITY", "CEE", "CHECK", "ENFORCE"),
+        "WF-010": ("DELIVER", "SEND", "TELEGRAM", "TESLIM"),
+    }
 
     for wf_id in wf_order:
         wf_info = manifest.get(wf_id, {})
@@ -420,51 +439,83 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
         wf_desc = wf_info.get("description", "")
         status = _wf_status(wf_id)
 
-        nodes = []
-        evidence_nodes = []  # Her WF için dinamik kanıt düğümleri
+        # Workflow'a ait tüm verileri topla
+        wf_tasks = _find_tasks_for_wf(wf_id, tasks)
+        wf_decisions = _find_decisions_for_wf(wf_id, decisions, events)
 
-        # ── Sonuç ─────────────────────────────────────────────────────────
+        # Event'leri filtrele
+        keywords = WF_EVENT_KEYWORDS.get(wf_id, (wf_id, wf_name.upper()))
+        wf_events = [e for e in events if _event_matches(e, keywords)]
+
+        api_refs = _get_api_refs_for_wf(wf_id)
+
+        # WF-008 içinse tüm task'ları da göster
+        if wf_id == "WF-008":
+            wf_tasks = tasks  # Tüm task'lar
+            # WF-008 için tüm event'leri göster
+            wf_events = events
+
+        nodes = []
+
+        # ── 1. SONUÇ ──────────────────────────────────────────────────────
         result_summary = _derive_wf_result(wf_id, brief, tasks, decisions, events,
                                            delivery, final_video, quality)
-        result_node = _make_node("result", "Sonuç", status,
-                                 summary=result_summary,
-                                 source=f"PID/{pid}/package",
-                                 reference=wf_id)
-        nodes.append(result_node)
+        nodes.append(_make_node("result", "1. Sonuç", status,
+                                summary=result_summary,
+                                source=f"ProductionPackage/{pid}",
+                                reference=wf_id))
 
-        # ── HLK Kararı ────────────────────────────────────────────────────
-        matching_decisions = _find_decisions_for_wf(wf_id, decisions, events)
-        if matching_decisions:
-            latest_d = matching_decisions[-1]
+        # ── 2. HLK KARARI ─────────────────────────────────────────────────
+        if wf_decisions:
+            latest_d = wf_decisions[-1]
             decision_id = latest_d.get("decision_id", "RTD-?")
-            verdict = latest_d.get("verdict", "")
+            verdict = latest_d.get("verdict", str(latest_d.get("result", "")))
             justification = latest_d.get("justification", "")
             if isinstance(justification, dict):
                 justification = justification.get("summary", str(justification))
 
-            hlk_node = _make_node("hlk_decision", "HLK Kararı",
+            hlk_node = _make_node("hlk_decision", "2. HLK Kararı",
                                   status="completed",
-                                  summary=f"{decision_id}: {verdict}",
+                                  summary=f"{decision_id}: {verdict}"[:200],
                                   source="decision_history",
-                                  detail={"decision_id": decision_id,
-                                          "verdict": verdict,
-                                          "full_decision": latest_d})
-            # Karar Gerekçesi alt düğümü
+                                  detail={"decision_id": decision_id, "verdict": verdict,
+                                          "full_decision": latest_d},
+                                  reference=decision_id)
+            # Karar Gerekçesi
             if justification:
-                rationale_node = _make_node("rationale", "Karar Gerekçesi",
-                                            status="completed",
-                                            summary=str(justification)[:300],
-                                            source="decision.justification",
-                                            reference=decision_id)
-                hlk_node["alt_dugumler"].append(rationale_node)
-            nodes.append(hlk_node)
+                hlk_node["alt_dugumler"].append(
+                    _make_node("rationale", "Karar Gerekçesi",
+                               status="completed",
+                               summary=str(justification)[:300],
+                               source="decision.justification",
+                               reference=decision_id))
+            # Diğer kararlar varsa
+            for i, d in enumerate(wf_decisions[:-1]):
+                did = d.get("decision_id", f"RTD-{i}")
+                hlk_node["alt_dugumler"].append(
+                    _make_node("decision", f"Karar #{i+1}",
+                               status="completed",
+                               summary=f"{did}: {d.get('verdict','')}"[:200],
+                               source="decision_history",
+                               detail=d))
+        else:
+            hlk_node = _make_node("hlk_decision", "2. HLK Kararı",
+                                  status="pending" if status in ("pending", "running") else "inactive",
+                                  summary="Henüz karar üretilmedi" if status != "inactive"
+                                  else "Bu aşamada karar üretilmez",
+                                  source="decision_history")
+        nodes.append(hlk_node)
 
-        # ── Görevler ──────────────────────────────────────────────────────
-        wf_tasks = _find_tasks_for_wf(wf_id, tasks)
+        # ── 3. GÖREVLER ───────────────────────────────────────────────────
         if wf_tasks:
-            tasks_node = _make_node("tasks", "Oluşturulan Görevler",
-                                    status="completed",
-                                    summary=f"{len(wf_tasks)} görev atandı",
+            tasks_node = _make_node("tasks", "3. Oluşturulan Görevler",
+                                    status="completed" if all(t.get("status") in ("COMPLETED", "SUCCESS")
+                                                             for t in wf_tasks)
+                                    else "failed" if any(t.get("status") == "FAILED" for t in wf_tasks)
+                                    else "running" if any(t.get("status") in ("PRODUCING", "PROCESSING")
+                                                         for t in wf_tasks)
+                                    else "pending",
+                                    summary=f"{len(wf_tasks)} görev",
                                     detail={"task_list": wf_tasks})
             for t in wf_tasks:
                 t_status = t.get("status", "")
@@ -472,169 +523,226 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                 "FAILED": "failed",
                                 "PRODUCING": "running", "PROCESSING": "running",
                                 "PENDING": "pending"}
-                task_child = _make_node("task", t.get("agent", "Görev"),
+                task_child = _make_node("task", f"Agent: {t.get('agent', 'Görev')}",
                                         status=t_status_map.get(t_status, "pending"),
-                                        summary=t.get("description", ""),
-                                        source=f"task:{t.get('task_id','')}",
+                                        summary=t.get("description", "")[:200],
+                                        source=f"TaskPackage/{t.get('task_id','')}",
                                         detail=t)
+                # Task output detayı
+                out = t.get("output", {}) or {}
+                if out:
+                    for ok, ov in out.items():
+                        if ov is not None and ov != "" and ok not in ("executed_at",):
+                            task_child["alt_dugumler"].append(
+                                _make_node("task_output", str(ok),
+                                           status="completed",
+                                           summary=str(ov)[:200],
+                                           source=f"output.{ok}"))
                 tasks_node["alt_dugumler"].append(task_child)
-            nodes.append(tasks_node)
+        else:
+            tasks_node = _make_node("tasks", "3. Oluşturulan Görevler",
+                                    status="pending" if status != "inactive" else "inactive",
+                                    summary="Henüz görev atanmadı" if status != "inactive"
+                                    else "Bu aşamada görev atanmaz")
+        nodes.append(tasks_node)
 
-        # ── Ajan Adayları + Puanları + Seçim ──────────────────────────────
-        if wf_id in ("WF-005", "WF-008"):
-            candidates = _extract_candidates(decisions)
-            if candidates:
-                cand_node = _make_node("agent_candidates", "Ajan Adayları",
-                                       status="completed",
-                                       summary=f"{sum(len(v) for v in candidates.values())} aday değerlendirildi",
-                                       detail={"candidates": candidates})
-                for cat, provs in candidates.items():
-                    cat_child = _make_node("candidate_group", f"{cat.upper()} Adayları",
-                                           status="completed",
-                                           summary=", ".join(p.get("provider", "?") for p in provs),
-                                           detail={"providers": provs})
-                    # Ajan puanları
-                    for p in provs:
-                        score_node = _make_node("agent_score", p.get("provider", "?"),
-                                                status="completed",
-                                                summary=f"Öncelik: {p.get('priority','?')}, Güven: {p.get('confidence',0)}",
-                                                source="decision_history.{cat}_providers",
-                                                detail=p)
-                        cat_child["alt_dugumler"].append(score_node)
-                    cand_node["alt_dugumler"].append(cat_child)
-                nodes.append(cand_node)
-
-            # Ajan Seçim Gerekçesi
-            selected = _extract_selected_providers(decisions)
-            if selected:
-                sel_text = []
-                for cat, prov in selected.items():
-                    justification = prov.get("justification", "")
-                    sel_text.append(f"{cat}: {prov.get('provider','?')} — {justification}"[:200])
-                sel_node = _make_node("agent_selection", "Ajan Seçim Gerekçesi",
-                                      status="completed",
-                                      summary=" | ".join(sel_text),
-                                      source="decision_history",
-                                      detail={"selected": selected})
-                nodes.append(sel_node)
-
-        # ── Çalışan Ajan ──────────────────────────────────────────────────
-        if wf_tasks:
-            for t in wf_tasks:
-                agent_name = t.get("agent", "")
-                t_status = t.get("status", "")
-                if t_status in ("COMPLETED", "SUCCESS", "PRODUCING", "PROCESSING", "FAILED"):
-                    agent_node = _make_node("working_agent", f"Çalışan Ajan: {agent_name}",
-                                            status="completed" if t_status in ("COMPLETED", "SUCCESS")
-                                            else "failed" if t_status == "FAILED"
-                                            else "running",
-                                            summary=t.get("description", ""),
-                                            source=f"task_packages",
-                                            detail={"agent": agent_name,
-                                                    "task_id": t.get("task_id", ""),
-                                                    "status": t_status,
-                                                    "output": t.get("output", {}),
-                                                    "completed_at": t.get("completed_at", "")})
-                    # Kanıtlar
-                    output = t.get("output", {}) or {}
-                    artifact = output.get("artifact", "")
-                    generated = output.get("generated", None)
-                    proof_keys = output.get("_proof_keys", [])
-                    if artifact or generated is not None or proof_keys:
-                        evidence_children = []
-                        if generated is not None:
-                            evidence_children.append(_make_node("evidence_item", "Generated",
-                                                                status="completed",
-                                                                summary=str(generated)[:200],
-                                                                source="output.generated"))
-                        if artifact:
-                            evidence_children.append(_make_node("evidence_item", "Artifact",
-                                                                status="completed",
-                                                                summary=artifact,
-                                                                source="output.artifact"))
-                        if proof_keys:
-                            evidence_children.append(_make_node("evidence_item", "Proof Keys",
-                                                                status="completed",
-                                                                summary=", ".join(str(k) for k in proof_keys),
-                                                                source="output._proof_keys"))
-                        evidence_nodes.append({
-                            "agent": agent_name,
-                            "children": evidence_children,
-                        })
-                    nodes.append(agent_node)
-                    break  # Her WF için en fazla 1 çalışan ajan
-
-        # ── Kanıtlar ──────────────────────────────────────────────────────
-        if evidence_nodes:
-            for ev in evidence_nodes:
-                evidence_node = _make_node("evidence", f"Kanıtlar ({ev['agent']})",
-                                           status="completed",
-                                           summary=f"{len(ev['children'])} kanıt öğesi",
-                                           detail={})
-                evidence_node["alt_dugumler"] = ev["children"]
-                nodes.append(evidence_node)
-
-        # Özel kanıtlar (WF-002 için ref imajlar, WF-009 için quality raporu)
-        if wf_id == "WF-002" and refs:
-            refs_node = _make_node("evidence", "Referans Görseller",
+        # ── 4. AJAN ADAYLARI ──────────────────────────────────────────────
+        candidates = _extract_candidates(decisions)
+        if candidates:
+            cand_node = _make_node("agent_candidates", "4. Ajan Adayları",
                                    status="completed",
-                                   summary=f"{len(refs) if isinstance(refs, list) else 0} görsel bulundu",
-                                   detail={"images": refs if isinstance(refs, list) else []})
-            nodes.append(refs_node)
-
-        if wf_id == "WF-009" and quality:
-            q_node = _make_node("evidence", "Kalite Raporu",
-                                status="completed" if quality.get("verdict") else "pending",
-                                summary=f"Verdict: {quality.get('verdict', 'Bekleniyor')}",
-                                detail=quality)
-            nodes.append(q_node)
-
-        # ── Event Kayıtları ───────────────────────────────────────────────
-        wf_events = _find_events_for_wf(wf_id, events)
-        if wf_events:
-            evt_node = _make_node("events", "Event Kayıtları",
-                                  status="completed",
-                                  summary=f"{len(wf_events)} event kaydı",
-                                  detail={"count": len(wf_events)})
-            for e in wf_events[:10]:  # Max 10 event göster
-                evt_child = _make_node("event", e.get("event", "Event"),
+                                   summary=f"{sum(len(v) for v in candidates.values())} aday",
+                                   detail={"candidates": candidates})
+            for cat, provs in candidates.items():
+                cat_child = _make_node("candidate_group", f"{cat.upper()} Adayları",
                                        status="completed",
-                                       summary=e.get("aciklama", ""),
-                                       source=f"event_registry",
-                                       detail=e)
-                evt_node["alt_dugumler"].append(evt_child)
-            nodes.append(evt_node)
+                                       summary=", ".join(p.get("provider", "?") for p in provs[:3]),
+                                       detail={"providers": provs})
+                for p in provs:
+                    score_child = _make_node("agent_score", p.get("provider", "?"),
+                                             status="completed",
+                                             summary=f"Öncelik: {p.get('priority','?')} | Güven: {p.get('confidence',0)}",
+                                             source=f"decision_history.{cat}_providers",
+                                             detail=p)
+                    cat_child["alt_dugumler"].append(score_child)
+                cand_node["alt_dugumler"].append(cat_child)
+        else:
+            cand_node = _make_node("agent_candidates", "4. Ajan Adayları",
+                                   status="pending" if status not in ("inactive",) and wf_id in ("WF-005", "WF-008")
+                                   else "inactive",
+                                   summary="Henüz aday değerlendirilmedi" if wf_id in ("WF-005", "WF-008")
+                                   else "Bu aşamada ajan adaylığı yok")
+        nodes.append(cand_node)
 
-        # ── Log Kayıtları ─────────────────────────────────────────────────
-        if wf_id == "WF-008" and agent_logs:
-            log_node = _make_node("logs", "Log Kayıtları",
+        # ── 5. AJAN SEÇİM GEREKÇESİ ───────────────────────────────────────
+        selected = _extract_selected_providers(decisions)
+        if selected:
+            sel_text = []
+            for cat, prov in selected.items():
+                sel_text.append(f"{cat}: {prov.get('provider','?')}")
+            sel_node = _make_node("agent_selection", "5. Ajan Seçim Gerekçesi",
+                                  status="completed",
+                                  summary=" | ".join(sel_text)[:200],
+                                  source="decision_history",
+                                  detail={"selected": selected})
+            for cat, prov in selected.items():
+                justification = prov.get("justification", "")
+                if justification:
+                    sel_node["alt_dugumler"].append(
+                        _make_node("justification", f"{cat} gerekçesi",
+                                   status="completed",
+                                   summary=str(justification)[:300],
+                                   source=f"decision.{cat}_provider.justification"))
+        else:
+            sel_node = _make_node("agent_selection", "5. Ajan Seçim Gerekçesi",
+                                  status="pending" if status not in ("inactive",) and wf_id in ("WF-005", "WF-008")
+                                  else "inactive",
+                                  summary="Henüz seçim yapılmadı" if wf_id in ("WF-005", "WF-008")
+                                  else "Bu aşamada ajan seçimi yok")
+        nodes.append(sel_node)
+
+        # ── 6. ÇALIŞAN AJAN ───────────────────────────────────────────────
+        working_agents = [t for t in wf_tasks if t.get("status") in
+                         ("COMPLETED", "SUCCESS", "PRODUCING", "PROCESSING", "FAILED")]
+        if working_agents:
+            for wa in working_agents:
+                agent_status = wa.get("status", "")
+                wa_node = _make_node("working_agent", f"6. Çalışan Ajan: {wa.get('agent','')}",
+                                     status="completed" if agent_status in ("COMPLETED", "SUCCESS")
+                                     else "failed" if agent_status == "FAILED"
+                                     else "running",
+                                     summary=wa.get("description", ""),
+                                     source=f"TaskPackage/{wa.get('task_id','')}",
+                                     detail={"agent": wa.get("agent", ""),
+                                             "task_id": wa.get("task_id", ""),
+                                             "status": agent_status,
+                                             "completed_at": wa.get("completed_at", "")})
+                # Task output'tan kanıt
+                out = wa.get("output", {}) or {}
+                artifact = out.get("artifact", "")
+                generated = out.get("generated", None)
+                proof_keys = out.get("_proof_keys", [])
+                ev_children = []
+                if generated is not None:
+                    ev_children.append(_make_node("evidence_item", "Generated",
+                                                  status="completed",
+                                                  summary=str(generated)[:200],
+                                                  source="output.generated"))
+                if artifact:
+                    ev_children.append(_make_node("evidence_item", "Artifact",
+                                                  status="completed",
+                                                  summary=str(artifact)[:200],
+                                                  source="output.artifact"))
+                if proof_keys:
+                    ev_children.append(_make_node("evidence_item", "Proof Keys",
+                                                  status="completed",
+                                                  summary=", ".join(str(k) for k in proof_keys),
+                                                  source="output._proof_keys"))
+                if ev_children:
+                    wa_node["alt_dugumler"] = ev_children
+                nodes.append(wa_node)
+        else:
+            wa_node = _make_node("working_agent", "6. Çalışan Ajan",
+                                 status="pending" if status not in ("inactive",) and wf_tasks
+                                 else "inactive",
+                                 summary="Henüz ajan çalışmadı" if wf_tasks
+                                 else "Bu aşamada ajan çalışmaz")
+            nodes.append(wa_node)
+
+        # ── 7. KANITLAR ───────────────────────────────────────────────────
+        evidence_all = []
+        if wf_id == "WF-002" and refs:
+            evidence_all.append(_make_node("evidence", "Referans Görseller",
+                                           status="completed",
+                                           summary=f"{len(refs) if isinstance(refs, list) else 0} görsel",
+                                           detail={"images": refs if isinstance(refs, list) else []}))
+        if wf_id == "WF-008" and final_video:
+            evidence_all.append(_make_node("evidence", "Final Video",
+                                           status="completed" if final_video.get("path") else "pending",
+                                           summary=str(final_video.get("path", "Üretilmedi"))[:200],
+                                           detail=final_video))
+        if wf_id == "WF-009" and quality:
+            evidence_all.append(_make_node("evidence", "Kalite Raporu",
+                                           status="completed" if quality.get("verdict") else "pending",
+                                           summary=f"Verdict: {quality.get('verdict', 'Bekleniyor')}",
+                                           detail=quality))
+        if wf_id == "WF-010" and delivery:
+            evidence_all.append(_make_node("evidence", "Teslim Kaydı",
+                                           status="completed" if delivery.get("delivered") else "pending",
+                                           summary=f"Teslim: {'Evet' if delivery.get('delivered') else 'Hayır'}",
+                                           detail=delivery))
+
+        if evidence_all:
+            ev_parent = _make_node("evidence", "7. Kanıtlar",
+                                   status="completed",
+                                   summary=f"{len(evidence_all)} kanıt paketi",
+                                   detail={})
+            ev_parent["alt_dugumler"] = evidence_all
+            nodes.append(ev_parent)
+        else:
+            nodes.append(_make_node("evidence", "7. Kanıtlar",
+                                    status="pending" if status not in ("inactive",)
+                                    else "inactive",
+                                    summary="Henüz kanıt üretilmedi"))
+
+        # ── 8. EVENT KAYITLARI ────────────────────────────────────────────
+        if wf_events:
+            evt_node = _make_node("events", "8. Event Kayıtları",
+                                  status="completed",
+                                  summary=f"{len(wf_events)} event",
+                                  detail={"count": len(wf_events)})
+            for e in wf_events[:15]:
+                evt_node["alt_dugumler"].append(
+                    _make_node("event", e.get("event_name", e.get("event_type", e.get("event", "Event"))),
+                               status="completed",
+                               summary=e.get("description", e.get("aciklama", ""))[:200],
+                               source="OlayKayitMerkezi",
+                               detail=e))
+        else:
+            evt_node = _make_node("events", "8. Event Kayıtları",
+                                  status="pending" if status not in ("inactive",)
+                                  else "inactive",
+                                  summary="Henüz event kaydı yok")
+        nodes.append(evt_node)
+
+        # ── 9. LOG KAYITLARI ──────────────────────────────────────────────
+        if agent_logs and wf_id in ("WF-002", "WF-005", "WF-008", "WF-009"):
+            log_node = _make_node("logs", "9. Log Kayıtları",
                                   status="completed",
                                   summary=f"{len(agent_logs)} log satırı",
                                   detail={"log_count": len(agent_logs)})
-            for log_entry in agent_logs[:5]:
-                if isinstance(log_entry, dict):
-                    log_child = _make_node("log", log_entry.get("level", "INFO"),
-                                           status="completed",
-                                           summary=str(log_entry.get("message", ""))[:200],
-                                           detail=log_entry)
-                    log_node["alt_dugumler"].append(log_child)
-            nodes.append(log_node)
+            for le in agent_logs[:8]:
+                if isinstance(le, dict):
+                    log_node["alt_dugumler"].append(
+                        _make_node("log", le.get("level", "INFO"),
+                                   status="completed",
+                                   summary=str(le.get("message", ""))[:200],
+                                   detail=le))
+        else:
+            log_node = _make_node("logs", "9. Log Kayıtları",
+                                  status="pending",
+                                  summary="Log kaydı bulunamadı" if wf_id in ("WF-008",)
+                                  else "Bu aşamada log üretilmez")
+        nodes.append(log_node)
 
-        # ── API Kayıtları ─────────────────────────────────────────────────
-        api_refs = _get_api_refs_for_wf(wf_id)
+        # ── 10. API KAYITLARI ─────────────────────────────────────────────
         if api_refs:
-            api_node = _make_node("api", "API Referansları",
+            api_node = _make_node("api", "10. API Referansları",
                                   status="completed",
                                   summary=f"{len(api_refs)} endpoint",
                                   detail={"endpoints": api_refs})
-            for api_ref in api_refs:
-                api_child = _make_node("api_ref", api_ref.get("name", "API"),
-                                       status="completed",
-                                       summary=api_ref.get("url", ""),
-                                       source=api_ref.get("module", ""),
-                                       detail=api_ref)
-                api_node["alt_dugumler"].append(api_child)
-            nodes.append(api_node)
+            for ar in api_refs:
+                api_node["alt_dugumler"].append(
+                    _make_node("api_ref", ar.get("name", "API"),
+                               status="completed",
+                               summary=ar.get("url", "") or ar.get("module", ""),
+                               source=ar.get("module", ""),
+                               detail=ar))
+        else:
+            api_node = _make_node("api", "10. API Referansları",
+                                  status="pending",
+                                  summary="Bu aşamada API referansı yok")
+        nodes.append(api_node)
 
         workflows.append({
             "wf_id": wf_id,
@@ -748,9 +856,12 @@ def _find_tasks_for_wf(wf_id: str, tasks: list) -> list:
         return []
 
     wf_task_map = {
-        "WF-002": [t for t in tasks if t.get("agent") == "ImageGenerator" and "research" in (t.get("description") or "").lower()],
-        "WF-005": [t for t in tasks if "scenario" in (t.get("description") or "").lower() or "Scenario" in t.get("agent", "")],
-        "WF-008": [t for t in tasks if t.get("agent") in ("ImageGenerator", "VoiceGenerator", "VideoRenderer")],
+        "WF-001": [],  # Link doğrulama — task yok
+        "WF-002": [t for t in tasks if t.get("agent") == "ImageGenerator"],
+        "WF-005": tasks,  # Tüm task'lar scenario aşamasıyla ilgili
+        "WF-007": [],  # Pricing — karar bazlı, task yok
+        "WF-008": tasks,  # Tüm üretim task'ları
+        "WF-009": [],  # QC — CEE bazlı
         "WF-010": [t for t in tasks if t.get("agent") == "DeliveryAgent"],
     }
     return wf_task_map.get(wf_id, [])

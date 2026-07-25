@@ -130,9 +130,10 @@ function renderTree(workflows) {
 function renderChildNode(node, depth) {
   const hasChildren = node.alt_dugumler && node.alt_dugumler.length > 0;
   const hasDetail = node.detail && Object.keys(node.detail).length > 0;
+  const hasAciklama = node.aciklama && node.aciklama.length > 0;
   const isExpandable = hasChildren || hasDetail;
   const s = node.durum || 'pending';
-  let classes = ['child-node', s];
+  let classes = ['child-node', s, 'depth-' + Math.min(depth, 5)];
   if (node.is_root_cause_node) classes.push('root-cause-node');
   if (s === 'affected') classes.push('affected');
 
@@ -141,7 +142,7 @@ function renderChildNode(node, depth) {
        + (isExpandable ? ' onclick="toggleChild(this.parentElement)"' : '')
        + '>';
   html += '    <span class="child-dot ' + dotClass(s) + '"></span>';
-  html += '    <span class="child-title">' + statusIcon(s) + ' ' + esc(node.baslik) + '</span>';
+  html += '    <span class="child-title">' + esc(node.baslik) + '</span>';
   html += '    <span class="child-summary" title="' + escAttr(node.aciklama || '') + '">'
        + esc(node.aciklama || '') + '</span>';
   if (node.kaynak) {
@@ -153,11 +154,14 @@ function renderChildNode(node, depth) {
   }
   html += '  </div>';
 
-  // Body
-  if (isExpandable) {
+  // Body — her zaman aciklama göster, expandable ise detay + children da göster
+  if (isExpandable || hasAciklama) {
     html += '  <div class="child-body">';
     if (node.referans) {
       html += '    <div class="child-kaynak"><strong>Referans:</strong> ' + esc(node.referans) + '</div>';
+    }
+    if (hasAciklama && isExpandable) {
+      html += '    <div class="child-aciklama">' + esc(node.aciklama) + '</div>';
     }
     if (hasDetail) {
       html += renderDetailTable(node.detail, node.type);
