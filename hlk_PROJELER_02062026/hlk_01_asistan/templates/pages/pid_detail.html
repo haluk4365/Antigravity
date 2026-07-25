@@ -3,42 +3,43 @@
 {% block page_title %}🎬 PID {{ pid }}{% endblock %}
 
 {% block content %}
+<!-- ÜST BİLGİ -->
 <div class="kpi-row" id="pidKpi">
-  <div class="kpi"><span class="label">PID</span><span class="value" id="pidVal">{{ pid }}</span></div>
-  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="urunVal">Veri Bekleniyor</span></div>
-  <div class="kpi"><span class="label">DURUM</span><span class="value" id="durumVal">Veri Bekleniyor</span></div>
+  <div class="kpi"><span class="label">PID</span><span class="value">{{ pid }}</span></div>
+  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="valUrun">Veri Bekleniyor</span></div>
+  <div class="kpi"><span class="label">MARKA</span><span class="value" id="valMarka">Veri Bekleniyor</span></div>
+  <div class="kpi"><span class="label">PLATFORM</span><span class="value" id="valPlatform">Veri Bekleniyor</span></div>
+  <div class="kpi"><span class="label">DURUM</span><span class="value" id="valDurum">Veri Bekleniyor</span></div>
+  <div class="kpi"><span class="label">AŞAMA</span><span class="value" id="valAsama">Veri Bekleniyor</span></div>
 </div>
 
-<div class="section">
-  <div class="section-title">⚙️ Servis Sağlayıcıları</div>
+<!-- SERVİS SAĞLAYICILARI (sadece seçildiyse) -->
+<div class="section" id="secProviders" style="display:none;">
+  <div class="section-title">⚙️ Servis Sağlayıcıları (Decision Engine Seçimi)</div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Kategori</th><th>Provider</th><th>Skor</th><th>Durum</th></tr></thead>
-      <tbody id="providerTable"><tr><td colspan="4" class="empty-state">Yükleniyor...</td></tr></tbody>
+      <thead><tr><th>#</th><th>Kategori</th><th>Provider</th><th>Görev</th><th>Güven</th><th>Durum</th></tr></thead>
+      <tbody id="providerTable"></tbody>
     </table>
   </div>
 </div>
 
-{% if events and events|length > 0 %}
-<div class="section">
+<!-- EVENT KAYITLARI (varsa) -->
+<div class="section" id="secEvents" style="display:none;">
   <div class="section-title">🔔 Event Kayıtları</div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Zaman</th><th>PID</th><th>Event</th><th>Açıklama</th></tr></thead>
-      <tbody id="pidEventTable">
-        {% for e in events %}
-        <tr><td>{{ e.zaman }}</td><td>{{ e.pid }}</td><td><b>{{ e.event }}</b></td><td>{{ e.aciklama }}</td></tr>
-        {% endfor %}
-      </tbody>
+      <thead><tr><th>Zaman</th><th>Event</th><th>Açıklama</th></tr></thead>
+      <tbody id="eventTable"></tbody>
     </table>
   </div>
 </div>
-{% endif %}
 
+<!-- BUTONLAR -->
 <div class="controls">
-  <button class="btn devam" id="btnDevam" onclick="doAction('devam')">▶ DEVAM</button>
-  <button class="btn dur" id="btnDur" onclick="doAction('dur')">⏹ DUR</button>
-  <button class="btn yenile" id="btnYenile" onclick="doAction('yenile')">🔄 YENİLE</button>
+  <button class="btn devam" id="btnDevam" onclick="doAction('devam')" disabled>▶ DEVAM</button>
+  <button class="btn dur" id="btnDur" onclick="doAction('dur')" disabled>⏹ DUR</button>
+  <button class="btn yenile" id="btnYenile" onclick="doAction('yenile')" disabled>🔄 YENİLE</button>
   <span class="refresh-indicator" id="controlMsg"></span>
 </div>
 {% endblock %}
@@ -50,49 +51,61 @@ const TOKEN = '{{ token }}';
 function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(() => ({})); }
 
 async function load() {
-  const data = await api('/pid/' + PID);
-  document.getElementById('urunVal').textContent = data.urun || 'Veri Bekleniyor';
-  document.getElementById('durumVal').textContent = data.durum || 'Veri Bekleniyor';
+  const d = await api('/pid/' + PID);
+  if (!d || !d.pid) return;
 
-  const providers = data.providers || [];
-  const pt = document.getElementById('providerTable');
-  if (!providers.length) { pt.innerHTML = '<tr><td colspan="4" class="empty-state">Veri Bekleniyor</td></tr>'; }
-  else {
-    pt.innerHTML = providers.map(p =>
-      `<tr><td>${p.kategori || ''}</td><td><b>${p.display_name || p.provider}</b></td><td>${p.skor || ''}</td><td><span class="status-badge ${p.status === 'AVAILABLE' ? 'active' : 'error'}">${p.status}</span></td></tr>`
+  document.getElementById('valUrun').textContent = d.urun || 'Bilinmiyor';
+  document.getElementById('valMarka').textContent = d.marka || 'Bilinmiyor';
+  document.getElementById('valPlatform').textContent = d.platform || 'Bilinmiyor';
+  document.getElementById('valDurum').textContent = d.durum || 'Veri Bekleniyor';
+  document.getElementById('valAsama').textContent = d.asama || 'Veri Bekleniyor';
+
+  // Provider'lar sadece seçildiyse
+  const providers = d.providers || [];
+  const secP = document.getElementById('secProviders');
+  if (providers.length) {
+    secP.style.display = '';
+    document.getElementById('providerTable').innerHTML = providers.map((p, i) =>
+      `<tr><td>${p.priority || i+1}</td><td>${p.kategori || ''}</td><td><b>${p.provider}</b></td>
+       <td>${p.gorev || ''}</td><td>${p.confidence ? (p.confidence*100).toFixed(0)+'%' : ''}</td>
+       <td><span class="status-badge ${p.status==='AVAILABLE'?'active':'error'}">${p.status}</span></td></tr>`
     ).join('');
+  } else {
+    secP.style.display = 'none';
   }
 
-  // Task packages (varsa)
-  const tasks = data.task_packages || [];
-  if (tasks.length && !document.getElementById('taskSection')) {
-    let html = '<div class="section" id="taskSection"><div class="section-title">📦 Task Paketleri</div><div class="table-wrap"><table>';
-    html += '<thead><tr><th>Task</th><th>Agent</th><th>Durum</th></tr></thead><tbody>';
-    html += tasks.map(t => `<tr><td>${t.task_id || ''}</td><td>${t.agent || ''}</td><td>${t.status || ''}</td></tr>`).join('');
-    html += '</tbody></table></div></div>';
-    document.querySelector('.controls').insertAdjacentHTML('beforebegin', html);
+  // Event'ler varsa
+  const events = d.events || [];
+  const secE = document.getElementById('secEvents');
+  if (events.length) {
+    secE.style.display = '';
+    document.getElementById('eventTable').innerHTML = events.slice(0, 30).map(e =>
+      `<tr><td>${e.zaman || ''}</td><td><b>${e.event || ''}</b></td><td>${e.aciklama || ''}</td></tr>`
+    ).join('');
+  } else {
+    secE.style.display = 'none';
   }
+
+  // Butonlar
+  const rc = d.runtime_connected;
+  document.getElementById('btnDevam').disabled = !rc;
+  document.getElementById('btnDur').disabled = !rc;
+  document.getElementById('btnYenile').disabled = !rc;
 }
 
 async function doAction(action) {
-  const btns = {devam:'btnDevam', dur:'btnDur', yenile:'btnYenile'};
-  const btn = document.getElementById(btns[action]);
+  const btn = document.getElementById('btn' + action.charAt(0).toUpperCase() + action.slice(1));
   const msg = document.getElementById('controlMsg');
   btn.disabled = true; msg.textContent = 'İşleniyor...';
   try {
-    const resp = await fetch('/api/controls/' + PID + '/' + action + '?token=' + TOKEN, {method:'POST'});
-    const data = await resp.json();
-    msg.textContent = data.ok ? data.message : (data.error || 'Hata');
-    if (data.ok) setTimeout(load, 1500);
+    const r = await fetch('/api/controls/' + PID + '/' + action + '?token=' + TOKEN, {method:'POST'});
+    const d = await r.json();
+    msg.textContent = d.ok ? d.message : (d.error || 'Hata');
+    if (d.ok) setTimeout(load, 1500);
   } catch(e) { msg.textContent = e.message; }
   btn.disabled = false;
 }
 
-load();
-setInterval(load, 15000);
-
-const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-function wsConnect() { const ws = new WebSocket(proto + '//' + location.host + '/ws/' + PID); ws.onmessage = () => load(); ws.onclose = () => setTimeout(wsConnect, 5000); }
-wsConnect();
+load(); setInterval(load, 15000);
 </script>
 {% endblock %}
