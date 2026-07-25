@@ -529,9 +529,15 @@ async def task_image(task: dict, pid: str) -> dict:
         # Provider başarısız oldu — cost_report'a kaydet (escalation için)
         if attempt_error:
             ctx.cost_report["services"][provider_name] = "failed"
-        if decision.params.get("action") == "NEXT_PROVIDER":
+        # AR-002_90 FIX: Provider başarısız olduysa ve sırada başka
+        # provider varsa, HLK Runtime kararına bakılmaksızın SONRAKİNE geçilir.
+        if remaining > 0:
+            logger.warning(
+                f"⚠️ [Provider Failed] {provider_name} → "
+                f"sırada {remaining} provider daha var, sonrakine geçiliyor"
+            )
             continue
-        break  # REPORT_FAILURE — döngü sonlandırılır, karar aşağıda istenir
+        break  # REPORT_FAILURE — tüm provider'lar tükendi
 
     # Görsel üretilemedi — süreklilik kararı HLK Runtime'ındır (AR-002_79)
     if not ctx.img_path:
@@ -771,9 +777,17 @@ async def task_video(task: dict, pid: str) -> dict:
             if decision.verdict == "ACCEPT":
                 logger.info(f"✅ [Provider Accepted] {provider_name} → {ctx.video_path}")
                 break
-            if decision.params.get("action") == "NEXT_PROVIDER":
+            # AR-002_90 FIX: Provider başarısız olduysa ve sırada başka
+            # provider varsa, HLK Runtime kararına bakılmaksızın SONRAKİNE
+            # geçilir. ANA YASA'ya göre sistem pes etmez, tüm yolları dener.
+            # Yalnızca tüm provider'lar tükendiğinde REPORT_FAILURE verilir.
+            if remaining > 0:
+                logger.warning(
+                    f"⚠️ [Provider Failed] {provider_name} → "
+                    f"sırada {remaining} provider daha var, sonrakine geçiliyor"
+                )
                 continue
-            break  # REPORT_FAILURE
+            break  # REPORT_FAILURE — tüm provider'lar tükendi
 
     # Video üretilemedi — süreklilik kararı HLK Runtime'ındır (AR-002_79)
     if not ctx.video_path and ctx.img_path and ctx.voice_path:

@@ -840,29 +840,25 @@ class ProductionExecutor:
                 # Tamamlanmamış task'ları bul
                 all_tasks = await self._load_task_packages(pid)
 
-                # AR-002_79: Recovery raporu YALNIZCA bu PID'nin tamamlanma
-                # durumunu gösterir — aynı süreçte farklı bir PID'den kalan
-                # rapor varsa sıfırlanır (sayaç/sonuç kirliliği önlenir).
-                if self._report is not None and self._report.pid != pid:
-                    self._report = None
+                # AR-002_90 FIX: Recovery HER ZAMAN temiz raporla başlar.
+                # Aynı PID için eski _report.results'taki SUCCESS kayıtları
+                # completed_task_ids'e karışırsa, yeni üretimde VideoRenderer
+                # ve DeliveryAgent atlanır → CEE POST-CHECK FAIL.
+                # Önceki çalıştırmadan kalan rapor tamamen atılır.
+                self._report = ExecutorReport(
+                    pid=pid,
+                    started_at=datetime.now(timezone.utc).isoformat(),
+                )
+                self._report.total_tasks = len(all_tasks)
 
-                # Restart senaryosu (AR-002_79 — Kaldığı Noktadan Devam):
-                # Yeni Executor instance'ı ile recovery yapıldığında rapor
-                # henüz oluşmamıştır; burada başlatılır.
-                if self._report is None:
-                    self._report = ExecutorReport(
-                        pid=pid,
-                        started_at=datetime.now(timezone.utc).isoformat(),
-                    )
-                if not self._report.total_tasks:
-                    self._report.total_tasks = len(all_tasks)
-
+                # completed_task_ids yalnızca DİSKTEKİ COMPLETED/SUCCESS
+                # task'lardan oluşturulur — _report.results değil.
+                # prepare_for_reproduction tarafından PENDING yapılan
+                # task'lar bu set'te OLMAZ → yeniden yürütülür.
                 completed_task_ids = {
-                    (r.get("task_id") if isinstance(r, dict) else r.task_id)
-                    for r in self._report.results
-                    if (r.get("status") if isinstance(r, dict) else r.status)
-                    == ExecutionStatus.SUCCESS.value
-                } if self._report.results else set()
+                    t.get("task_id") for t in all_tasks
+                    if t.get("status") in ("COMPLETED", "SUCCESS")
+                }
 
                 pending_tasks = [
                     t for t in all_tasks
@@ -870,15 +866,9 @@ class ProductionExecutor:
                     and t.get("status") not in ("COMPLETED", "SUCCESS")
                 ]
 
-                # Checkpoint ile daha önce tamamlanmış (bu raporda henüz
-                # sayılmamış) task'lar rapora yansıtılır — recovery raporu
-                # üretimin TAM tamamlanma durumunu gösterir (AR-002_79)
-                already_done = [
-                    t for t in all_tasks
-                    if t.get("task_id") not in completed_task_ids
-                    and t.get("status") in ("COMPLETED", "SUCCESS")
-                ]
-                self._report.completed_tasks += len(already_done)
+                # Recovery raporu başlangıç durumu: diskteki COMPLETED/SUCCESS
+                # task sayısı kadar completed_tasks ile başlar.
+                self._report.completed_tasks = len(completed_task_ids)
 
                 logger.info(
                     f"📋 [Executor] Recovery: {len(pending_tasks)}/{len(all_tasks)} "
