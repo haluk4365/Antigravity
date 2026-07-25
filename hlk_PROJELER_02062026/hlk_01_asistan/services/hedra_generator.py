@@ -73,11 +73,15 @@ class HedraGenerator:
 
     def generate(self, image_url: str, audio_url: str, model_id: str = "omnia") -> str | None:
         """Video üretim isteği gönder, generation_id döndür."""
+        # AR-002_90: Hedra API input yapisi duzeltildi
+        # type field'i discriminator icin zorunlu
         payload = {
             "model": model_id,
+            "type": "video",
             "input": {
                 "image_asset_id": image_url,
                 "audio_asset_id": audio_url,
+                "type": "lipsync",
             },
             "aspect_ratio": "9:16",
             "resolution": "720p",
