@@ -1,17 +1,14 @@
 {% extends "base.html" %}
-{% block title %}PID {{ pid }} — HLK Üretim Operasyon Merkezi{% endblock %}
-{% block page_title %}🎬 HLK ÜRETİM OPERASYON MERKEZİ{% endblock %}
+{% block title %}PID {{ pid }} — HLK Operasyon Merkezi{% endblock %}
+{% block page_title %}🎬 PID {{ pid }}{% endblock %}
 
 {% block content %}
-<!-- TEMEL BİLGİ -->
 <div class="kpi-row" id="pidKpi">
   <div class="kpi"><span class="label">PID</span><span class="value" id="pidVal">{{ pid }}</span></div>
-  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="urunVal">--</span></div>
-  <div class="kpi"><span class="label">AŞAMA</span><span class="value" id="asamaVal">--</span></div>
-  <div class="kpi"><span class="label">DURUM</span><span class="value" id="durumVal">--</span></div>
+  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="urunVal">Veri Bekleniyor</span></div>
+  <div class="kpi"><span class="label">DURUM</span><span class="value" id="durumVal">Veri Bekleniyor</span></div>
 </div>
 
-<!-- SERVİS SAĞLAYICI LİSTESİ -->
 <div class="section">
   <div class="section-title">⚙️ Servis Sağlayıcıları</div>
   <div class="table-wrap">
@@ -22,13 +19,22 @@
   </div>
 </div>
 
-<!-- YAŞAM DÖNGÜSÜ -->
+{% if events and events|length > 0 %}
 <div class="section">
-  <div class="section-title">🔄 Yaşam Döngüsü</div>
-  <div class="layers-grid" id="lifecycleGrid"></div>
+  <div class="section-title">🔔 Event Kayıtları</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Zaman</th><th>PID</th><th>Event</th><th>Açıklama</th></tr></thead>
+      <tbody id="pidEventTable">
+        {% for e in events %}
+        <tr><td>{{ e.zaman }}</td><td>{{ e.pid }}</td><td><b>{{ e.event }}</b></td><td>{{ e.aciklama }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
+{% endif %}
 
-<!-- OPERATÖR KONTROL -->
 <div class="controls">
   <button class="btn devam" id="btnDevam" onclick="doAction('devam')">▶ DEVAM</button>
   <button class="btn dur" id="btnDur" onclick="doAction('dur')">⏹ DUR</button>
@@ -45,32 +51,26 @@ function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token='
 
 async function load() {
   const data = await api('/pid/' + PID);
+  document.getElementById('urunVal').textContent = data.urun || 'Veri Bekleniyor';
+  document.getElementById('durumVal').textContent = data.durum || 'Veri Bekleniyor';
 
-  document.getElementById('urunVal').textContent = data.urun || '--';
-  document.getElementById('asamaVal').textContent = data.asama || '--';
-  document.getElementById('durumVal').textContent = data.durum || '--';
-
-  // Provider listesi
   const providers = data.providers || [];
   const pt = document.getElementById('providerTable');
-  if (!providers.length) { pt.innerHTML = '<tr><td colspan="4" class="empty-state">Provider kaydı yok</td></tr>'; }
+  if (!providers.length) { pt.innerHTML = '<tr><td colspan="4" class="empty-state">Veri Bekleniyor</td></tr>'; }
   else {
     pt.innerHTML = providers.map(p =>
-      `<tr>
-        <td>${p.kategori || ''}</td>
-        <td><b>${p.display_name || p.provider}</b></td>
-        <td>${p.skor || 0}</td>
-        <td><span class="status-badge ${p.status === 'AVAILABLE' ? 'active' : 'error'}">${p.status}</span></td>
-      </tr>`
+      `<tr><td>${p.kategori || ''}</td><td><b>${p.display_name || p.provider}</b></td><td>${p.skor || ''}</td><td><span class="status-badge ${p.status === 'AVAILABLE' ? 'active' : 'error'}">${p.status}</span></td></tr>`
     ).join('');
   }
 
-  // Lifecycle
-  const steps = data.lifecycle || [];
-  if (steps.length) {
-    document.getElementById('lifecycleGrid').innerHTML = steps.map(s =>
-      `<div class="layer-card"><span class="layer-name">${s.isim}</span><span class="layer-status" style="color:${s.renk}">${s.durum}</span></div>`
-    ).join('');
+  // Task packages (varsa)
+  const tasks = data.task_packages || [];
+  if (tasks.length && !document.getElementById('taskSection')) {
+    let html = '<div class="section" id="taskSection"><div class="section-title">📦 Task Paketleri</div><div class="table-wrap"><table>';
+    html += '<thead><tr><th>Task</th><th>Agent</th><th>Durum</th></tr></thead><tbody>';
+    html += tasks.map(t => `<tr><td>${t.task_id || ''}</td><td>${t.agent || ''}</td><td>${t.status || ''}</td></tr>`).join('');
+    html += '</tbody></table></div></div>';
+    document.querySelector('.controls').insertAdjacentHTML('beforebegin', html);
   }
 }
 
@@ -88,17 +88,11 @@ async function doAction(action) {
   btn.disabled = false;
 }
 
-// Auto-refresh
 load();
-setInterval(load, 8000);
+setInterval(load, 15000);
 
-// WebSocket
-function wsConnect() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(proto + '//' + location.host + '/ws/' + PID);
-  ws.onmessage = () => load();
-  ws.onclose = () => setTimeout(wsConnect, 5000);
-}
+const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+function wsConnect() { const ws = new WebSocket(proto + '//' + location.host + '/ws/' + PID); ws.onmessage = () => load(); ws.onclose = () => setTimeout(wsConnect, 5000); }
 wsConnect();
 </script>
 {% endblock %}

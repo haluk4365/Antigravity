@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Canlı Oturumlar — HLK Operasyon Merkezi{% endblock %}
-{% block page_title %}📡 Canlı Oturumlar{% endblock %}
+{% block title %}PID Kayıtları — HLK Operasyon Merkezi{% endblock %}
+{% block page_title %}📡 PID Kayıtları{% endblock %}
 
 {% block content %}
 <div class="table-wrap">
   <table>
-    <thead><tr><th>PID</th><th>Ürün</th><th>Aşama</th><th>Başlangıç</th><th>Durum</th></tr></thead>
-    <tbody id="sessionTable"><tr><td colspan="5" class="empty-state">Yükleniyor...</td></tr></tbody>
+    <thead><tr><th>PID</th><th>Oluşturma</th><th>Durum</th><th></th></tr></thead>
+    <tbody id="sessionTable"><tr><td colspan="4" class="empty-state">Yükleniyor...</td></tr></tbody>
   </table>
 </div>
 <p class="refresh-indicator" id="refreshNote" style="margin-top:8px;"></p>
@@ -20,14 +20,13 @@ async function load() {
   const data = await api('/sessions');
   const sessions = data.sessions || [];
   const tbody = document.getElementById('sessionTable');
-  if (!sessions.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Henüz oturum yok. Telegram\'da /start yazın.</td></tr>'; return; }
+  if (!sessions.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Kayıtlı PID yok. Telegram\'da /start yazıp üretim başlatın.</td></tr>'; return; }
   tbody.innerHTML = sessions.map(s =>
     `<tr class="clickable" onclick="location.href='/pid/${s.pid}?token=${TOKEN}'">
       <td><b>${s.pid}</b></td>
-      <td>${s.urun || s.kullanici || '?'}</td>
-      <td>${s.state || '--'}</td>
-      <td>${s.baslangic}</td>
-      <td><span class="status-badge ${s.durumSinif}">${s.durum}</span></td>
+      <td>${s.created_at || 'Veri Bekleniyor'}</td>
+      <td><span class="status-badge ${s.durumSinif || 'completed'}">${s.durum || 'Veri Bekleniyor'}</span></td>
+      <td><a href="/pid/${s.pid}?token=${TOKEN}">Detay →</a></td>
     </tr>`
   ).join('');
   document.getElementById('refreshNote').textContent = 'Son güncelleme: ' + new Date().toLocaleTimeString();
