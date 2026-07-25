@@ -76,6 +76,7 @@ class HedraGenerator:
         # AR-002_90: Hedra API yeni body yapisi
         # video.generated_video_inputs wrapper zorunlu
         payload = {
+            "type": "video",
             "video": {
                 "generated_video_inputs": {
                     "model": model_id,
