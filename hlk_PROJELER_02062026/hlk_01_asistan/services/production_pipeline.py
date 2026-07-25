@@ -513,6 +513,11 @@ async def task_image(task: dict, pid: str) -> dict:
                 continue
             break
 
+        # AR-002_81: Başarısızlık sebebini logla — anayasal izlenebilirlik
+        if attempt_error:
+            logger.warning(
+                f"⚠️ [Provider Error] {provider_name}: {attempt_error}"
+            )
         # AR-002_81 PROVIDER_RESULT: kabul/red kararı HLK Runtime'ındır
         decision = _request_provider_result_decision(
             pid=pid,
@@ -702,14 +707,14 @@ async def task_video(task: dict, pid: str) -> dict:
                     from services.hedra_generator import HedraGenerator
                     hedra = HedraGenerator()
                     video_path = os.path.join(tmp, f"hlk_video_{req.user_id}.mp4")
-                    # AR-002_90 FIX: Hedra'ya 300sn yerine 120sn ver ki
-                    # basarisiz olursa Higgsfield'a gecilebilsin.
-                    # Executor 300sn task timeout'u icinde Hedra (120sn) +
-                    # Higgsfield (120sn) + buffer (60sn) sigabilecek sekilde.
+                    # AR-002_90 / AR-002_81: Anayasal polling standardı.
+                    # Hedra wait_for_completion her 5sn'de bir poll yapar.
+                    # GC_PROVIDER_POLL_COUNT × 30sn = yeterli süre tanı.
+                    _max_wait = int(os.getenv("GC_PROVIDER_POLL_COUNT", "10")) * 30
                     ok = await asyncio.to_thread(
                         hedra.create_lipsync_video,
                         ctx.img_path, str(ctx.voice_path), video_path,
-                        "omnia", 120,
+                        "omnia", _max_wait,
                     )
                     if ok:
                         ctx.video_path = video_path
@@ -739,21 +744,39 @@ async def task_video(task: dict, pid: str) -> dict:
                                 timeout=_GC_PROVIDER_HTTP_TIMEOUT)
                             if gen_resp.status_code == 200:
                                 req_id = gen_resp.json().get("request_id", "")
-                                for _ in range(_GC_PROVIDER_POLL_COUNT):
-                                    await asyncio.sleep(_GC_VIDEO_POLL_INTERVAL)
-                                    st = _r.get(f"https://platform.higgsfield.ai/requests/{req_id}/status",
-                                        headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}"},
-                                        timeout=_GC_PROVIDER_STATUS_TIMEOUT)
-                                    if st.status_code == 200 and st.json().get("status") == "completed":
-                                        vid_url = st.json().get("output_url", "")
-                                        if vid_url:
-                                            video_path = os.path.join(tmp, f"hlk_video_{req.user_id}.mp4")
-                                            urllib.request.urlretrieve(vid_url, video_path)
-                                            ctx.video_path = video_path
-                                            ctx.cost_report["services"]["higgsfield"] = "ok"
-                                        break
+                                if req_id:
+                                    poll_success = False
+                                    for poll_n in range(_GC_PROVIDER_POLL_COUNT):
+                                        await asyncio.sleep(_GC_VIDEO_POLL_INTERVAL)
+                                        st = _r.get(f"https://platform.higgsfield.ai/requests/{req_id}/status",
+                                            headers={"Authorization": f"Key {hf_key_id}:{hf_key_secret}"},
+                                            timeout=_GC_PROVIDER_STATUS_TIMEOUT)
+                                        if st.status_code == 200 and st.json().get("status") == "completed":
+                                            vid_url = st.json().get("output_url", "")
+                                            if vid_url:
+                                                video_path = os.path.join(tmp, f"hlk_video_{req.user_id}.mp4")
+                                                urllib.request.urlretrieve(vid_url, video_path)
+                                                ctx.video_path = video_path
+                                                ctx.cost_report["services"]["higgsfield"] = "ok"
+                                                poll_success = True
+                                            break
+                                    if not poll_success:
+                                        attempt_error = (
+                                            f"Higgsfield polling tükendi "
+                                            f"({_GC_PROVIDER_POLL_COUNT} deneme) — completed gelmedi"
+                                        )
+                                else:
+                                    attempt_error = "Higgsfield generation response'ta request_id yok"
+                            else:
+                                attempt_error = (
+                                    f"Higgsfield generation HTTP {gen_resp.status_code}: "
+                                    f"{gen_resp.text[:200]}"
+                                )
                         else:
-                            attempt_error = f"HTTP {up_resp.status_code}"
+                            attempt_error = (
+                                f"Higgsfield upload HTTP {up_resp.status_code}: "
+                                f"{up_resp.text[:200]}"
+                            )
                 except Exception as e:
                     attempt_error = f"{type(e).__name__}: {e}"
                     logger.warning(f"⚠️ [Production] Higgsfield basarisiz: {e}")
@@ -770,6 +793,11 @@ async def task_video(task: dict, pid: str) -> dict:
                     continue
                 break
 
+            # AR-002_81: Başarısızlık sebebini logla — anayasal izlenebilirlik
+            if attempt_error:
+                logger.warning(
+                    f"⚠️ [Provider Error] {provider_name}: {attempt_error}"
+                )
             # AR-002_81 PROVIDER_RESULT: kabul/red kararı HLK Runtime'ındır
             decision = _request_provider_result_decision(
                 pid=pid,
