@@ -3,39 +3,32 @@
 {% block page_title %}🎬 HLK ÜRETİM OPERASYON MERKEZİ{% endblock %}
 
 {% block content %}
-<div class="kpi-row" id="pidKpiRow">
-  <div class="kpi"><span class="label">PID</span><span class="value">{{ pid }}</span><span class="sub" id="pidCreatedAt">--</span></div>
-  <div class="kpi"><span class="label">DURUM</span><span class="value" id="pidState">--</span><span class="sub" id="pidStateSub"></span></div>
+<!-- TEMEL BİLGİ -->
+<div class="kpi-row" id="pidKpi">
+  <div class="kpi"><span class="label">PID</span><span class="value" id="pidVal">{{ pid }}</span></div>
+  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="urunVal">--</span></div>
+  <div class="kpi"><span class="label">AŞAMA</span><span class="value" id="asamaVal">--</span></div>
+  <div class="kpi"><span class="label">DURUM</span><span class="value" id="durumVal">--</span></div>
+</div>
+
+<!-- SERVİS SAĞLAYICI LİSTESİ -->
+<div class="section">
+  <div class="section-title">⚙️ Servis Sağlayıcıları</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Kategori</th><th>Provider</th><th>Skor</th><th>Durum</th></tr></thead>
+      <tbody id="providerTable"><tr><td colspan="4" class="empty-state">Yükleniyor...</td></tr></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- YAŞAM DÖNGÜSÜ -->
 <div class="section">
   <div class="section-title">🔄 Yaşam Döngüsü</div>
-  <div class="layers-grid" id="lifecycleGrid">
-    {% for step in lifecycle %}{% if step %}
-    <div class="layer-card"><span class="layer-name">{{ step.isim }}</span><span class="layer-status" style="color:{{ step.renk }}">{{ step.durum }}</span></div>
-    {% endif %}{% endfor %}
-  </div>
+  <div class="layers-grid" id="lifecycleGrid"></div>
 </div>
 
-<!-- HLK ÜRETİM HAZIRLIK RAPORU -->
-<div class="section" id="hazirlikSection">
-  <div class="section-title">📋 HLK Üretim Hazırlık Raporu</div>
-  <div id="hazirlikContent">Yükleniyor...</div>
-</div>
-
-<!-- EVENT LOG -->
-<div class="section">
-  <div class="section-title">🔔 Son Event'ler</div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Zaman</th><th>PID</th><th>Event</th><th>Açıklama</th></tr></thead>
-      <tbody id="pidEventTable"><tr><td colspan="4" class="empty-state">Yükleniyor...</td></tr></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- OPERATÖR KONTROL BUTONLARI -->
+<!-- OPERATÖR KONTROL -->
 <div class="controls">
   <button class="btn devam" id="btnDevam" onclick="doAction('devam')">▶ DEVAM</button>
   <button class="btn dur" id="btnDur" onclick="doAction('dur')">⏹ DUR</button>
@@ -48,94 +41,64 @@
 <script>
 const PID = '{{ pid }}';
 const TOKEN = '{{ token }}';
+function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(() => ({})); }
 
-function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(()=>({})); }
-
-async function loadDetail() {
+async function load() {
   const data = await api('/pid/' + PID);
 
-  // KPI
-  document.getElementById('pidCreatedAt').textContent = data.created_at || '--';
-  document.getElementById('pidState').textContent = data.is_active ? '🟢 ÇALIŞIYOR' : '⚫ TAMAMLANDI';
-  document.getElementById('pidStateSub').textContent = data.is_active ? 'Üretim devam ediyor' : 'Üretim tamamlandı';
+  document.getElementById('urunVal').textContent = data.urun || '--';
+  document.getElementById('asamaVal').textContent = data.asama || '--';
+  document.getElementById('durumVal').textContent = data.durum || '--';
+
+  // Provider listesi
+  const providers = data.providers || [];
+  const pt = document.getElementById('providerTable');
+  if (!providers.length) { pt.innerHTML = '<tr><td colspan="4" class="empty-state">Provider kaydı yok</td></tr>'; }
+  else {
+    pt.innerHTML = providers.map(p =>
+      `<tr>
+        <td>${p.kategori || ''}</td>
+        <td><b>${p.display_name || p.provider}</b></td>
+        <td>${p.skor || 0}</td>
+        <td><span class="status-badge ${p.status === 'AVAILABLE' ? 'active' : 'error'}">${p.status}</span></td>
+      </tr>`
+    ).join('');
+  }
 
   // Lifecycle
   const steps = data.lifecycle || [];
-  document.getElementById('lifecycleGrid').innerHTML = steps.map(s =>
-    `<div class="layer-card"><span class="layer-name">${s.isim}</span><span class="layer-status" style="color:${s.renk}">${s.durum}</span></div>`
-  ).join('');
-
-  // Hazırlık raporu
-  renderHazirlik(data.hazirlik_raporu || {});
-
-  // Events
-  const events = data.events || [];
-  const tbody = document.getElementById('pidEventTable');
-  if (!events.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Event yok</td></tr>'; }
-  else { tbody.innerHTML = events.slice(0, 20).map(e =>
-    `<tr><td>${e.zaman}</td><td>${e.pid}</td><td><b>${e.event}</b></td><td>${e.aciklama || ''}</td></tr>`
-  ).join(''); }
-}
-
-function renderHazirlik(rapor) {
-  const cats = rapor;
-  if (!cats || !Object.keys(cats).length) {
-    document.getElementById('hazirlikContent').innerHTML = '<p class="empty-state">Henüz hazırlık raporu oluşmadı</p>';
-    return;
+  if (steps.length) {
+    document.getElementById('lifecycleGrid').innerHTML = steps.map(s =>
+      `<div class="layer-card"><span class="layer-name">${s.isim}</span><span class="layer-status" style="color:${s.renk}">${s.durum}</span></div>`
+    ).join('');
   }
-  let html = '<div class="provider-grid">';
-  for (const [key, cat] of Object.entries(cats)) {
-    html += `<div style="grid-column:1/-1;"><div class="section-title">${cat.label}</div></div>`;
-    for (const p of (cat.providers || [])) {
-      const scoreColor = p.skor > 150 ? '#16a34a' : p.skor > 100 ? '#eab308' : '#dc2626';
-      const statusClass = p.status === 'AVAILABLE' ? 'active' : 'error';
-      const statusText = p.status === 'AVAILABLE' ? '🟢 HAZIR' : p.status;
-      html += `<div class="provider-card">
-        <div class="provider-name">${p.display_name || p.provider}</div>
-        <div class="provider-meta">
-          <span>Görev: ${p.gorev || '-'}</span>
-          <span>Seçim Puanı: <b style="color:${scoreColor}">${p.skor || 0}</b></span>
-          <span>Güven: ${(p.confidence*100).toFixed(0) if p.confidence else 0}%</span>
-          <span>Durum: <span class="status-badge ${statusClass}">${statusText}</span></span>
-        </div>
-      </div>`;
-    }
-  }
-  html += '</div>';
-  document.getElementById('hazirlikContent').innerHTML = html;
 }
 
 async function doAction(action) {
-  const btn = document.getElementById('btn' + action.charAt(0).toUpperCase() + action.slice(1));
+  const btns = {devam:'btnDevam', dur:'btnDur', yenile:'btnYenile'};
+  const btn = document.getElementById(btns[action]);
   const msg = document.getElementById('controlMsg');
-  btn.disabled = true;
-  msg.textContent = 'İşleniyor...';
+  btn.disabled = true; msg.textContent = 'İşleniyor...';
   try {
     const resp = await fetch('/api/controls/' + PID + '/' + action + '?token=' + TOKEN, {method:'POST'});
     const data = await resp.json();
-    msg.textContent = data.message || data.error || 'Tamam';
-    if (data.ok) setTimeout(loadDetail, 1000);
-  } catch(e) {
-    msg.textContent = 'Hata: ' + e.message;
-  }
+    msg.textContent = data.ok ? data.message : (data.error || 'Hata');
+    if (data.ok) setTimeout(load, 1500);
+  } catch(e) { msg.textContent = e.message; }
   btn.disabled = false;
 }
 
-// WebSocket bağlantısı
-function connectWS() {
+// Auto-refresh
+load();
+setInterval(load, 8000);
+
+// WebSocket
+function wsConnect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(proto + '//' + location.host + '/ws/' + PID);
-  ws.onmessage = (e) => {
-    try {
-      const event = JSON.parse(e.data);
-      if (event.pid === PID) { loadDetail(); }
-    } catch {}
-  };
-  ws.onclose = () => { setTimeout(connectWS, 5000); };
+  ws.onmessage = () => load();
+  ws.onclose = () => setTimeout(wsConnect, 5000);
 }
-connectWS();
-
-loadDetail();
-setInterval(loadDetail, 15000);
+wsConnect();
 </script>
 {% endblock %}

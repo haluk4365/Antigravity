@@ -92,18 +92,26 @@ def _get_active_pid() -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def get_active_sessions() -> list[dict]:
-    """Aktif PID'leri ve oturum bilgilerini döndürür."""
+    """Aktif PID'leri ve /start oturumlarını döndürür.
+
+    İki kaynaktan beslenir:
+    1. pid_runtime — production başlamış PID'ler
+    2. hlk_runtime._sessions — /start ile başlamış ama henüz PID almamış oturumlar
+    """
     sessions = []
+    seen_pids = set()
+
+    # Kaynak 1: PID almış üretimler
     try:
         from services.pid_runtime import pid_runtime
-        from services.hlk_runtime import hlk_runtime as hr
-
         for rec in pid_runtime._pid_registry.values():
             pid = rec.pid
             is_active = getattr(rec, "is_active", False)
+            seen_pids.add(pid)
             sessions.append({
                 "pid": pid,
                 "kullanici": str(_get_pid_user(pid)),
+                "urun": _get_pid_product(pid),
                 "dil": "TR",
                 "state": _get_pid_state(pid),
                 "baslangic": getattr(rec, "created_at", "--")[-8:] if getattr(rec, "created_at", "") else "--",
@@ -112,11 +120,59 @@ def get_active_sessions() -> list[dict]:
                 "is_active": is_active,
             })
     except Exception as e:
-        logger.warning(f"Oturumlar alınamadı: {e}")
+        logger.warning(f"PID oturumları alınamadı: {e}")
+
+    # Kaynak 2: /start ile başlamış, henüz PID almamış oturumlar
+    try:
+        from services.hlk_runtime import hlk_runtime as hr
+        import time as _time
+        for session_id, ctx in list(getattr(hr, '_sessions', {}).items()):
+            if not ctx or not getattr(ctx, 'hlk_runtime_active', False):
+                continue
+            # Bu oturumun zaten bir PID'i var mı?
+            pid = getattr(ctx, 'production_pid', None)
+            if pid and pid in seen_pids:
+                continue
+            user_id = str(getattr(ctx, 'user_id', '?'))
+            start_ts = getattr(ctx, 'start_timestamp', '')
+            if start_ts:
+                try:
+                    start_time = _time.strftime("%H:%M", _time.localtime(start_ts))
+                except Exception:
+                    start_time = "--"
+            else:
+                start_time = "--"
+            sessions.append({
+                "pid": pid or f"SESSION-{user_id}",
+                "kullanici": user_id,
+                "urun": "Link Bekleniyor",
+                "dil": "--",
+                "state": "STATE_START",
+                "baslangic": start_time,
+                "durum": "🟡 Hazırlanıyor" if not pid else "🟢 Çalışıyor",
+                "durumSinif": "waiting" if not pid else "running",
+                "is_active": True,
+                "is_pre_pid": not bool(pid),
+            })
+    except Exception as e:
+        logger.warning(f"HLK Runtime session'ları alınamadı: {e}")
 
     # Aktif olanları üste al
-    sessions.sort(key=lambda s: (not s["is_active"], s.get("baslangic", "")))
+    sessions.sort(key=lambda s: (not s.get("is_active", False), s.get("baslangic", "")))
     return sessions
+
+
+def _get_pid_product(pid: str) -> str:
+    """PID'e ait ürün adını döndürür."""
+    try:
+        from services.production_package_runtime import package_runtime
+        pkg = package_runtime.load_sync(pid) if hasattr(package_runtime, "load_sync") else None
+        if pkg:
+            brief = getattr(pkg, "brief", {}) or {}
+            return str(brief.get("product_name", brief.get("url", "Bilinmiyor")))
+    except Exception:
+        pass
+    return "Bilinmiyor"
 
 
 def _get_pid_user(pid: str) -> str:
@@ -149,97 +205,132 @@ def _get_pid_state(pid: str) -> str:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def get_pid_detail(pid: str) -> Optional[dict]:
-    """PID'e ait tüm detayları döndürür."""
-    # Package verisi
+    """PID'e ait sadeleştirilmiş detay: PID, Ürün, Aşama, Durum, Provider listesi."""
+    # Ürün adı
+    product_name = "Bilinmiyor"
     package_data = {}
     try:
         from services.production_package_runtime import package_runtime
         pkg = package_runtime.load_sync(pid) if hasattr(package_runtime, "load_sync") else None
-        if pkg is None:
-            # async load'ı dene
-            pass
         if pkg:
             package_data = pkg.to_dict() if hasattr(pkg, "to_dict") else {}
-    except Exception as e:
-        logger.debug(f"Package load failed ({pid}): {e}")
-
-    # Event log
-    events = get_events(pid=pid, limit=30)
-
-    # PID kaydı
-    pid_record = None
-    try:
-        from services.pid_runtime import pid_runtime
-        pid_record = pid_runtime._pid_registry.get(pid)
+            brief = package_data.get("brief", {}) or {}
+            product_name = brief.get("product_name") or brief.get("url") or pid
     except Exception:
         pass
 
-    # Lifecycle
-    lifecycle = get_pid_lifecycle(pid)
+    # PID kaydı
+    is_active = False
+    created_at = "--"
+    try:
+        from services.pid_runtime import pid_runtime
+        rec = pid_runtime._pid_registry.get(pid)
+        if rec:
+            is_active = getattr(rec, "is_active", False)
+            created_at = getattr(rec, "created_at", "--")
+    except Exception:
+        pass
 
-    # Hazırlık raporu
-    hazirlik = get_hazirlik_raporu(pid)
+    # Stage tespiti
+    stage = _detect_stage(pid, package_data)
+
+    # Provider listesi
+    providers = _get_provider_list_simple()
 
     return {
         "pid": pid,
-        "is_active": getattr(pid_record, "is_active", False) if pid_record else False,
-        "created_at": getattr(pid_record, "created_at", "--") if pid_record else "--",
-        "package": package_data,
-        "events": events,
-        "lifecycle": lifecycle,
-        "hazirlik_raporu": hazirlik,
+        "urun": product_name,
+        "asama": stage,
+        "durum": "🟢 ÇALIŞIYOR" if is_active else "⚫ TAMAMLANDI",
+        "is_active": is_active,
+        "created_at": created_at,
+        "providers": providers,
     }
 
 
-def get_pid_lifecycle(pid: str) -> list[dict]:
-    """PID yaşam döngüsü adımlarını döndürür."""
-    lifecycle_steps = [
-        ("/start", "PID Oluşturuldu"),
-        ("Kullanıcı Doğrulandı", "Doğrulama"),
-        ("Ürün Linki", "Link Bekleniyor"),
-        ("Ürün Analizi", "Analiz"),
-        ("Marka Analizi", "Marka"),
-        ("Görsel Araştırması", "Görsel"),
-        ("Servis Sağlayıcı", "Provider Seçimi"),
-        ("Üretim Hazırlık Raporu", "Hazırlık Raporu"),
-        ("Production Package", "Package"),
-        ("Video Üretimi", "Video"),
-        ("Render", "Render"),
-        ("Telegram Teslimi", "Teslim"),
-        ("Oturum Tamamlandı", "Tamamlandı"),
-    ]
+def _detect_stage(pid: str, package_data: dict) -> str:
+    """Mevcut üretim aşamasını tespit et."""
+    task_packages = package_data.get("task_packages") or []
+    if not task_packages:
+        return "Hazırlanıyor"
 
-    # Event log'dan tamamlanan adımları tespit et
-    completed_steps = set()
+    statuses = [t.get("status", "") for t in task_packages]
+    if "COMPLETED" in statuses or "SUCCESS" in statuses:
+        # En son tamamlanan task'ı bul
+        for t in reversed(task_packages):
+            if t.get("status") in ("COMPLETED", "SUCCESS"):
+                agent = t.get("agent", "")
+                if agent == "DeliveryAgent":
+                    return "Tamamlandı"
+                elif agent == "VideoRenderer":
+                    return "Video Üretimi Tamamlandı"
+                elif agent == "VoiceGenerator":
+                    return "Ses Üretildi — Video Bekleniyor"
+                elif agent == "ImageGenerator":
+                    return "Görsel Üretildi — Ses Bekleniyor"
+    if any(s in ("PRODUCING", "PENDING", "PROCESSING") for s in statuses):
+        return "Üretim Devam Ediyor"
+    if all(s == "FAILED" for s in statuses if s):
+        return "Başarısız"
+    return "Hazırlanıyor"
+
+
+def _get_provider_list_simple() -> list[dict]:
+    """Servis sağlayıcı listesini basit formatta döndür."""
+    try:
+        from services.provider_priority import provider_priority
+        categories = {"video": "🎬 Video", "voice": "🔊 Ses", "image": "🖼 Görsel"}
+        result = []
+        for cat_key, cat_label in categories.items():
+            items = provider_priority.get_priority_map(cat_key)
+            items.sort(key=lambda x: x["score"], reverse=True)
+            for p in items:
+                result.append({
+                    "kategori": cat_label,
+                    "provider": p["provider"],
+                    "display_name": p["display_name"],
+                    "skor": p["score"],
+                    "status": p["status"],
+                })
+        return result
+    except Exception:
+        return []
+
+
+def get_pid_lifecycle(pid: str) -> list[dict]:
+    """PID yaşam döngüsü adımları — event log'dan gerçek veri."""
+    steps_def = [
+        "/start", "Link Alındı", "Platform Seçildi", "Brief Tamamlandı",
+        "Senaryo Onayı", "Fiyat Onayı", "Ödeme Onayı",
+        "Üretim Başladı", "Görsel Üretildi", "Ses Üretildi",
+        "Video Üretildi", "Teslim Edildi"
+    ]
+    completed = set()
     try:
         events = get_events(pid=pid, limit=100)
         for e in events:
-            event_name = e.get("event", "")
-            if "PRODUCTION_STARTED" in event_name or "TASK_STARTED" in event_name:
-                completed_steps.add("/start")
-            if "LINK" in event_name or "VALIDATED" in event_name:
-                completed_steps.add("Ürün Linki")
-            if "DECISION" in event_name or "PROVIDER" in event_name:
-                completed_steps.add("Servis Sağlayıcı")
-            if "VIDEO" in event_name or "PRODUCTION" in event_name:
-                completed_steps.add("Video Üretimi")
-            if "DELIVERY" in event_name or "COMPLETED" in event_name:
-                completed_steps.add("Telegram Teslimi")
-            if "SESSION_COMPLETED" in event_name or "TERMINAL" in event_name:
-                completed_steps.add("Oturum Tamamlandı")
+            evt = e.get("event", "")
+            if "START" in evt: completed.add("/start")
+            if "LINK" in evt or "VALIDATED" in evt: completed.add("Link Alındı")
+            if "PLATFORM" in evt: completed.add("Platform Seçildi")
+            if "BRIEF" in evt: completed.add("Brief Tamamlandı")
+            if "SCENARIO" in evt or "APPROVED" in evt: completed.add("Senaryo Onayı")
+            if "PRICE" in evt or "PRICING" in evt: completed.add("Fiyat Onayı")
+            if "PAYMENT" in evt: completed.add("Ödeme Onayı")
+            if "PRODUCTION" in evt or "TASK_STARTED" in evt: completed.add("Üretim Başladı")
+            if "IMAGE" in evt or "ImageGen" in evt: completed.add("Görsel Üretildi")
+            if "VOICE" in evt or "VoiceGen" in evt: completed.add("Ses Üretildi")
+            if "VIDEO" in evt or "VideoRen" in evt: completed.add("Video Üretildi")
+            if "DELIVER" in evt or "COMPLETED" in evt: completed.add("Teslim Edildi")
     except Exception:
         pass
 
     steps = []
-    for step_key, step_name in lifecycle_steps:
-        if step_key in completed_steps:
-            status, color = "✅ Tamamlandı", "#16a34a"
-        elif step_key == lifecycle_steps[-1][0]:
-            status, color = "⏳ Bekliyor", "#64748b"
+    for s in steps_def:
+        if s in completed:
+            steps.append({"isim": s, "durum": "✅", "renk": "#16a34a"})
         else:
-            status, color = "⏳ Bekliyor", "#64748b"
-        steps.append({"isim": step_name, "durum": status, "renk": color})
-
+            steps.append({"isim": s, "durum": "⏳", "renk": "#64748b"})
     return steps
 
 
