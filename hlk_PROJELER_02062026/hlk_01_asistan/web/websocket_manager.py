@@ -104,18 +104,29 @@ ws_manager = WebSocketManager()
 
 def install_eec_bridge():
     """EEC emit_event metodunu WebSocket broadcast ile sarar.
-
-    Bu fonksiyon bir kere çağrılır (post_init sırasında).
+    Sync kalır — WS broadcast arka planda schedule edilir.
     """
     global _bridge_installed
     if _bridge_installed:
         return
 
     try:
-        from services.execution_event_collector import execution_event_collector, EECEventType
-        _original_emit = execution_event_collector.emit_event
+        import asyncio as _asyncio
+        from services.execution_event_collector import execution_event_collector
 
-        async def _bridge_emit(*args, **kwargs):
+        _original_emit = execution_event_collector.emit_event
+        _loop = None
+
+        def _get_loop():
+            nonlocal _loop
+            if _loop is None or _loop.is_closed():
+                try:
+                    _loop = _asyncio.get_running_loop()
+                except RuntimeError:
+                    _loop = _asyncio.new_event_loop()
+            return _loop
+
+        def _bridge_emit(*args, **kwargs):
             event = _original_emit(*args, **kwargs)
             if event:
                 try:
@@ -129,7 +140,13 @@ def install_eec_bridge():
                         "durum": "OK",
                         "durumSinif": "active",
                     }
-                    await ws_manager.broadcast(event_dict, pid=event_dict.get("pid"))
+                    try:
+                        loop = _get_loop()
+                        _asyncio.run_coroutine_threadsafe(
+                            ws_manager.broadcast(event_dict, pid=event_dict.get("pid")), loop
+                        )
+                    except Exception:
+                        pass
                 except Exception as e:
                     logger.debug(f"EEC bridge broadcast hatası: {e}")
             return event
