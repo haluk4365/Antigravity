@@ -90,6 +90,23 @@ async def api_hazirlik_raporu(request: Request, pid: str):
         raise HTTPException(500, str(e))
 
 
+@router.get("/pid/{pid}/workflow-tree")
+async def api_workflow_tree(request: Request, pid: str):
+    """Explainable Workflow Explorer — tam workflow ağacı verisi."""
+    _check_auth(request)
+    try:
+        from .data_providers import get_workflow_tree
+        result = get_workflow_tree(pid)
+        if result is None:
+            raise HTTPException(404, f"PID bulunamadı: {pid}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Workflow tree alınamadı ({pid}): {e}")
+        raise HTTPException(500, str(e))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Provider'lar
 # ═══════════════════════════════════════════════════════════════════════════════

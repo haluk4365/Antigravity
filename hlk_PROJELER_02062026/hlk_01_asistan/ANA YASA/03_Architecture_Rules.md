@@ -3730,6 +3730,158 @@ LAC üzerinde aşağıdakiler kesinlikle yasaktır:
 
 ---
 
+### LAC Explainable Workflow Prensipleri
+
+AR-002_59 kapsamında LAC, yalnızca bir Event izleme ekranı değil; **HLK'nın karar süreçlerini yöneticiye açıklayan resmi Explainable Workflow Explorer** olarak tanımlanır.
+
+Bu prensipler mevcut mimariyi değiştirmez; Workflow, State Engine, Event sistemi, Decision Engine, Runtime ve Production Package davranışı aynen korunur. Bu prensipler yalnızca LAC'ın **sunum standardını** anayasal seviyede tanımlar.
+
+#### AR-002_59.1 — LAC Explainable Workflow Explorer'dır
+
+LAC yalnızca Event gösteren bir ekran değildir.
+
+LAC;
+
+* Workflow,
+* Decision,
+* State,
+* Event,
+* Agent,
+* Production Package,
+* Decision History
+
+arasındaki **neden-sonuç ilişkisini açıklayan resmi yönetici ekranıdır.**
+
+LAC'ın merkezinde Event değil, **Workflow** bulunur.
+
+Yönetici LAC'ta log okumaz; **neden-sonuç zincirini okur.**
+
+#### AR-002_59.2 — LAC Bilgi Üretmez
+
+LAC hiçbir yeni bilgi üretmez.
+
+LAC;
+
+* karar vermez,
+* ajan seçmez,
+* puan hesaplamaz,
+* neden üretmez,
+* Workflow oluşturmaz,
+* Event üretmez.
+
+LAC mevcut anayasal kayıtlar arasındaki ilişkileri görselleştirir ve açıklar. LAC hiçbir yeni karar, yeni Workflow, yeni Event, yeni State veya yeni veri üretmez. Gösterdiği tüm bilgiler yalnızca mevcut anayasal kayıtların ilişkilendirilmesiyle oluşturulur.
+
+Bu ilke aşağıdaki anayasal bileşenlerle tam uyumludur:
+
+* **MASTER-004** — HLK tek karar vericidir; LAC bu yetkiyi devralamaz veya paylaşamaz.
+* **AR-002_59** — LAC, bu mimari maddenin tanımladığı sınırlar içerisinde çalışır.
+* **Decision History** — LAC kararları yalnızca okur; yeni karar girişi yapamaz.
+* **Production Package** — LAC'ın gösterdiği tüm üretim verisi Production Package'ten gelir.
+* **Event System** — LAC yalnızca Olay Kayıt Merkezi tarafından kaydedilmiş Event'leri gösterir.
+* **Olay Kayıt Merkezi** — LAC Event üretmez; yalnızca kayıtlı Event'leri okur.
+
+LAC'ın gösterdiği her bilginin kaynağı bir anayasal kayıttır:
+
+* PID → PID Registry
+* Workflow → Workflow Manifest
+* Decision → Decision History
+* Event → Olay Kayıt Merkezi
+* State → State Engine
+* Runtime → Production Runtime
+* Agent → Agent Assignment kayıtları
+* Production Package → Production Package JSON
+
+LAC bu kaynaklardan okur, ilişkilendirir, gösterir; hiçbirini değiştirmez.
+
+#### AR-002_59.3 — Katmanlı Açıklama Zinciri
+
+Her Workflow, LAC üzerinde **katmanlı açıklama mantığıyla** incelenebilmelidir.
+
+Standart açıklama zinciri:
+
+```
+Workflow
+  ↓
+Sonuç
+  ↓
+HLK Kararı
+  ↓
+Karar Gerekçesi
+  ↓
+Oluşturulan Görevler
+  ↓
+Ajan Adayları
+  ↓
+Ajan Puanları
+  ↓
+Ajan Seçim Gerekçesi
+  ↓
+Çalışan Ajan
+  ↓
+Kanıtlar
+  ↓
+Event Kayıtları
+  ↓
+Log Kayıtları
+  ↓
+API Kayıtları
+```
+
+Bu yapı **yeni Workflow oluşturmaz.** Mevcut Workflow'un nasıl ilerlediğini **açıklar.**
+
+Her katman tekrar açılabilir olmalıdır. Teorik olarak açıklama derinliği sınırsızdır.
+
+Yönetici yalnızca ilgilendiği katmanı açarak detayı inceler; ilgilenmediği katmanları kapalı tutar.
+
+#### AR-002_59.4 — Workflow Merkezli Sunum
+
+LAC, kronolojik Log veya Event listesi olarak çalışmaz.
+
+Yönetici;
+
+* Workflow sonucundan başlayarak,
+* ilgili karar zincirini,
+* kanıtları,
+* Event kayıtlarını,
+* Log kayıtlarını,
+* ve teknik ayrıntıları
+
+**katman katman** inceleyebilmelidir.
+
+Bu sayede yönetici yüzlerce satır log okumak zorunda kalmaz; yalnızca Workflow ağacını takip ederek üretimin neden başarılı veya başarısız olduğunu sezgisel olarak anlayabilir.
+
+#### AR-002_59.5 — Root Cause Görselleştirmesi
+
+LAC, **Root Cause analizini kolaylaştıracak şekilde** ilk hata noktasını görsel olarak ayırt edebilmelidir.
+
+Root Cause tespit mantığı:
+
+1. Workflow'lar anayasal sırayla taranır (WF-001 → WF-010).
+2. **İlk başarısız (FAILED) Workflow** Root Cause olarak işaretlenir.
+3. Root Cause Workflow içerisindeki **ilk başarısız karar katmanı** Root Cause düğümü olarak belirlenir.
+4. Root Cause'tan sonraki Workflow'lar **etkilendi** (affected) olarak gösterilir.
+5. Root Cause öncesindeki Workflow'lar kendi gerçek durumlarını korur.
+
+Renk standardı:
+
+| Durum | Renk | Anlamı |
+|-------|------|--------|
+| 🟢 Yeşil | Başarıyla tamamlandı |
+| 🟡 Sarı | Devam ediyor |
+| ⚪ Gri | Henüz başlanmadı |
+| 🔴 Kırmızı | İlk hata burada başladı (Root Cause) |
+| 🟠 Turuncu | Root Cause sonrası etkilendi |
+
+Bu özellik **yalnızca sunum katmanıdır.** Karar mekanizmasını değiştirmez. HLK'nın karar otoritesi (MASTER-004) aynen korunur.
+
+#### AR-002_59.6 — Temel İlke
+
+LAC'ın amacı Event'leri göstermek değil, **Event'lerin oluşturduğu neden-sonuç zincirini yöneticiye açıklamaktır.**
+
+Bu ilke, AR-002_59'un kuruluş amacı olan *"HLK'nın karar süreçlerini yöneticiye açıklamak"* hedefinin **sunum standardını** anayasal seviyede netleştirir.
+
+---
+
 ### Amaç
 
 Bu mimarinin amacı;
@@ -3738,6 +3890,9 @@ Bu mimarinin amacı;
 * Session, Workflow, State, Agent, Event, Decision, Service, Digital Asset, Production Package, Video Production, Quality Control, Delivery ve Archive katmanlarını tek merkezi ekranda toplamak,
 * Tüm oturum ve üretim sürecini izlenebilir hale getirmek,
 * HLK'nın karar süreçlerini yöneticiye açıklamak,
+* Event'lerin oluşturduğu neden-sonuç zincirini yöneticiye Explainable Workflow Explorer mantığıyla sunmak,
+* İlk hata noktasını (Root Cause) görsel olarak ayırt edilebilir kılmak,
+* Yöneticiyi log okumaya zorlamamak; neden-sonuç ilişkisini katmanlı açıklama zinciriyle sezgisel hale getirmek,
 * Fake Progress'i mimari seviyede yasaklamak,
 * Yönetici ile HLK arasındaki yetki sınırını mimari seviyede tanımlamak,
 * LAC'nin Desktop ve Mobile için tek bir resmi referans tasarım standardı oluşturmak,
@@ -3749,6 +3904,10 @@ Bu mimarinin amacı;
 
 * HLK Live Activity Center, `/start` anından oturum kapanışına kadar tüm oturum yaşam döngüsünü izleyen merkezi operasyon ekranı olarak tanımlanmış olur.
 * LAC; Session, Workflow, State, Agent, Event, Decision, Service, Digital Asset, Production Package, Video Production, Quality Control, Delivery ve Archive olmak üzere 13 katmanı kapsar.
+* LAC, Explainable Workflow Explorer olarak tanımlanır; merkezinde Event değil Workflow bulunur.
+* Her Workflow katmanlı açıklama zinciriyle (Workflow → Sonuç → HLK Kararı → Gerekçe → Görevler → Ajanlar → Puanlama → Kanıtlar → Event → Log → API) incelenebilir.
+* Root Cause (ilk hata noktası) görsel olarak ayırt edilebilir; yönetici tek bakışta problemin başlangıç noktasını anlayabilir.
+* LAC yalnızca mevcut anayasal kayıtları ilişkilendirir; karar vermez, bilgi üretmez, Workflow oluşturmaz.
 * Her oturum ve PID için LAC üzerinden canlı izleme başlatılabilir.
 * Yönetici, HLK'nın tüm karar süreçlerini şeffaf şekilde izleyebilir.
 * Fake Progress mimari seviyede yasaklanmış olur.

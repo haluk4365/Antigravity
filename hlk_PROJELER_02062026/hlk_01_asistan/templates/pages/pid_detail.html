@@ -1,37 +1,27 @@
 {% extends "base.html" %}
-{% block title %}PID {{ pid }} — HLK Operasyon Merkezi{% endblock %}
-{% block page_title %}🎬 PID {{ pid }}{% endblock %}
+{% block title %}PID {{ pid }} — Explainable Workflow Explorer{% endblock %}
+{% block page_title %}🔍 PID {{ pid }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/workflow_explorer.css">
+{% endblock %}
 
 {% block content %}
-<!-- ÜST BİLGİ -->
+<!-- ÜST KPI -->
 <div class="kpi-row" id="pidKpi">
-  <div class="kpi"><span class="label">PID</span><span class="value">{{ pid }}</span></div>
-  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="valUrun">Veri Bekleniyor</span></div>
-  <div class="kpi"><span class="label">MARKA</span><span class="value" id="valMarka">Veri Bekleniyor</span></div>
-  <div class="kpi"><span class="label">PLATFORM</span><span class="value" id="valPlatform">Veri Bekleniyor</span></div>
-  <div class="kpi"><span class="label">DURUM</span><span class="value" id="valDurum">Veri Bekleniyor</span></div>
-  <div class="kpi"><span class="label">AŞAMA</span><span class="value" id="valAsama">Veri Bekleniyor</span></div>
+  <div class="kpi"><span class="label">PID</span><span class="value" id="valPid">{{ pid }}</span></div>
+  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="valUrun">—</span></div>
+  <div class="kpi"><span class="label">MARKA</span><span class="value" id="valMarka">—</span></div>
+  <div class="kpi"><span class="label">PLATFORM</span><span class="value" id="valPlatform">—</span></div>
+  <div class="kpi"><span class="label">DURUM</span><span class="value" id="valDurum">—</span></div>
+  <div class="kpi"><span class="label">AŞAMA</span><span class="value" id="valAsama">—</span></div>
 </div>
 
-<!-- SERVİS SAĞLAYICILARI (sadece seçildiyse) -->
-<div class="section" id="secProviders" style="display:none;">
-  <div class="section-title">⚙️ Servis Sağlayıcıları (Decision Engine Seçimi)</div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>#</th><th>Kategori</th><th>Provider</th><th>Görev</th><th>Güven</th><th>Durum</th></tr></thead>
-      <tbody id="providerTable"></tbody>
-    </table>
-  </div>
-</div>
-
-<!-- EVENT KAYITLARI (varsa) -->
-<div class="section" id="secEvents" style="display:none;">
-  <div class="section-title">🔔 Event Kayıtları</div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Zaman</th><th>Event</th><th>Açıklama</th></tr></thead>
-      <tbody id="eventTable"></tbody>
-    </table>
+<!-- WORKFLOW AĞACI -->
+<div class="section">
+  <div class="section-title">🌳 Explainable Workflow Explorer</div>
+  <div class="wf-tree" id="wfTree">
+    <div class="wf-loading"><span class="wf-spinner"></span>Workflow ağacı yükleniyor...</div>
   </div>
 </div>
 
@@ -49,54 +39,230 @@
 <script>
 const PID = '{{ pid }}';
 const TOKEN = '{{ token }}';
-function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(() => ({})); }
+function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(() => null); }
 
+/* ── Durum → Renk / Emoji ──────────────────────────────────────────────── */
+const STATUS_ICONS = {
+  success: '🟢', running: '🟡', pending: '⚪', failed: '🔴', inactive: '⚪',
+  completed: '🟢', affected: '🟠',
+};
+const STATUS_DOT = {
+  success: 'green', running: 'yellow', pending: 'gray', failed: 'red', inactive: 'gray',
+  completed: 'green', affected: 'gray',
+};
+function statusIcon(s) { return STATUS_ICONS[s] || '⚪'; }
+function dotClass(s) { return STATUS_DOT[s] || 'gray'; }
+
+/* ── Ana Yükleme ───────────────────────────────────────────────────────── */
 async function load() {
-  const d = await api('/pid/' + PID);
-  if (!d || !d.pid) return;
-
-  document.getElementById('valUrun').textContent = d.urun || 'Bilinmiyor';
-  document.getElementById('valMarka').textContent = d.marka || 'Bilinmiyor';
-  document.getElementById('valPlatform').textContent = d.platform || 'Bilinmiyor';
-  document.getElementById('valDurum').textContent = d.durum || 'Veri Bekleniyor';
-  document.getElementById('valAsama').textContent = d.asama || 'Veri Bekleniyor';
-
-  // Provider'lar sadece seçildiyse
-  const providers = d.providers || [];
-  const secP = document.getElementById('secProviders');
-  if (providers.length) {
-    secP.style.display = '';
-    document.getElementById('providerTable').innerHTML = providers.map((p, i) =>
-      `<tr><td>${p.priority || i+1}</td><td>${p.kategori || ''}</td><td><b>${p.provider}</b></td>
-       <td>${p.gorev || ''}</td><td>${p.confidence ? (p.confidence*100).toFixed(0)+'%' : ''}</td>
-       <td><span class="status-badge ${p.status==='AVAILABLE'?'active':'error'}">${p.status}</span></td></tr>`
-    ).join('');
-  } else {
-    secP.style.display = 'none';
+  const data = await api('/pid/' + PID + '/workflow-tree');
+  if (!data || !data.workflows) {
+    document.getElementById('wfTree').innerHTML =
+      '<div class="wf-empty">⚠️ Workflow verisi alınamadı. Package henüz oluşmamış olabilir.</div>';
+    return;
   }
 
-  // Event'ler varsa
-  const events = d.events || [];
-  const secE = document.getElementById('secEvents');
-  if (events.length) {
-    secE.style.display = '';
-    document.getElementById('eventTable').innerHTML = events.slice(0, 30).map(e =>
-      `<tr><td>${e.zaman || ''}</td><td><b>${e.event || ''}</b></td><td>${e.aciklama || ''}</td></tr>`
-    ).join('');
-  } else {
-    secE.style.display = 'none';
-  }
+  // KPI'ları güncelle
+  const s = data.summary || {};
+  document.getElementById('valUrun').textContent = s.product_name || 'Bilinmiyor';
+  document.getElementById('valMarka').textContent = s.brand || 'Bilinmiyor';
+  document.getElementById('valPlatform').textContent = s.platform || 'Bilinmiyor';
+  document.getElementById('valDurum').textContent = s.status_label || s.status || '—';
+  document.getElementById('valAsama').textContent = s.stage || '—';
 
-  // Butonlar
-  const rc = d.runtime_connected;
-  document.getElementById('btnDevam').disabled = !rc;
-  document.getElementById('btnDur').disabled = !rc;
-  document.getElementById('btnYenile').disabled = !rc;
+  // Workflow ağacını render et
+  renderTree(data.workflows);
+
+  // Butonları aktif et
+  document.getElementById('btnDevam').disabled = false;
+  document.getElementById('btnDur').disabled = false;
+  document.getElementById('btnYenile').disabled = false;
 }
 
+/* ── Workflow Ağacı Render ─────────────────────────────────────────────── */
+function renderTree(workflows) {
+  const container = document.getElementById('wfTree');
+  let html = '';
+
+  workflows.forEach(wf => {
+    const isOpen = wf.status === 'failed' || wf.is_root_cause;
+    let wfClasses = ['wf-node', wf.status];
+    if (wf.is_root_cause) wfClasses.push('root-cause');
+    if (wf.affected_by_root_cause) wfClasses.push('affected');
+    if (isOpen) wfClasses.push('open');
+
+    const badges = [];
+    if (wf.is_root_cause) badges.push('<span class="wf-root-badge">🔴 ROOT CAUSE</span>');
+    if (wf.affected_by_root_cause) badges.push('<span class="wf-affected-badge">ETKİLENDİ</span>');
+
+    html += '<div class="' + wfClasses.join(' ') + '">';
+    html += '  <div class="wf-header" onclick="toggleWF(this.parentElement)">';
+    html += '    <span class="wf-dot ' + dotClass(wf.status) + '"></span>';
+    html += '    <span class="wf-id">' + esc(wf.wf_id) + '</span>';
+    html += '    <span class="wf-name">' + esc(wf.wf_name) + '</span>';
+    html += '    <span class="wf-badges">' + badges.join('') + '</span>';
+    html += '    <span class="wf-chevron">▶</span>';
+    html += '  </div>';
+    html += '  <div class="wf-body">';
+    if (wf.description) {
+      html += '    <div class="wf-description">' + esc(wf.description) + '</div>';
+    }
+    html += '    <div class="wf-child-tree">';
+    // Her node'u render et
+    (wf.nodes || []).forEach(node => {
+      html += renderChildNode(node, 0);
+    });
+    html += '    </div>';
+    html += '  </div>';
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+
+  // Root cause workflow'ya scroll
+  setTimeout(() => {
+    const rc = container.querySelector('.wf-node.root-cause');
+    if (rc) rc.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 200);
+}
+
+/* ── Child Node Render (rekürsif) ──────────────────────────────────────── */
+function renderChildNode(node, depth) {
+  const hasChildren = node.alt_dugumler && node.alt_dugumler.length > 0;
+  const hasDetail = node.detail && Object.keys(node.detail).length > 0;
+  const isExpandable = hasChildren || hasDetail;
+  const s = node.durum || 'pending';
+  let classes = ['child-node', s];
+  if (node.is_root_cause_node) classes.push('root-cause-node');
+  if (s === 'affected') classes.push('affected');
+
+  let html = '<div class="' + classes.join(' ') + '">';
+  html += '  <div class="child-header"'
+       + (isExpandable ? ' onclick="toggleChild(this.parentElement)"' : '')
+       + '>';
+  html += '    <span class="child-dot ' + dotClass(s) + '"></span>';
+  html += '    <span class="child-title">' + statusIcon(s) + ' ' + esc(node.baslik) + '</span>';
+  html += '    <span class="child-summary" title="' + escAttr(node.aciklama || '') + '">'
+       + esc(node.aciklama || '') + '</span>';
+  if (node.kaynak) {
+    html += '    <span class="child-source" title="' + escAttr(node.kaynak) + '">'
+         + esc(node.kaynak) + '</span>';
+  }
+  if (isExpandable) {
+    html += '    <span class="child-chevron">▶</span>';
+  }
+  html += '  </div>';
+
+  // Body
+  if (isExpandable) {
+    html += '  <div class="child-body">';
+    if (node.referans) {
+      html += '    <div class="child-kaynak"><strong>Referans:</strong> ' + esc(node.referans) + '</div>';
+    }
+    if (hasDetail) {
+      html += renderDetailTable(node.detail, node.type);
+    }
+    if (hasChildren) {
+      html += '    <div class="child-sub-tree">';
+      node.alt_dugumler.forEach(child => {
+        html += renderChildNode(child, depth + 1);
+      });
+      html += '    </div>';
+    }
+    html += '  </div>';
+  }
+
+  html += '</div>';
+  return html;
+}
+
+/* ── Detail Tablosu ─────────────────────────────────────────────────────── */
+function renderDetailTable(detail, nodeType) {
+  if (!detail || Object.keys(detail).length === 0) return '';
+
+  // Özel render: task_list
+  if (nodeType === 'tasks' && detail.task_list) {
+    let rows = detail.task_list.map(t =>
+      '<tr><td>' + esc(t.agent || '') + '</td>'
+      + '<td>' + esc(t.status || '') + '</td>'
+      + '<td>' + esc(t.description || '') + '</td></tr>'
+    ).join('');
+    return '<table class="wf-detail-table"><thead><tr><th>Ajan</th><th>Durum</th><th>Açıklama</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+
+  // Özel render: candidates
+  if (nodeType === 'agent_candidates' && detail.candidates) {
+    let html = '';
+    Object.entries(detail.candidates).forEach(([cat, provs]) => {
+      html += '<div style="margin-bottom:6px;"><strong>' + esc(cat.toUpperCase()) + ':</strong> ';
+      html += provs.map(p => esc(p.provider || '?') + ' (öncelik:' + (p.priority || '?') + ', güven:' + (p.confidence || '?') + ')').join(', ');
+      html += '</div>';
+    });
+    return html;
+  }
+
+  // Özel render: selected
+  if (nodeType === 'agent_selection' && detail.selected) {
+    let html = '';
+    Object.entries(detail.selected).forEach(([cat, prov]) => {
+      html += '<div style="margin-bottom:4px;"><strong>' + esc(cat) + ':</strong> '
+           + esc(prov.provider || '?')
+           + ' — ' + esc(prov.justification || '') + '</div>';
+    });
+    return html;
+  }
+
+  // Özel render: evidence images
+  if (nodeType === 'evidence' && detail.images) {
+    return '<div>' + detail.images.length + ' referans görsel</div>';
+  }
+
+  // Özel render: events
+  if (nodeType === 'events' && detail.count) {
+    return '<div class="child-kaynak">Toplam ' + detail.count + ' event kaydı (aşağıda listeli)</div>';
+  }
+
+  // Özel render: log_count
+  if (nodeType === 'logs' && detail.log_count) {
+    return '<div class="child-kaynak">Toplam ' + detail.log_count + ' log satırı</div>';
+  }
+  if (nodeType === 'log' && detail.level) {
+    return '<div class="child-kaynak"><strong>Level:</strong> ' + esc(detail.level) + ' | <strong>Module:</strong> ' + esc(detail.module || '') + '</div>';
+  }
+
+  // Özel render: endpoints
+  if (nodeType === 'api' && detail.endpoints) {
+    let rows = detail.endpoints.map(e =>
+      '<tr><td>' + esc(e.name || '') + '</td><td>' + esc(e.module || '') + '</td><td style="font-family:monospace;font-size:11px;">' + esc(e.url || '') + '</td></tr>'
+    ).join('');
+    return '<table class="wf-detail-table"><thead><tr><th>Endpoint</th><th>Modül</th><th>URL</th></tr></thead><tbody>' + rows + '</tbody></table>';
+  }
+  if (nodeType === 'api_ref' && detail.name) {
+    return '<div class="child-kaynak"><strong>Modül:</strong> ' + esc(detail.module || '') + ' | <strong>URL:</strong> ' + esc(detail.url || '') + '</div>';
+  }
+
+  // Genel: key-value tablosu (boş olmayanlar)
+  let keys = Object.keys(detail).filter(k => detail[k] !== null && detail[k] !== undefined && detail[k] !== '' && !['task_list', 'candidates', 'selected', 'images', 'count', 'log_count', 'level', 'module', 'name', 'url', 'endpoints'].includes(k));
+  if (keys.length === 0) return '';
+  let rows = keys.map(k =>
+    '<tr><td><strong>' + esc(k) + '</strong></td><td>' + esc(String(detail[k]).substring(0, 500)) + '</td></tr>'
+  ).join('');
+  return '<table class="wf-detail-table"><tbody>' + rows + '</tbody></table>';
+}
+
+/* ── Accordion Toggle ──────────────────────────────────────────────────── */
+function toggleWF(el) {
+  el.classList.toggle('open');
+}
+function toggleChild(el) {
+  el.classList.toggle('open');
+}
+
+/* ── Kontrol Butonları ─────────────────────────────────────────────────── */
 async function doAction(action) {
   const btn = document.getElementById('btn' + action.charAt(0).toUpperCase() + action.slice(1));
   const msg = document.getElementById('controlMsg');
+  if (!btn) return;
   btn.disabled = true; msg.textContent = 'İşleniyor...';
   try {
     const r = await fetch('/api/controls/' + PID + '/' + action + '?token=' + TOKEN, {method:'POST'});
@@ -107,6 +273,12 @@ async function doAction(action) {
   btn.disabled = false;
 }
 
-load(); setInterval(load, 15000);
+/* ── Utility ────────────────────────────────────────────────────────────── */
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function escAttr(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// İlk yükleme + auto-refresh
+load();
+setInterval(load, 15000);
 </script>
 {% endblock %}

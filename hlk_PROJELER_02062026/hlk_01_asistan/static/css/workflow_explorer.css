@@ -1,0 +1,382 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   HLK Explainable Workflow Explorer — Stil Dosyası
+   Presentation Layer Only — LAC karar vermez, sadece gösterir.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Workflow Tree Container ─────────────────────────────────────────────── */
+.wf-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+/* ── Workflow Node (Accordion Card) ──────────────────────────────────────── */
+.wf-node {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.wf-node:hover {
+  border-color: #c4cde0;
+}
+
+/* Durum renkleri — sol border */
+.wf-node.success  { border-left: 4px solid var(--green); }
+.wf-node.running  { border-left: 4px solid var(--yellow); }
+.wf-node.pending  { border-left: 4px solid #cbd5e1; }
+.wf-node.failed   { border-left: 4px solid var(--red); }
+.wf-node.inactive { border-left: 4px solid #e2e8f0; opacity: 0.65; }
+
+/* Root Cause highlight */
+.wf-node.root-cause {
+  border-left: 4px solid var(--red);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15);
+  animation: root-cause-pulse 2s ease-in-out infinite;
+}
+@keyframes root-cause-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15); }
+  50% { box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25); }
+}
+
+/* Affected (root cause sonrası) */
+.wf-node.affected {
+  border-left: 4px solid #f97316;
+  opacity: 0.75;
+  background: #fff7ed;
+}
+
+/* ── WF Header (tıklanabilir) ────────────────────────────────────────────── */
+.wf-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+.wf-header:hover {
+  background: #f8fafd;
+}
+
+.wf-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.wf-dot.green  { background: var(--green); }
+.wf-dot.yellow { background: var(--yellow); }
+.wf-dot.gray   { background: #cbd5e1; }
+.wf-dot.red    { background: var(--red); }
+
+.wf-id {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  min-width: 60px;
+}
+.wf-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+.wf-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+.wf-root-badge {
+  background: #fdf0f0;
+  color: var(--red);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 8px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.wf-affected-badge {
+  background: #fff7ed;
+  color: #f97316;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+.wf-chevron {
+  font-size: 14px;
+  color: var(--muted);
+  transition: transform 0.25s ease;
+  width: 24px;
+  text-align: center;
+}
+.wf-node.open .wf-chevron {
+  transform: rotate(90deg);
+}
+
+/* ── WF Body (collapsible) ───────────────────────────────────────────────── */
+.wf-body {
+  display: none;
+  padding: 0 20px 18px 20px;
+  border-top: 1px solid #f1f5f9;
+}
+.wf-node.open .wf-body {
+  display: block;
+}
+
+.wf-description {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 12px 0 6px;
+  line-height: 1.5;
+}
+
+/* ── Child Node Tree ─────────────────────────────────────────────────────── */
+.wf-child-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-left: 4px;
+}
+
+/* ── Child Node (alt düğüm kartı) ────────────────────────────────────────── */
+.child-node {
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  background: #fafbfc;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.child-node:hover {
+  border-color: #e2e8f0;
+}
+
+.child-node.success  { border-left: 3px solid var(--green); }
+.child-node.running  { border-left: 3px solid var(--yellow); }
+.child-node.pending  { border-left: 3px solid #e2e8f0; }
+.child-node.failed   { border-left: 3px solid var(--red); }
+.child-node.affected { border-left: 3px solid #f97316; opacity: 0.7; }
+
+/* Root cause node highlight */
+.child-node.root-cause-node {
+  border-left: 3px solid var(--red);
+  background: #fef2f2;
+}
+
+/* ── Child Header ────────────────────────────────────────────────────────── */
+.child-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  transition: background 0.1s;
+}
+.child-header:hover {
+  background: #f0f4f8;
+}
+
+.child-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.child-dot.green  { background: var(--green); }
+.child-dot.yellow { background: var(--yellow); }
+.child-dot.gray   { background: #cbd5e1; }
+.child-dot.red    { background: var(--red); }
+
+.child-title {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 13px;
+}
+.child-summary {
+  color: var(--muted);
+  font-size: 12px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.child-source {
+  font-size: 10.5px;
+  color: var(--muted);
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  max-width: 180px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.child-chevron {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+  width: 18px;
+  text-align: center;
+}
+.child-node.open .child-chevron {
+  transform: rotate(90deg);
+}
+
+/* ── Child Body (collapsible) ────────────────────────────────────────────── */
+.child-body {
+  display: none;
+  padding: 8px 14px 12px 28px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.child-node.open .child-body {
+  display: block;
+}
+
+.child-aciklama {
+  color: var(--muted);
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.child-kaynak {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.child-kaynak strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ── Nested sub-children ─────────────────────────────────────────────────── */
+.child-sub-tree {
+  margin-top: 6px;
+  padding-left: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ── Detail Table (inside child body) ────────────────────────────────────── */
+.wf-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 6px;
+}
+.wf-detail-table th {
+  text-align: left;
+  padding: 6px 10px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.wf-detail-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+/* ── Compact event/log/API rows ──────────────────────────────────────────── */
+.compact-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #f8fafc;
+}
+.compact-row:last-child {
+  border-bottom: none;
+}
+.compact-time {
+  color: var(--muted);
+  font-family: 'SF Mono', 'Consolas', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+  min-width: 70px;
+}
+.compact-name {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 100px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compact-desc {
+  color: var(--muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.wf-empty {
+  text-align: center;
+  padding: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── Loading spinner ─────────────────────────────────────────────────────── */
+.wf-loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.wf-spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e2e8f0;
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: wf-spin 0.7s linear infinite;
+  margin-right: 10px;
+  vertical-align: middle;
+}
+@keyframes wf-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .wf-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .wf-name {
+    font-size: 14px;
+    flex-basis: 100%;
+  }
+  .child-header {
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+  }
+  .child-source {
+    display: none;
+  }
+}
