@@ -107,6 +107,52 @@ async def api_workflow_tree(request: Request, pid: str):
         raise HTTPException(500, str(e))
 
 
+@router.get("/pid/{pid}/compliance")
+async def api_compliance_report(request: Request, pid: str):
+    """PID için anayasal uyumluluk özet raporu."""
+    _check_auth(request)
+    try:
+        from .constitution_scanner import get_scanner
+        from .data_providers import _read_package, get_events
+        scanner = get_scanner()
+        pkg = _read_package(pid)
+        if not pkg:
+            raise HTTPException(404, f"PID bulunamadı: {pid}")
+        results = {}
+        for wf_id in scanner.get_all_wf_ids():
+            results[wf_id] = {
+                "verdict": scanner.evaluate_compliance(wf_id, pkg).verdict,
+                "basis": {
+                    "arch_rules": len(scanner.get_constitution_context(wf_id).get("arch_rules", [])),
+                    "oper_rules": len(scanner.get_constitution_context(wf_id).get("oper_rules", [])),
+                },
+            }
+        return {"pid": pid, "compliance": results}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Compliance raporu alınamadı ({pid}): {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/constitution/article/{article_id}")
+async def api_constitution_article(request: Request, article_id: str):
+    """Tek bir anayasa maddesinin tam detayını döndürür."""
+    _check_auth(request)
+    try:
+        from .constitution_scanner import get_scanner
+        scanner = get_scanner()
+        detail = scanner.get_article_detail(article_id)
+        if not detail:
+            raise HTTPException(404, f"Madde bulunamadı: {article_id}")
+        return detail
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Madde detayı alınamadı ({article_id}): {e}")
+        raise HTTPException(500, str(e))
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Provider'lar
 # ═══════════════════════════════════════════════════════════════════════════════

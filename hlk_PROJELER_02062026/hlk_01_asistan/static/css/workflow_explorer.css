@@ -389,3 +389,87 @@
     display: none;
   }
 }
+
+/* ── Constitution Compliance Monitor — 13 Bölüm ─────────────────────────── */
+.wf-compliance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.wf-compliance-badge.compliant {
+  background: var(--green-bg, #eafaf0); color: var(--green, #16a34a);
+  border: 1px solid var(--green, #16a34a);
+}
+.wf-compliance-badge.partial {
+  background: var(--yellow-bg, #fefce8); color: var(--yellow, #b45309);
+  border: 1px solid var(--yellow, #eab308);
+}
+.wf-compliance-badge.violation {
+  background: var(--red-bg, #fdf0f0); color: var(--red, #dc2626);
+  border: 1px solid var(--red, #dc2626);
+}
+.wf-compliance-badge.unknown {
+  background: #f8fafc; color: #64748b; border: 1px solid #cbd5e1;
+}
+
+/* ── Constitution Article Ref ──────────────────────────────────────────── */
+.constitution-ref {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: monospace;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.constitution-ref:hover { opacity: 0.75; }
+.constitution-ref.type-MASTER { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.constitution-ref.type-AR     { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.constitution-ref.type-OR     { background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+.constitution-ref.type-QR     { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.constitution-ref.type-GK     { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
+.constitution-ref.type-GC     { background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; }
+
+/* ── Dependency Chain Viz ──────────────────────────────────────────────── */
+.dep-chain-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; }
+.dep-chain-node {
+  padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+  background: #f1f5f9; border: 1px solid #cbd5e1;
+}
+.dep-chain-node.current { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
+.dep-chain-arrow { color: #94a3b8; font-size: 16px; font-weight: bold; }
+
+/* ── Operation Checklist ───────────────────────────────────────────────── */
+.op-list { list-style: none; padding: 0; margin: 0; }
+.op-item { padding: 4px 0; font-size: 13px; display: flex; gap: 8px; }
+.op-item.done { color: #16a34a; }
+.op-item.running { color: #2563eb; }
+.op-item.pending { color: #94a3b8; }
+.op-item.failed { color: #dc2626; }
+
+/* ── Evidence Pipeline ─────────────────────────────────────────────────── */
+.evidence-chain { display: flex; align-items: center; gap: 0; flex-wrap: wrap; padding: 12px 0; overflow-x: auto; }
+.evidence-step {
+  padding: 8px 16px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  white-space: nowrap; position: relative;
+}
+.evidence-step.constitution { background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+.evidence-step.decision { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+.evidence-step.code { background: #ecfeff; color: #0891b2; border: 1px solid #a5f3fc; }
+.evidence-step.output { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.evidence-step.evidence { background: #fefce8; color: #b45309; border: 1px solid #fde68a; }
+.evidence-step.log { background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; }
+.evidence-step.event { background: #fff7ed; color: #ea580c; border: 1px solid #fed7aa; }
+.evidence-arrow { padding: 0 4px; color: #94a3b8; font-size: 18px; }
+
+/* ── Compliance KPI Card ───────────────────────────────────────────────── */
+.kpi.compliance-kpi { border-left: 3px solid #7c3aed; }
+.kpi.compliance-kpi.compliant { border-left-color: #16a34a; }
+.kpi.compliance-kpi.partial { border-left-color: #eab308; }
+.kpi.compliance-kpi.violation { border-left-color: #dc2626; }
