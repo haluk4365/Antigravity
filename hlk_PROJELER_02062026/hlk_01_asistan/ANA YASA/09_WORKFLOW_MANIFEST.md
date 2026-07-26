@@ -57,7 +57,9 @@ WF-001, HLK'nın oturum boyunca çalışan Karar ve Yönetim Merkezidir. Sistemd
 
 ### Durum
 
-AKTİF
+FREEZE v1.0 — Referans Workflow (Değişiklik Kısıtlı)
+
+**Değişiklik Kuralları:** WF-001 yalnızca Bug Fix veya Anayasa Revizyonu sonrası referans güncellemesi kapsamında değiştirilebilir. Yeni özellik eklenemez, workflow akışı değiştirilemez, anayasa maddeleri workflow içine kopyalanamaz. WF-002 veya sonraki workflow'lar WF-001'i değiştiremez. İhtiyaç oluşursa önce Anayasa güncellenir, WF-001 yalnızca referans takibi yapar. Tüm workflow'lar tamamlandığında aynı freeze kuralı uygulanacaktır.
 
 ---
 
