@@ -1696,50 +1696,34 @@ def _build_wf002_evidence(pkg: Optional[dict], pid: str, scanner) -> list[dict]:
         },
     })
 
-    # 5. Servis Kullanımı (Service Usage)
-    services = service_usage.get("services", {}) if isinstance(service_usage, dict) else {}
-    outputs.append({
-        "id": "service_usage",
-        "name": f"Servis Kullanımı (Service Usage) — {len(services)} servis",
-        "type": "analysis",
-        "status": "ok" if services else "missing",
-        "producer": "WF-002 / WF-008",
-        "content": {
-            "text": "\n".join(f"{k}: {v}" for k, v in services.items()) if services else "",
-        },
-        "traceability": {
-            "source_wf": "WF-002",
-            "decision_ids": [d.get("decision_id","") for d in decisions[:2]],
-        },
-        "downstream_wfs": ["WF-007", "WF-008"],
-        "evidence": {
-            "runtime": f"Production Package'te service_usage kaydı mevcut"
-                       if services else "KANIT BULUNAMADI",
-        },
-    })
+    # NOT: Service Usage → WF-008 üretir (WORKFLOW DATA OWNERSHIP RULE Madde 2,4)
+    # NOT: Decision History → WF-001/WF-007/WF-008 üretir
 
-    # 6. Decision History özeti
-    if decisions:
+    # 5. Decision History özeti (yalnızca WF-002 bağlamında ilgili kararlar)
+    wf002_decisions = [d for d in decisions if "research" in str(d).lower()
+                       or "background" in str(d).lower()
+                       or "araştırma" in str(d).lower()]
+    if wf002_decisions:
         outputs.append({
             "id": "decision_history",
-            "name": f"Karar Geçmişi (Decision History) — {len(decisions)} karar",
+            "name": f"WF-002 İlgili Kararlar — {len(wf002_decisions)} karar",
             "type": "analysis",
             "status": "ok",
             "producer": "HLK Runtime",
             "content": {
                 "text": "\n".join(
                     f"{d.get('decision_id','')}: {d.get('verdict','')} ({d.get('category','')})"
-                    for d in decisions[:10]
+                    for d in wf002_decisions[:10]
                 ),
             },
             "traceability": {
-                "source_wf": "WF-001 / WF-002 / WF-008",
-                "decision_ids": [d.get("decision_id","") for d in decisions[:10]],
+                "source_wf": "WF-002",
+                "decision_ids": [d.get("decision_id","") for d in wf002_decisions[:10]],
                 "event_ids": [],
             },
-            "downstream_wfs": ["WF-003", "WF-004", "WF-005", "WF-006", "WF-007", "WF-008"],
+            "downstream_wfs": ["WF-003"],
             "evidence": {
-                "runtime": f"Production Package'te {len(decisions)} karar kaydı mevcut",
+                "runtime": f"WF-002 kapsamında {len(wf002_decisions)} karar kaydı mevcut",
                 "decisions": [{"id": d.get("decision_id",""), "verdict": d.get("verdict","")}
                               for d in decisions[:5]],
             },
