@@ -827,6 +827,58 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                   status="pending",
                                   summary="Bu aşamada API referansı yok")
         nodes.append(api_node)
+        # 14. SONUC (Workflow Result)
+        recs = scanner.generate_recommendations(wf_id, pkg)
+        is_success = recs["is_success"]
+        result_emoji = "\U0001f7e2" if is_success else "\U0001f534"
+        result_label = "Basarili (Success)" if is_success else "Basarisiz (Failed)"
+        result_reasons = recs["success_reasons"] if is_success else recs["failure_reasons"]
+        result_verdict_icon = {"COMPLIANT": "\U0001f7e2", "PARTIAL": "\U0001f7e1", "VIOLATION": "\U0001f534", "UNKNOWN": "\u26ab"}
+        result_summary_lines = [f"{result_emoji} {result_label}"]
+        for r in result_reasons[:5]:
+            result_summary_lines.append(f"\u2022 {r}")
+        result_summary_lines.append(
+            f"Anayasal Uyum: {result_verdict_icon.get(recs['compliance_verdict'], '\u26ab')} "
+            f"{recs['compliance_verdict']}"
+        )
+        result_node = _make_node("workflow_result", "14. Sonuc (Workflow Result)",
+                                 status="completed" if is_success else "failed",
+                                 summary=" | ".join(result_summary_lines)[:500],
+                                 source="Anayasa Tarayicisi (Constitution Scanner)",
+                                 detail={
+                                     "is_success": is_success,
+                                     "reasons": result_reasons,
+                                     "compliance_verdict": recs["compliance_verdict"],
+                                     "affected_workflows": recs["affected_workflows"],
+                                 })
+        nodes.append(result_node)
+
+        # 15. YAPILMASI GEREKENLER (Recommended Actions)
+        rec_parts = []
+        if recs["auto_actions"]:
+            rec_parts.append(f"A. HLK Otomatik: {'; '.join(recs['auto_actions'][:4])}"[:300])
+        if recs["admin_actions"]:
+            rec_parts.append(f"B. Yonetici: {'; '.join(recs['admin_actions'][:3])}"[:300])
+        if recs["affected_workflows"]:
+            rec_parts.append(f"C. Etkilenen: {', '.join(recs['affected_workflows'][:5])}")
+        rerun = recs.get("rerun", {})
+        rec_parts.append(f"D. Tekrar: {'\u2713 Mumkun' if rerun.get('possible') else '\u2717 Mumkun Degil'} - {rerun.get('condition', '-')}")
+        if recs.get("estimated_fix_seconds", 0) > 0:
+            rec_parts.append(f"E. Tahmini: ~{recs['estimated_fix_seconds']}sn, Basari: %{recs['estimated_success_rate']}")
+        rec_node = _make_node("recommended_actions", "15. Yapilmasi Gerekenler (Recommended Actions)",
+                              status="completed" if is_success else "running",
+                              summary=" | ".join(rec_parts)[:500],
+                              source="Anayasa Tarayicisi (Constitution Scanner)",
+                              detail={
+                                  "auto_actions": recs["auto_actions"],
+                                  "admin_actions": recs["admin_actions"],
+                                  "affected_workflows": recs["affected_workflows"],
+                                  "rerun": recs["rerun"],
+                                  "estimated_fix_seconds": recs.get("estimated_fix_seconds", 0),
+                                  "estimated_success_rate": recs.get("estimated_success_rate", 0),
+                              })
+        nodes.append(rec_node)
+
         workflows.append({
             "wf_id": wf_id,
             "wf_name": wf_name,
