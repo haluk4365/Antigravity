@@ -8424,3 +8424,164 @@ Bu sınırlar sistemdeki tüm harici üretim servis sağlayıcıları için mutl
 * Tüm Provider değişimleri kanıt temelli ve izlenebilir şekilde kaydedilir.
 * Hiçbir koşulda tek bir Provider için sonsuz bekleme yapılamaz.
 * Provider'a özel implementasyonlar bu mimari standardı ihlal edemez.
+
+---
+
+## AR-002_90
+
+### Production Gate Architecture — Video Üretim Öncesi Zorunlu Workflow Doğrulama Mimarisi
+
+### Kural
+
+HLK hiçbir koşulda Video Production sürecini yalnızca akış sırasına bakarak başlatamaz.
+
+Video Production başlamadan önce HLK aşağıdaki Workflow'ların tamamlanma durumunu anayasal olarak doğrulamak zorundadır:
+
+* **WF-001** Product Link Validation
+* **WF-002** Background Research
+* **WF-003** Brief Collection
+* **WF-004** Brief Approval
+* **WF-005** Scenario Generation
+* **WF-006** Scenario Approval
+* **WF-007** Pricing
+
+HLK bu Workflow'ların tamamının `COMPLETED` durumunda olduğunu doğrulamadan;
+
+* Video Production başlatamaz.
+* Provider seçemez.
+* Provider çağrısı yapamaz.
+* Production Runtime başlatamaz.
+* Video Render işlemini başlatamaz.
+* Telegram üzerinden "Video Üretimi Başladı" bildirimi gönderemez.
+* Telegram üzerinden "Üretim Tamamlandı" bildirimi gönderemez.
+
+---
+
+### Production Gate
+
+Production Gate, HLK'nın Video Production sürecine geçiş izni veren **anayasal doğrulama kapısıdır.**
+
+Production Gate yalnızca aşağıdaki koşulların **tamamı** sağlandığında açılır:
+
+```
+WF-001 == COMPLETED
+AND
+WF-002 == COMPLETED
+AND
+WF-003 == COMPLETED
+AND
+WF-004 == COMPLETED
+AND
+WF-005 == COMPLETED
+AND
+WF-006 == COMPLETED
+AND
+WF-007 == COMPLETED
+```
+
+Bu koşullardan herhangi biri sağlanmazsa Production Gate **kapalı kalır.** HLK üretimi durdurur ve Recovery sürecine girer.
+
+---
+
+### Recovery Zorunluluğu
+
+Workflow'lardan herhangi biri `COMPLETED` durumunda değilse HLK üretime geçmeyecektir.
+
+Bunun yerine HLK anayasal karar mekanizmasını kullanarak otomatik olarak:
+
+1. **Eksik Workflow'u tespit eder.**
+2. **Tamamlanmama nedenini analiz eder.**
+3. **Event kayıtlarını inceler.**
+4. **Task durumunu inceler.**
+5. **Execution durumunu inceler.**
+6. **Gerekli Recovery mekanizmasını uygular.**
+7. **İlgili Workflow'u yeniden çalıştırmayı dener.**
+8. **Workflow durumunu tekrar doğrular.**
+
+Bu döngü başarıyla tamamlanmadan Production Gate açılamaz.
+
+Recovery döngüsü maksimum **3 kez** tekrarlanabilir. 3 başarısız Recovery denemesinden sonra HLK;
+
+* Production Gate'i **kalıcı olarak kapatır.**
+* Durumu **FAILED** olarak işaretler.
+* Proje Yöneticisine **eskalasyon bildirimi** gönderir.
+* İlgili PID'i **arızalı** (faulted) olarak kaydeder.
+
+---
+
+### Single Source of Truth
+
+Workflow `COMPLETED` durumu aşağıdaki bileşenler arasında **tek bir doğrulanmış durumdan** okunacaktır:
+
+* **Workflow Explorer** — Explainable Workflow ağacı
+* **Production State** — State Engine kaydı
+* **Event System** — Olay Kayıt Merkezi kaydı
+* **Telegram Bildirimleri** — Kullanıcıya gönderilen durum mesajları
+* **OPS Dashboard** — Yönetici operasyon ekranı
+
+Hiçbir bileşen kendi başına `COMPLETED` varsayımı yapamaz.
+
+`COMPLETED` durumunun tek yetkili kaynağı **Workflow Manifest + Production Package + Decision History** üçlüsünün tutarlı kesişimidir.
+
+---
+
+### Production Gate Yaşam Döngüsü
+
+```
+WF-001..WF-007 Durum Kontrolü
+  ↓
+Tümü COMPLETED?
+  ├─ EVET → Production Gate AÇIK → Video Production başlatılır
+  └─ HAYIR → Production Gate KAPALI
+                ↓
+              Eksik Workflow Tespiti
+                ↓
+              Neden Analizi (Event + Task + Execution)
+                ↓
+              Recovery Mekanizması
+                ↓
+              Workflow Yeniden Çalıştırma
+                ↓
+              Doğrulama
+                ├─ COMPLETED → Production Gate AÇIK
+                └─ FAILED → Recovery döngüsü (max 3)
+                              └─ 3 deneme sonrası → Eskalasyon
+```
+
+---
+
+### Yasaklar
+
+Aşağıdaki durumlar Production Gate mimarisi kapsamında **kesinlikle yasaktır:**
+
+* Eksik Workflow'ları görmezden gelerek üretime geçmek
+* `COMPLETED` varsayımıyla hareket etmek
+* Workflow durumunu Telegram bildirimi veya OPS Dashboard üzerinden tahmin etmek
+* Recovery uygulamadan manuel müdahale ile Production Gate'i açmak
+* Production Gate kontrolünü atlayarak doğrudan Provider çağrısı yapmak
+* Başarısız Workflow'ları atlayarak sonraki aşamaya geçmek
+
+---
+
+### Amaç
+
+Bu mimarinin amacı;
+
+* Video Production sürecinin yalnızca tüm zorunlu Workflow'lar `COMPLETED` olduğunda başlamasını anayasal olarak garanti etmek,
+* Eksik veya başarısız Workflow'ların görmezden gelinmesini mimari seviyede engellemek,
+* Production Gate mekanizması ile Video Production'a geçişi anayasal denetime bağlamak,
+* Eksik Workflow tespitinde otomatik Recovery sürecini zorunlu kılmak,
+* Workflow, Event, State, OPS Dashboard ve Telegram'ın aynı yaşam döngüsünü yansıtmasını sağlamak,
+* `COMPLETED` durumunun tek bir doğrulanmış kaynaktan okunmasını mimari olarak zorunlu kılmak,
+* HLK'nın eksik veya başarısız Workflow'ları görmezden gelmesini anayasal olarak imkansız hale getirmektir.
+
+---
+
+### Beklenen Sonuç
+
+* Workflow tamamlanmadan Production başlamaz.
+* Production başlamadan önce HLK eksik Workflow'ları otomatik olarak tamamlamaya çalışır.
+* Recovery tamamlanmadan Production Gate açılmaz.
+* Telegram yalnızca gerçek Production Event'lerinden sonra bildirim gönderir.
+* Workflow, Event, State, OPS Dashboard ve Telegram aynı yaşam döngüsünü yansıtır.
+* HLK, eksik veya başarısız Workflow'ları görmezden gelmez; anayasal olarak analiz eder, gerekirse tekrar çalıştırır ve yalnızca tüm zorunlu Workflow'lar doğrulandığında video üretimine izin verir.
