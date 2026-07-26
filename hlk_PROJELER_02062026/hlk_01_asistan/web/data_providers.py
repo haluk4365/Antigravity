@@ -301,6 +301,121 @@ def _find_events(events: list, *keywords: str) -> list:
     return result[:30]
 
 
+def _build_workflow_diagnostics(
+    wf_id: str, pkg: dict, status: str,
+    decisions: list, events: list, tasks: list,
+) -> dict:
+    """AR-002_59: Her Workflow için Explainable Diagnostics verisi oluşturur.
+
+    Production Package, Decision History, Event Registry ve Task Package'lerden
+    ilgili WF'ye ait provider denemeleri, retry sayıları, recovery adımları
+    ve hata sınıflandırmasını çıkarır.
+    """
+    diag = {
+        "wf_id": wf_id,
+        "status": status,
+        "root_cause": "",
+        "self_healing_applied": False,
+        "recovery_policy_applied": False,
+        "retry_counts": {},
+        "provider_attempts": [],
+        "recovery_steps": [],
+        "decision_history": [],
+        "event_history": [],
+        "error_classification": "",
+        "exhaustion_reason": "",
+    }
+
+    # Provider denemeleri (Package'ten)
+    pa = pkg.get("provider_attempts", {}) or {}
+    diag["provider_attempts"] = pa
+
+    # Retry sayıları
+    rc = pkg.get("retry_counts", {}) or {}
+    diag["retry_counts"] = rc
+
+    # Recovery adımları
+    rs = pkg.get("recovery_steps", []) or []
+    diag["recovery_steps"] = rs
+
+    # Service usage (binary ok/failed)
+    su = pkg.get("service_usage", {}) or {}
+    services = su.get("services", {}) if isinstance(su, dict) else {}
+
+    # Self-healing tespiti: provider switch → retry → success zinciri
+    has_provider_fallback = any(
+        d.get("category") in ("PROVIDER_SWITCH", "PROVIDER_RESULT", "EXECUTION_FAILURE")
+        for d in decisions
+    )
+    has_success_after_fallback = has_provider_fallback and status == "completed"
+    diag["self_healing_applied"] = has_provider_fallback
+
+    # Recovery policy: yeniden üretim prosedürü
+    delivery = pkg.get("delivery_info", {}) or {}
+    diag["recovery_policy_applied"] = bool(
+        delivery.get("reproduction") or
+        any(d.get("category") == "REPRODUCTION" for d in decisions)
+    )
+
+    # Decision history (filtered)
+    wf_decisions = []
+    for d in decisions:
+        desc = str(d.get("rationale", "") or d.get("verdict", "") or "").lower()
+        if wf_id.lower() in desc or any(
+            kw in desc for kw in ["provider", "retry", "recover", "reevaluate", "switch"]
+        ):
+            wf_decisions.append({
+                "decision_id": d.get("decision_id", ""),
+                "verdict": d.get("verdict", ""),
+                "category": d.get("category", ""),
+                "rationale": str(d.get("rationale", ""))[:200],
+            })
+    diag["decision_history"] = wf_decisions[:10]
+
+    # Event history (count)
+    wf_events = [e for e in events if any(
+        kw in str(e).upper() for kw in ["FAILED", "ERROR", "RETRY", "RECOVER",
+        "PROVIDER", "SWITCH", "EXECUTION", "TIMEOUT", wf_id.upper()]
+    )]
+    diag["event_history"] = [{
+        "event": e.get("event", ""),
+        "aciklama": str(e.get("aciklama", ""))[:150],
+    } for e in wf_events[:15]]
+
+    # Root cause / error classification
+    if status == "failed":
+        failed_tasks = [t for t in tasks if t.get("status") == "FAILED"]
+        if failed_tasks:
+            ft = failed_tasks[0]
+            diag["root_cause"] = f"{ft.get('agent', 'Task')}: {ft.get('status', 'FAILED')}"
+        # Provider exhaustion check
+        all_services_failed = all(
+            v == "failed" for v in services.values()
+        ) if services else False
+        if all_services_failed and has_provider_fallback:
+            diag["error_classification"] = "PERMANENT"
+            diag["exhaustion_reason"] = (
+                f"Tum anayasal cozum yollari tuketildi. "
+                f"{len(services)} provider denendi, hicbiri basarili olmadi. "
+                f"WF-{wf_id} burada durduruldu. Sonraki workflow baslatilmadi."
+            )
+        elif has_provider_fallback:
+            diag["error_classification"] = "TRANSIENT"
+            diag["exhaustion_reason"] = (
+                f"Provider denemeleri yapildi ancak tum yollar tuketildi."
+            )
+        else:
+            diag["error_classification"] = "TRANSIENT"
+            diag["exhaustion_reason"] = (
+                f"WF-{wf_id} basarisiz oldu. Anayasal cozum yollari uygulandi."
+            )
+    elif status == "completed":
+        diag["error_classification"] = "NONE"
+        diag["exhaustion_reason"] = ""
+
+    return diag
+
+
 def get_workflow_tree(pid: str) -> Optional[dict]:
     """Explainable Workflow Explorer için tam workflow ağacı verisi.
 
@@ -890,6 +1005,24 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                               })
         nodes.append(rec_node)
 
+        # ── AR-002_59: Explainable Diagnostics ──────────────────────────
+        diag = _build_workflow_diagnostics(wf_id, pkg, status,
+                                           decisions, events, tasks)
+        nodes.append(_make_node("explainable_diagnostics",
+            "16. Aciklanabilir Tani Karti (Explainable Diagnostics Card)",
+            status="failed" if status == "failed" else (
+                "completed" if status == "completed" else (
+                    "running" if status == "running" else "pending"
+                )
+            ),
+            summary=diag.get("exhaustion_reason", "") or (
+                "Tum anayasal cozum yollari uygulandi."
+                if status == "completed" else ""
+            ),
+            source="Production Package + Decision History + Event Registry",
+            detail=diag,
+        ))
+
         workflows.append({
             "wf_id": wf_id,
             "wf_name": wf_name,
@@ -897,6 +1030,15 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             "status": status,
             "is_root_cause": False,
             "affected_by_root_cause": False,
+            "diagnostics": {
+                "self_healing_applied": diag.get("self_healing_applied", False),
+                "recovery_policy_applied": diag.get("recovery_policy_applied", False),
+                "retry_count": sum(diag.get("retry_counts", {}).values()) if isinstance(diag.get("retry_counts"), dict) else 0,
+                "provider_attempts": diag.get("provider_attempts", []),
+                "recovery_steps": diag.get("recovery_steps", []),
+                "error_classification": diag.get("error_classification", ""),
+                "exhaustion_reason": diag.get("exhaustion_reason", ""),
+            },
             "nodes": nodes,
         })
 
@@ -1459,12 +1601,23 @@ def _build_wf002_evidence(pkg: Optional[dict], pid: str, scanner) -> list[dict]:
 # Event'ler
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def get_events(pid: Optional[str] = None, limit: int = 50) -> list[dict]:
+def get_events(pid: Optional[str] = None, session_id: Optional[str] = None, limit: int = 50) -> list[dict]:
+    """PID veya Session ID'ye göre Event'leri getirir.
+
+    PID verilmişse PID'ye göre, session_id verilmişse session'a göre sorgular.
+    Hiçbiri verilmemişse en son event'leri döndürür.
+    """
     try:
         from services.olay_kayit_merkezi import event_registry
-        records = event_registry.get_by_pid(pid, limit) if pid else event_registry.get_recent(limit)
+        if pid:
+            records = event_registry.get_by_pid(pid, limit)
+        elif session_id:
+            records = event_registry.get_by_session(session_id, limit)
+        else:
+            records = event_registry.get_recent(limit)
         return [
             {"zaman": getattr(r, "timestamp", ""), "pid": getattr(r, "pid", ""),
+             "session_id": getattr(r, "session_id", ""),
              "event": getattr(r, "event_name", getattr(r, "event_constant", "")),
              "aciklama": getattr(r, "event_description", "")}
             for r in (records or [])

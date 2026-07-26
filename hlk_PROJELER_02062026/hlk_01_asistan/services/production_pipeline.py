@@ -98,6 +98,10 @@ class PipelineContext:
     video_path: Optional[str] = None
     cost_report: dict = field(default_factory=dict)
     delivered: bool = False
+    # AR-002_59 Explainable Diagnostics: yapısal provider/recovery/retry verisi
+    provider_attempts: dict = field(default_factory=dict)  # {"image": [...], "video": [...], "voice": [...]}
+    recovery_steps: list = field(default_factory=list)     # [{step, action, result, timestamp}]
+    retry_counts: dict = field(default_factory=dict)       # {"image": 0, "video": 0, "voice": 0, "delivery": 0}
 
 
 # PID → PipelineContext (Production Runtime tarafından set edilir)
@@ -115,6 +119,62 @@ def get_context(pid: str) -> Optional[PipelineContext]:
 
 def clear_context(pid: str) -> None:
     _contexts.pop(pid, None)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1B. DIAGNOSTIC HELPER — AR-002_59 Explainable Diagnostics Standardı
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _record_provider_attempt(
+    ctx: PipelineContext,
+    category: str,
+    provider: str,
+    attempt: int,
+    error: str,
+    success: bool,
+    artifact: str = "",
+) -> None:
+    """Provider denemesini yapısal olarak PipelineContext'e kaydeder.
+
+    AR-002_59: Her provider denemesi Explainable Workflow Explorer
+    tarafından görüntülenebilir olmalıdır.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    if category not in ctx.provider_attempts:
+        ctx.provider_attempts[category] = []
+    ctx.provider_attempts[category].append({
+        "provider": provider,
+        "attempt": attempt,
+        "timestamp": _dt.now(_tz.utc).isoformat(),
+        "error": error or "",
+        "result": "ok" if success else "failed",
+        "artifact": artifact or "",
+    })
+    # Retry sayacını güncelle
+    if category not in ctx.retry_counts:
+        ctx.retry_counts[category] = 0
+    if not success:
+        ctx.retry_counts[category] += 1
+
+
+def _record_recovery_step(
+    ctx: PipelineContext,
+    step: str,
+    action: str,
+    result: str,
+) -> None:
+    """Recovery/Self-Healing adımını PipelineContext'e kaydeder.
+
+    AR-002_59: Her recovery adımı Explainable Workflow Explorer
+    tarafından görüntülenebilir olmalıdır.
+    """
+    from datetime import datetime as _dt, timezone as _tz
+    ctx.recovery_steps.append({
+        "step": step,
+        "action": action,
+        "result": result,
+        "timestamp": _dt.now(_tz.utc).isoformat(),
+    })
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -518,6 +578,13 @@ async def task_image(task: dict, pid: str) -> dict:
             logger.warning(
                 f"⚠️ [Provider Error] {provider_name}: {attempt_error}"
             )
+        # AR-002_59: Provider denemesini kaydet
+        _record_provider_attempt(
+            ctx, "image", provider_name, idx + 1,
+            error=attempt_error, success=bool(ctx.img_path),
+            artifact=ctx.img_path or "",
+        )
+
         # AR-002_81 PROVIDER_RESULT: kabul/red kararı HLK Runtime'ındır
         decision = _request_provider_result_decision(
             pid=pid,
@@ -627,6 +694,13 @@ async def task_voice(task: dict, pid: str) -> dict:
         except Exception as e:
             attempt_error = f"{type(e).__name__}: {e}"
             logger.warning(f"⚠️ [Production] ElevenLabs basarisiz: {e}")
+
+        # AR-002_59: Provider denemesini kaydet
+        _record_provider_attempt(
+            ctx, "voice", "elevenlabs", 1,
+            error=attempt_error, success=bool(ctx.voice_path),
+            artifact=str(ctx.voice_path) if ctx.voice_path else "",
+        )
 
         # AR-002_81 PROVIDER_RESULT: kabul/red kararı HLK Runtime'ındır
         decision = _request_provider_result_decision(
@@ -798,6 +872,13 @@ async def task_video(task: dict, pid: str) -> dict:
                 logger.warning(
                     f"⚠️ [Provider Error] {provider_name}: {attempt_error}"
                 )
+            # AR-002_59: Provider denemesini kaydet
+            _record_provider_attempt(
+                ctx, "video", provider_name, idx + 1,
+                error=attempt_error, success=bool(ctx.video_path),
+                artifact=ctx.video_path or "",
+            )
+
             # AR-002_81 PROVIDER_RESULT: kabul/red kararı HLK Runtime'ındır
             decision = _request_provider_result_decision(
                 pid=pid,

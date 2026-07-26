@@ -47,6 +47,7 @@ class LACEvent:
     event_id: str = ""
     event_type: str = ""
     pid: str = ""
+    session_id: str = ""       # HLK Session ID (pre-PID tracking)
     description: str = ""
     phase: str = ""            # PRE_CHECK / EXECUTE / POST_CHECK
     status: str = "PENDING"    # PENDING / RUNNING / COMPLETED / FAILED
@@ -63,6 +64,7 @@ class LACEvent:
             "event_id": self.event_id,
             "event_type": self.event_type,
             "pid": self.pid,
+            "session_id": self.session_id,
             "description": self.description,
             "phase": self.phase,
             "status": self.status,
@@ -146,6 +148,7 @@ class LiveActivityCenter:
         if hasattr(event_data, 'to_lac_entry'):
             d = event_data.to_lac_entry()
             pid = d.get("pid", "UNKNOWN")
+            session_id = d.get("session_id", "")
             event_type = d.get("event_name", "")
             event_id = d.get("event_id", "")
             phase = d.get("phase", "")
@@ -153,6 +156,7 @@ class LiveActivityCenter:
             description = f"{event_type}"
         elif hasattr(event_data, 'get'):
             pid = event_data.get("pid", "UNKNOWN")
+            session_id = event_data.get("session_id", "")
             event_type = event_data.get("event_type", "")
             event_id = event_data.get("event_id", "")
             phase = event_data.get("phase", "")
@@ -175,6 +179,7 @@ class LiveActivityCenter:
             event_id=event_id or f"LAC-{self._sequence}",
             event_type=event_type,
             pid=pid,
+            session_id=session_id,
             description=description or event_type,
             phase=phase,
             status="COMPLETED",
@@ -230,6 +235,25 @@ class LiveActivityCenter:
         """
         events = self._events.get(pid, [])
         return [e.to_dict() for e in sorted(events, key=lambda e: e.sequence)]
+
+    def get_stream_by_session(self, session_id: str) -> list[dict]:
+        """Session ID için kronolojik Event akışını döndürür.
+
+        Tüm PID'ler arasında session_id eşleşen event'leri toplar.
+
+        Args:
+            session_id: HLK Session ID.
+
+        Returns:
+            LACEvent dict listesi (kronolojik sıralı).
+        """
+        matched = []
+        for ev_list in self._events.values():
+            for e in ev_list:
+                if e.session_id == session_id:
+                    matched.append(e)
+        matched.sort(key=lambda e: e.sequence)
+        return [e.to_dict() for e in matched]
 
     def get_latest(self, pid: str) -> Optional[LACEvent]:
         """PID için en son Event'i döndürür."""

@@ -165,6 +165,7 @@ class ExecutionEvent:
 
     # ── EEC 8 ek alanı ──
     pid: str = ""                               # Production ID (ZORUNLU)
+    session_id: str = ""                        # HLK Session ID (pre-PID tracking)
     event_duration_ms: float = 0.0              # Event süresi (ms)
     related_file: str = ""                      # İlgili Dosya
     related_workflow: str = "WF-016"            # İlgili Workflow
@@ -186,6 +187,7 @@ class ExecutionEvent:
         """LAC'ta gösterilecek formata dönüştür."""
         return {
             "pid": self.pid,
+            "session_id": self.session_id,
             "event_id": self.event_id,
             "event_name": self.event_name,
             "phase": self.execution_phase.value,
@@ -214,21 +216,30 @@ class ExecutionEventCollector:
     def __init__(self):
         self._events: list[ExecutionEvent] = []
         self._events_by_pid: dict[str, list[ExecutionEvent]] = {}
+        self._events_by_session: dict[str, list[ExecutionEvent]] = {}
         self._active_pid: str | None = None
+        self._active_session_id: str = ""
         self._session_start: float | None = None
 
     # ── LISTEN: Executor'u Dinle ───────────────────────────────────────────
 
-    def listen(self, pid: str) -> None:
+    def listen(self, pid: str, session_id: str = "") -> None:
         """Belirtilen PID için Executor'u dinlemeye başla.
 
         EEC-002: Her Event PID ile ilişkilendirilir.
+        Session ID, pre-PID olayların izlenebilirliği için kullanılır.
         """
         self._active_pid = pid
+        self._active_session_id = session_id
         self._session_start = time.time()
         if pid not in self._events_by_pid:
             self._events_by_pid[pid] = []
-        logger.info(f"👂 [EEC LISTEN] PID={pid} — Executor dinleniyor")
+        if session_id and session_id not in self._events_by_session:
+            self._events_by_session[session_id] = []
+        logger.info(
+            f"👂 [EEC LISTEN] PID={pid} session={session_id or 'N/A'} "
+            f"— Executor dinleniyor"
+        )
 
     # ── TRANSFORM + REGISTER: Event Üret ve Kaydet ─────────────────────────
 
@@ -267,6 +278,7 @@ class ExecutionEventCollector:
             related_file=related_file,
             execution_phase=phase,
             pid=pid,
+            session_id=self._active_session_id,
             timestamp=timestamp,
             workflow_id="WF-016",
             feature_id="FEAT-020",
@@ -275,17 +287,25 @@ class ExecutionEventCollector:
         if result:
             event.complete(result)
             logger.info(f"📤 [EEC EMIT] {event.event_constant.value} "
-                        f"| PID={pid} | file={related_file} | "
+                        f"| PID={pid} | session={self._active_session_id or 'N/A'} "
+                        f"| file={related_file} | "
                         f"phase={phase.value} | dur={event.event_duration_ms:.0f}ms")
         else:
             logger.info(f"📤 [EEC EMIT] {event.event_constant.value} "
-                        f"| PID={pid} | phase={phase.value}")
+                        f"| PID={pid} | session={self._active_session_id or 'N/A'} "
+                        f"| phase={phase.value}")
 
         # REGISTER: Olay Kayıt Merkezi'ne kaydet
         self._events.append(event)
         if pid not in self._events_by_pid:
             self._events_by_pid[pid] = []
         self._events_by_pid[pid].append(event)
+
+        # Session-based indeks
+        if self._active_session_id:
+            if self._active_session_id not in self._events_by_session:
+                self._events_by_session[self._active_session_id] = []
+            self._events_by_session[self._active_session_id].append(event)
 
         return event
 
@@ -322,6 +342,10 @@ class ExecutionEventCollector:
         if pid is None:
             pid = self._active_pid
         return self._events_by_pid.get(pid or "", [])
+
+    def get_events_by_session(self, session_id: str) -> list[ExecutionEvent]:
+        """Belirtilen Session ID için tüm Event'leri döndürür."""
+        return self._events_by_session.get(session_id, [])
 
     def get_lac_feed(self, pid: str | None = None) -> list[dict]:
         """LAC'ta gösterilecek formatta Event akışı döndürür.

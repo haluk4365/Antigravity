@@ -558,3 +558,114 @@ body.admin-mode .child-source { display: inline !important; }
 .ev-evidence { font-size: 12px; padding: 6px 10px; background: #fefce8; border-left: 3px solid #eab308; border-radius: 0 4px 4px 0; margin: 4px 0; }
 .ev-thumb { font-size: 12px; padding: 2px 0; }
 .ev-decisions { font-size: 12px; padding: 4px 0; color: #475569; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AR-002_59: Explainable Diagnostics Card — Açıklanabilir Tanı Kartı
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Diagnostic Badges (Workflow header) */
+.wf-healing-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 4px;
+  background: #e8f5e9; color: #2e7d32;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.wf-retry-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 4px;
+  background: #fff3e0; color: #e65100;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.wf-exhausted-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  margin: 0 4px;
+  background: #ffebee; color: #c62828;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Diagnostics Card Container */
+.diagnostics-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+
+/* Diagnostic Rows */
+.diag-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 7px 0;
+  border-bottom: 1px solid #f1f5f9;
+  gap: 12px;
+}
+.diag-row:last-child { border-bottom: none; }
+.diag-final { border-top: 2px solid #e2e8f0; padding-top: 10px; margin-top: 4px; }
+
+.diag-label {
+  font-weight: 600;
+  color: #475569;
+  min-width: 200px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.diag-value {
+  color: #334155;
+  text-align: right;
+  word-break: break-word;
+  font-size: 13px;
+}
+.diag-value.success { color: #16a34a; font-weight: 600; }
+.diag-value.failed { color: #dc2626; font-weight: 600; }
+.diag-value.running { color: #2563eb; font-weight: 600; }
+.diag-value.pending { color: #94a3b8; }
+.diag-value.permanent { color: #dc2626; font-weight: 700; }
+.diag-value.transient { color: #e65100; }
+.diag-value.none { color: #94a3b8; }
+
+/* Provider & Recovery Sections */
+.diag-provider-section, .diag-recovery-section {
+  padding: 7px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.diag-provider-item, .diag-recovery-step {
+  padding: 4px 0 4px 16px;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+.diag-provider-item small { color: #94a3b8; font-size: 11px; }
+.diag-provider-item.ok { color: #16a34a; }
+.diag-provider-item.failed { color: #dc2626; }
+
+/* Final Result Highlight */
+.final-result.failed {
+  color: #dc2626;
+  font-weight: 700;
+  background: #fef2f2;
+  padding: 6px 10px;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 400px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.final-result.completed {
+  color: #16a34a;
+  font-weight: 600;
+}

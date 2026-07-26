@@ -34,6 +34,7 @@ class EventRecord:
     target_state: str = ""
     producer: str = ""
     pid: str = ""                   # Production ID
+    session_id: str = ""            # HLK Session ID (pre-PID tracking)
     timestamp: str = ""
     duration_ms: float = 0.0
     phase: str = ""
@@ -74,6 +75,7 @@ class EventRegistry:
     def __init__(self):
         self._records: list[EventRecord] = []
         self._by_pid: dict[str, list[EventRecord]] = {}
+        self._by_session: dict[str, list[EventRecord]] = {}
         self._by_category: dict[str, list[EventRecord]] = {}
         self._session_start: float = time.time()
 
@@ -94,6 +96,12 @@ class EventRegistry:
                 self._by_pid[record.pid] = []
             self._by_pid[record.pid].append(record)
 
+        # Session ID indeksi (pre-PID izlenebilirlik)
+        if record.session_id:
+            if record.session_id not in self._by_session:
+                self._by_session[record.session_id] = []
+            self._by_session[record.session_id].append(record)
+
         # Kategori indeksi
         cat = record.category or "GENEL"
         if cat not in self._by_category:
@@ -102,7 +110,8 @@ class EventRegistry:
 
         logger.debug(
             f"📝 [EventRegistry] Kaydedildi: {record.event_id} | "
-            f"PID={record.pid} | {record.event_name[:40]}"
+            f"PID={record.pid} | session={record.session_id or 'N/A'} "
+            f"| {record.event_name[:40]}"
         )
         return record
 
@@ -126,6 +135,7 @@ class EventRegistry:
             target_state=execution_event.target_state,
             producer=execution_event.producer,
             pid=execution_event.pid,
+            session_id=execution_event.session_id,
             timestamp=execution_event.timestamp or f"{time.time():.0f}",
             duration_ms=execution_event.event_duration_ms,
             phase=execution_event.execution_phase.value,

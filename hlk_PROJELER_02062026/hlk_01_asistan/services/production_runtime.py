@@ -144,6 +144,8 @@ class ProductionRuntime:
         self._current_pid: str = ""
         self._result: Optional[ProductionResult] = None
         self._cancel_requested: bool = False
+        self._is_reproduction: bool = False
+        self._gate_check_report: dict = {}
 
         # ── Concurrency control ──────────────────────────────────────────
         self._lock = asyncio.Lock()
@@ -211,6 +213,36 @@ class ProductionRuntime:
                     self._result.error = "CEE PRE-CHECK FAIL — anayasal denetim başarısız"
                     self._result.completed_at = datetime.now(timezone.utc).isoformat()
                     return self._result
+                self._check_cancellation()
+
+                # ── Adım 6.5: Production Gate Check (AR-002_90) ──────
+                # Video Production başlamadan önce WF-001…WF-007'nin
+                # COMPLETED olduğunu doğrula. Eksik WF varsa recovery
+                # loop başlat (max 3 deneme).
+                if not self._is_reproduction:
+                    logger.info("🚪 [Production Gate] AR-002_90 kontrolü başlıyor (Adım 6.5)")
+                    gate_result = await self._run_production_gate_check(request)
+                    self._result.gate_check = gate_result
+                    self._result.completed_steps = 6.5
+                    if not gate_result.get("passed"):
+                        logger.error(
+                            f"🚪 [Production Gate] KAPALI — "
+                            f"{len(gate_result.get('failed_workflows', []))} WF eksik, "
+                            f"{gate_result.get('recovery_attempts', 0)} recovery denemesi"
+                        )
+                        self._state = ProductionState.FAILED
+                        self._result.state = ProductionState.FAILED.value
+                        self._result.success = False
+                        self._result.error = (
+                            f"Production Gate CLOSED — "
+                            f"WF-001…WF-007 tamamlanmamış: "
+                            f"{', '.join(gate_result.get('failed_workflows', []))}"
+                        )
+                        self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                        # Gate check raporunu package'e yaz (PID yoksa sonra yazılır)
+                        self._gate_check_report = gate_result
+                        return self._result
+                    logger.info("🚪 [Production Gate] AÇIK — tüm ön WF'ler COMPLETED")
                 self._check_cancellation()
 
                 # ── Adım 7: PID Oluşturma (PID Runtime) ────────────────
@@ -529,6 +561,69 @@ class ProductionRuntime:
     # ═══════════════════════════════════════════════════════════════════════
     # CEE Entegrasyonu (21_CONSTITUTION_ENFORCEMENT_ENGINE.md)
     # ═══════════════════════════════════════════════════════════════════════
+
+    async def _run_production_gate_check(self, request) -> dict:
+        """AR-002_90: Production Gate Check."""
+        required_wfs = ["WF-001", "WF-002", "WF-003", "WF-004",
+                        "WF-005", "WF-006", "WF-007"]
+        max_recovery = int(os.getenv("GC_PRODUCTION_GATE_MAX_RECOVERY", "3"))
+        result = {"passed": False, "failed_workflows": [],
+                  "recovery_attempts": 0, "escalated": False, "checks": []}
+
+        for recovery_n in range(max_recovery + 1):
+            failed_wfs = []
+            for wf_id in required_wfs:
+                wf_status = await self._check_workflow_status(wf_id, request)
+                result["checks"].append({"wf_id": wf_id, "status": wf_status,
+                                         "recovery_attempt": recovery_n})
+                if wf_status not in ("COMPLETED", "completed"):
+                    failed_wfs.append(wf_id)
+
+            if not failed_wfs:
+                result["passed"] = True
+                result["recovery_attempts"] = recovery_n
+                return result
+
+            if recovery_n < max_recovery:
+                result["recovery_attempts"] = recovery_n + 1
+                delay = float(os.getenv("GC_PRODUCTION_GATE_RECOVERY_DELAY", "3"))
+                await asyncio.sleep(delay)
+                continue
+
+            result["failed_workflows"] = failed_wfs
+            result["recovery_attempts"] = max_recovery
+            result["escalated"] = True
+            try:
+                from services.escalation_engine import escalation_engine
+                escalation_engine.escalate(
+                    pid="GATE-CHECK", reason="Production Gate CLOSED",
+                    detail=f"WF eksik: {failed_wfs}. {max_recovery} deneme.",
+                    failed_providers=failed_wfs, retry_count=max_recovery)
+            except Exception:
+                pass
+            return result
+        return result
+
+    async def _check_workflow_status(self, wf_id: str, request) -> str:
+        """AR-002_90: Tek bir Workflow durumunu kontrol eder."""
+        wf_checks = {
+            "WF-001": lambda p: bool((p or {}).get("brief", {}).get("url")),
+            "WF-002": lambda p: bool((p or {}).get("research_results")),
+            "WF-003": lambda p: bool((p or {}).get("brief", {}).get("product_name")),
+            "WF-004": lambda p: bool((p or {}).get("brief", {}).get("product_name")),
+            "WF-005": lambda p: bool((p or {}).get("scenario")),
+            "WF-006": lambda p: bool((p or {}).get("scenario")),
+            "WF-007": lambda p: bool((p or {}).get("decision_history")),
+        }
+        checker = wf_checks.get(wf_id)
+        if checker is None:
+            return "inactive"
+        try:
+            user_data = getattr(request, 'user_data', {}) or {}
+            pkg = user_data.get("production_package", {}) or {}
+            return "COMPLETED" if checker(pkg) else "pending"
+        except Exception:
+            return "pending"
 
     async def _run_cee_pre_check(self) -> Optional[dict]:
         """CEE PRE-CHECK: Production başlamadan önce anayasal denetim.
@@ -1278,6 +1373,16 @@ class ProductionRuntime:
 
             await package_runtime.update_section(
                 pid, "service_usage", ctx.cost_report
+            )
+            # AR-002_59: Explainable Diagnostics — provider denemeleri ve recovery
+            await package_runtime.update_section(
+                pid, "provider_attempts", ctx.provider_attempts
+            )
+            await package_runtime.update_section(
+                pid, "recovery_steps", ctx.recovery_steps
+            )
+            await package_runtime.update_section(
+                pid, "retry_counts", ctx.retry_counts
             )
             if ctx.video_path:
                 await package_runtime.update_section(

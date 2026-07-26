@@ -214,8 +214,13 @@ function renderTree(workflows) {
     if (isOpen) wfClasses.push('open');
 
     const badges = [];
-    if (wf.is_root_cause) badges.push('<span class="wf-root-badge">🔴 ROOT CAUSE</span>');
+    if (wf.is_root_cause) badges.push('<span class="wf-root-badge" title="' + esc(wf.root_cause_detail || '') + '">🔴 ROOT CAUSE</span>');
     if (wf.affected_by_root_cause) badges.push('<span class="wf-affected-badge">ETKİLENDİ</span>');
+    // AR-002_59: Explainable Diagnostics badges
+    var dx = wf.diagnostics || {};
+    if (dx.self_healing_applied) badges.push('<span class="wf-healing-badge">🩺 SELF-HEALING ✓</span>');
+    if (dx.retry_count > 0) badges.push('<span class="wf-retry-badge">🔄 RETRY x' + dx.retry_count + '</span>');
+    if (dx.error_classification === 'PERMANENT') badges.push('<span class="wf-exhausted-badge">⛔ PROVIDER EXHAUSTED</span>');
 
     html += '<div class="' + wfClasses.join(' ') + '">';
     html += '  <div class="wf-header" onclick="toggleWF(this.parentElement)">';
@@ -773,6 +778,101 @@ function renderDetailTable(detail, nodeType) {
   }
   if (nodeType === 'api_ref' && detail.name) {
     return '<div class="child-kaynak"><strong>Modül:</strong> ' + esc(detail.module || '') + ' | <strong>URL:</strong> ' + esc(detail.url || '') + '</div>';
+  }
+
+  // AR-002_59: Explainable Diagnostics Card
+  if (nodeType === 'explainable_diagnostics') {
+    var d = detail;
+    var h = '<div class="diagnostics-card">';
+
+    // 1. Workflow Status
+    var statusIcons = {completed:'🟢', running:'🟡', pending:'⚪', failed:'🔴', inactive:'⚫'};
+    h += '<div class="diag-row"><span class="diag-label">Is Akisi Durumu:</span>'
+      + '<span class="diag-value ' + esc(d.status || '') + '">'
+      + (statusIcons[d.status] || '⚪') + ' ' + esc((d.status || '').toUpperCase()) + '</span></div>';
+
+    // 2. Root Cause
+    h += '<div class="diag-row"><span class="diag-label">Kok Neden (Root Cause):</span>'
+      + '<span class="diag-value">' + esc(d.root_cause || '—') + '</span></div>';
+
+    // 3. Self-Healing
+    h += '<div class="diag-row"><span class="diag-label">Kendi Kendine Iyilesme (AR-002_91):</span>'
+      + '<span class="diag-value ' + (d.self_healing_applied ? 'success' : 'pending') + '">'
+      + (d.self_healing_applied ? '✅ Uygulandi' : '○ Uygulanmadi') + '</span></div>';
+
+    // 4. Recovery Policy
+    h += '<div class="diag-row"><span class="diag-label">Kurtarma Politikasi (AR-002_83):</span>'
+      + '<span class="diag-value ' + (d.recovery_policy_applied ? 'success' : 'pending') + '">'
+      + (d.recovery_policy_applied ? '✅ Uygulandi' : '○ Uygulanmadi') + '</span></div>';
+
+    // 5. Retry Counts
+    var rc = d.retry_counts || {};
+    var rcKeys = Object.keys(rc);
+    if (rcKeys.length > 0) {
+      h += '<div class="diag-row"><span class="diag-label">Retry Sayilari:</span><span class="diag-value">';
+      rcKeys.forEach(function(k) { h += esc(k) + ': ' + rc[k] + 'x | '; });
+      h += '</span></div>';
+    }
+
+    // 6. Provider Attempts
+    var pa = d.provider_attempts || {};
+    var paKeys = Object.keys(pa);
+    if (paKeys.length > 0) {
+      h += '<div class="diag-provider-section"><div class="diag-label">Provider Denemeleri:</div>';
+      paKeys.forEach(function(cat) {
+        var items = Array.isArray(pa[cat]) ? pa[cat] : [];
+        items.forEach(function(p) {
+          var icon = p.result === 'ok' ? '✅' : '❌';
+          h += '<div class="diag-provider-item ' + esc(p.result || '') + '">'
+            + icon + ' ' + esc(cat) + '/' + esc(p.provider || '?')
+            + ' (deneme ' + (p.attempt || '?') + ')'
+            + (p.error ? ' <small>— ' + esc(String(p.error).substring(0, 100)) + '</small>' : '')
+            + '</div>';
+        });
+      });
+      h += '</div>';
+    }
+
+    // 7. Recovery Steps
+    var rs = d.recovery_steps || [];
+    if (rs.length > 0) {
+      h += '<div class="diag-recovery-section"><div class="diag-label">Recovery Adimlari (' + rs.length + ' adim):</div>';
+      rs.forEach(function(s) {
+        h += '<div class="diag-recovery-step">'
+          + 'Adim ' + esc(s.step || '?') + ': ' + esc(s.action || '')
+          + ' → ' + esc(s.result || '') + '</div>';
+      });
+      h += '</div>';
+    }
+
+    // 8. Decision History
+    var dh = d.decision_history || [];
+    if (dh.length > 0) {
+      h += '<div class="diag-row"><span class="diag-label">Karar Gecmisi:</span>'
+        + '<span class="diag-value">' + dh.length + ' karar (Provider/Switch/Recovery)</span></div>';
+    }
+
+    // 9. Event History
+    var eh = d.event_history || [];
+    if (eh.length > 0) {
+      h += '<div class="diag-row"><span class="diag-label">Olay Gecmisi:</span>'
+        + '<span class="diag-value">' + eh.length + ' olay kaydedildi</span></div>';
+    }
+
+    // 10. Error Classification
+    if (d.error_classification) {
+      h += '<div class="diag-row"><span class="diag-label">Hata Siniflandirmasi:</span>'
+        + '<span class="diag-value ' + esc(d.error_classification.toLowerCase()) + '">'
+        + esc(d.error_classification) + '</span></div>';
+    }
+
+    // 11. Final Result
+    h += '<div class="diag-row diag-final"><span class="diag-label">Nihai Sonuc:</span>'
+      + '<span class="diag-value final-result ' + esc(d.status || '') + '">'
+      + esc(d.exhaustion_reason || '—') + '</span></div>';
+
+    h += '</div>';
+    return h;
   }
 
   // Genel: key-value tablosu

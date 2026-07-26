@@ -546,6 +546,37 @@ class HLKRuntime:
             return ctx is not None and ctx.constitution_runtime_active
         return _constitution_runtime.is_active
 
+    def get_session_id_for_user(self, user_id: str | int) -> str:
+        """Kullanıcının aktif oturumunun session_id'sini döndürür.
+
+        Pre-PID olayların izlenebilirliği için EEC, EventRegistry ve LAC
+        katmanlarına session_id aktarımında kullanılır.
+
+        Args:
+            user_id: Telegram kullanıcı ID'si.
+
+        Returns:
+            session_id string veya boş string (oturum yoksa).
+        """
+        ctx = self.get_session(user_id)
+        return ctx.session_id if ctx else ""
+
+    def get_session_for_pid(self, pid: str) -> RuntimeContext | None:
+        """PID'ye bağlı RuntimeContext'i döndürür.
+
+        Production başladıktan sonra PID ile session ilişkisini çözer.
+
+        Args:
+            pid: Production ID.
+
+        Returns:
+            RuntimeContext veya None.
+        """
+        for ctx in self._sessions.values():
+            if ctx.production_pid == pid:
+                return ctx
+        return None
+
     # ── MASTER-013 / AR-002_81: Karar Otoritesi ──────────────────────────────
 
     def request_decision(self, request: DecisionRequest) -> RuntimeDecision:

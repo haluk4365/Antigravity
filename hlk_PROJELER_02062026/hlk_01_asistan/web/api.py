@@ -107,6 +107,35 @@ async def api_workflow_tree(request: Request, pid: str):
         raise HTTPException(500, str(e))
 
 
+@router.get("/session/{session_id}/workflows")
+async def api_session_workflows(request: Request, session_id: str):
+    """AR-002_59: Session ID bazlı pre-PID workflow durumları.
+
+    PID oluşmadan önceki WF-001…WF-007 aralığındaki workflow'ların
+    session olayları üzerinden durumunu döndürür.
+    """
+    _check_auth(request)
+    try:
+        from .data_providers import get_events
+        from services.hlk_runtime import hlk_runtime as _hr
+        events = get_events(session_id=session_id, limit=200)
+        # Session'ı bul ve bağlı PID varsa onu da döndür
+        pid = ""
+        for ctx in getattr(_hr, '_sessions', {}).values():
+            if hasattr(ctx, 'session_id') and ctx.session_id == session_id:
+                pid = getattr(ctx, 'production_pid', '')
+                break
+        return {
+            "session_id": session_id,
+            "pid": pid or None,
+            "events": events,
+            "event_count": len(events),
+        }
+    except Exception as e:
+        logger.error(f"Session workflows alınamadı ({session_id}): {e}")
+        raise HTTPException(500, str(e))
+
+
 @router.get("/pid/{pid}/compliance")
 async def api_compliance_report(request: Request, pid: str):
     """PID için anayasal uyumluluk özet raporu."""
@@ -186,12 +215,12 @@ async def api_providers_health(request: Request):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/events")
-async def api_events(request: Request, pid: str = "", limit: int = 50):
-    """Event log (PID filtresi opsiyonel)."""
+async def api_events(request: Request, pid: str = "", session_id: str = "", limit: int = 50):
+    """Event log (PID veya session_id filtresi opsiyonel)."""
     _check_auth(request)
     try:
         from .data_providers import get_events
-        return {"events": get_events(pid=pid or None, limit=limit)}
+        return {"events": get_events(pid=pid or None, session_id=session_id or None, limit=limit)}
     except Exception as e:
         logger.error(f"Event verisi alınamadı: {e}")
         raise HTTPException(500, str(e))
