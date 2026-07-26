@@ -619,16 +619,13 @@ class ProductionExecutor:
                     + ", ".join(f"{k}={output[k]}" for k in proof_keys)
                 )
 
-            # Task Checkpoint: status + output persist (AR-002_84)
+            # AR-002_85: Task status gerçek execution sonucuna göre belirlenir.
+            # output içindeki proof (generated/delivered) kontrol edilir.
+            # proof'ların HEPSI True ise → SUCCESS, değilse → FAILED.
+            proof_keys = [k for k in ("generated", "delivered") if k in output]
+            all_proved = all(bool(output.get(k)) for k in proof_keys) if proof_keys else None
+            task["status"] = "SUCCESS" if all_proved else "FAILED"
             await self._checkpoint_task_completion(task_id, pid, output)
-
-            # MASTER-013: In-memory task status güncellemesi.
-            # Checkpoint diske yazar ama memory'deki task dict'ini
-            # güncellemez. Retry loop'ta _run_task_handler tekrar
-            # çağrıldığında task["status"] hâlâ "PENDING" olduğu için
-            # handler tekrar çalışır → send_message() mükerrer çağrılır.
-            # Bu güncelleme line 581'deki early-return guard'ı aktif eder.
-            task["status"] = "COMPLETED"
             return output
 
         # ── Fallback: handler kayıtlı değil (test/simülasyon modu) ──────
@@ -650,11 +647,10 @@ class ProductionExecutor:
         # Recovery sırasında tamamlanan task'lar tekrar yürütülmesin
         await self._checkpoint_task_completion(task_id, pid, task_output)
 
-        # MASTER-013: In-memory task status güncellemesi (fallback path).
-        # Checkpoint diske yazar ama memory'deki task dict'ini güncellemez.
-        # handler path ile aynı sebep — line 581'deki early-return guard'ı
-        # aktif etmek için gerekli.
-        task["status"] = "COMPLETED"
+        # Fallback path: handler kayıtlı değilse, görev sonucu net değildir.
+        # AR-002_85 gereği kanıt olmadan SUCCESS sayılamaz → PENDING korunur
+        # ancak executed_at işaretlenir. Recovery'de tekrar çalıştırılabilir.
+        task["status"] = "EXECUTED"
         return task_output
 
     async def _checkpoint_task_completion(
