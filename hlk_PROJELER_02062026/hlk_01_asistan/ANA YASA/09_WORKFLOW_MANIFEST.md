@@ -8,27 +8,50 @@ Business Workflow kayıtları.
 
 ### Workflow
 
-HLK Karar ve Yönetim Merkezi — Product Link Validation & Production Planning
+HLK Decision and Management Center — Karar ve Yönetim Merkezi
 
 ### Açıklama
 
-WF-001, HLK'nın çalışma oturumudur. Sistemdeki ilk çalışan ajan değil, ilk karar vericidir.
+WF-001, HLK'nın oturum boyunca çalışan Karar ve Yönetim Merkezidir. Sistemdeki ilk karar vericidir; araştırma yapmaz, üretim sürecini yönetir.
 
-WF-001'in temel görevi araştırma yapmak değil, üretim sürecini yönetmektir:
-- Kullanıcıdan alınan ürün linkini doğrulamak (GK-001_1..12)
-- Ürünü tanımak ve analiz etmek
-- "Bu ürünü eksiksiz, güvenilir ve en kaliteli şekilde tanıtabilmem için hangi bilgilere ihtiyacım var?" sorusunu cevaplamak
-- Ürün tipine göre dinamik Bilgi Açığı Listesi oluşturmak
-- Yapılacak işleri, öncelik sırasını ve uygun uzman ajanları belirlemek
-- Uzman ajanları görevlendirmek (Link Validation, Product Research, Image Research, Brand Research, Technical Research, Asset Organizer)
-- Ajan sonuçlarını değerlendirmek, eksik bilgi varsa yeni görev oluşturmak
-- Toplanan tüm doğrulanmış bilgileri standart klasör yapısına yerleştirmek
-- Production Package'i eksiksiz oluşturmak
-- Hazır hale gelen Production Package'i WF-002'ye devretmek
+**İş Akışı (12 Adım):**
 
-HLK = WF-001. Üretim süreci boyunca tek karar verici WF-001'dir. Hiçbir ajan karar veremez. Tüm kararlar WF-001 tarafından alınır.
+1. **Product Link Validation** — Kullanıcıdan alınan ürün linki doğrulanır (GK-001_1..12). Link doğrulanmadan hiçbir alt süreç başlatılamaz.
 
-Link doğrulanmadan hiçbir araştırma başlatılamaz. Ürün tanınmadan araştırma başlatılmaz.
+2. **Reference Product** — Doğrulanmış link üzerinden referans ürün kaydı oluşturulur. Ürün tanınmadan araştırma başlatılmaz.
+
+3. **Ürün Analizi** — Ürünün teknik özellikleri, kategorisi, pazar konumu ve temel nitelikleri analiz edilir.
+
+4. **Dynamic Information Gaps** — HLK, "Bu ürünü eksiksiz, güvenilir ve en kaliteli şekilde tanıtabilmem için hangi bilgilere ihtiyacım var?" sorusunu değerlendirir. Ürün tipine göre dinamik Bilgi Açığı Listesi oluşturur. Sabit kontrol listesi kullanılmaz.
+
+5. **Görev Planı** — Yapılacak işler, öncelik sırası ve uygun uzman ajanlar belirlenir.
+
+6. **Selection Architecture** — Aşağıdaki seçimler anayasal kurallara göre yapılır:
+   - Link Validation Agent seçimi (AR-002_46A)
+   - Research Agent seçimi (AR-002_19, AR-002_46)
+   - Service Provider seçimi (AR-002_21, AR-002_22, AR-002_75)
+   - Aday sayısı ve yedek aday sayısı GC parametrelerine göre belirlenir (GC_PRIMARY_CANDIDATE_COUNT, GC_BACKUP_CANDIDATE_COUNT)
+
+7. **Task Package Oluşturma** — Seçilen ajanlar için AR-002_47 hükümlerine uygun Task Package'ler oluşturulur. Her ajan yalnızca kendi görevini yerine getirebilmesi için gerekli minimum bilgiye erişebilir.
+
+8. **Araştırma Sonuçlarının Değerlendirilmesi** — Bütün ajan sonuçları HLK tarafından değerlendirilir. Eksik bilgi varsa yeni görev oluşturulur. Yetersiz sonuç varsa uygun ajan tekrar görevlendirilir.
+
+9. **Information Gaps Güncelleme** — Araştırma sonuçlarına göre Bilgi Açığı Listesi güncellenir. Tüm açıklar kapanana kadar görevlendirme devam eder.
+
+10. **Production Package Hazırlama** — Toplanan tüm doğrulanmış bilgiler standart klasör yapısına yerleştirilir. Production Package eksiksiz oluşturulur (AR-002_58, 16_PRODUCTION_PACKAGE_STANDARD.md).
+
+11. **WF-001 Work Package** — WF-001 kendi çalışma paketini oluşturur. Bu paket en az şu bölümleri içerir: Link Validation, Product Profile, Product Classification, Information Gaps, Task Plan, Agent Selection, Service Provider Selection, Assigned Tasks, Agent Results, Decision History, Production Package, Handover Report.
+
+12. **Handover** — HLK "READY FOR WF-002" kararını verir. Hazır hale gelen Production Package WF-002'ye devredilir.
+
+**Temel İlkeler:**
+- HLK = WF-001. Üretim süreci boyunca tek karar verici WF-001'dir.
+- Hiçbir ajan karar veremez. Ajanlar yalnızca verilen görevi icra eder.
+- WF-001 yeni raporlama sistemi oluşturmaz; mevcut anayasal kayıtları (Decision History, Production Package, Execution Event, Olay Kayıt Merkezi, LAC) ilişkilendirerek görünür hale getirir.
+- Fake Progress üretilmez. Tüm kararlar izlenebilirdir.
+- Production Package ve Work Package birbirinden bağımsız tutulur.
+
+**Görev Tamamlama Kriteri:** Link doğrulanmış, Product Profile oluşturulmuş, Dynamic Information Gaps oluşturulmuş, Görev Planı hazırlanmış, Selection Architecture uygulanmış, Task Package'ler oluşturulmuş, araştırma sonuçları değerlendirilmiş, Information Gaps güncellenmiş, Production Package hazırlanmış, WF-001 Work Package hazırlanmış, Handover Report oluşturulmuş ve HLK "READY FOR WF-002" kararını vermiş olmalıdır.
 
 ### Durum
 
