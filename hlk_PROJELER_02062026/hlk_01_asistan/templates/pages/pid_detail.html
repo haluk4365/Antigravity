@@ -102,7 +102,14 @@ function restoreOpenState(openWFs, openChildren) {
   });
   document.querySelectorAll('.child-node').forEach(el => {
     const titleEl = el.querySelector('.child-title');
-    if (titleEl && openChildren.includes(titleEl.textContent.trim())) {
+    var title = titleEl ? titleEl.textContent.trim() : '';
+    // AR-002_59: Output Contract her zaman açık (birincil katman)
+    if (title.indexOf('📦 Output Contract') === 0) {
+      el.classList.add('open');
+      return;
+    }
+    // Details Group: kullanıcı tercihine saygılı (saklanan durumu kullan)
+    if (titleEl && openChildren.includes(title)) {
       el.classList.add('open');
     }
   });
@@ -399,6 +406,31 @@ function getBilingualTitle(baslik, nodeType) {
 /* ── Detail Tablosu ─────────────────────────────────────────────────────── */
 function renderDetailTable(detail, nodeType) {
   if (!detail || Object.keys(detail).length === 0) return '';
+
+  // AR-002_59: Output Contract — ANA ÇIKTI, birincil katman
+  if (nodeType === 'output_contract' && detail.items) {
+    var h = '<div class="output-contract-card">';
+    h += '<div class="oc-status">' + esc(detail.status_icon || '') + ' '
+      + esc(detail.wf_id || '') + ' — ' + esc(detail.status || '') + '</div>';
+    h += '<div class="oc-items">';
+    detail.items.forEach(function(item) {
+      var iconClass = item.icon === '✓' ? 'oc-ok' : (item.icon === '✗' ? 'oc-fail' : 'oc-neutral');
+      h += '<div class="oc-item ' + iconClass + '">';
+      h += '<span class="oc-icon">' + esc(item.icon) + '</span>';
+      h += '<span class="oc-label">' + esc(item.label) + '</span>';
+      h += '<span class="oc-value">' + esc(item.value) + '</span>';
+      h += '</div>';
+    });
+    h += '</div></div>';
+    return h;
+  }
+
+  // Details Group — ikincil node'ları toplayan parent (kendisi render edilmez)
+  if (nodeType === 'details_group') {
+    return '<div class="details-group-info">'
+      + esc(detail.section_count || '0') + ' bölüm içeriyor. '
+      + 'Açmak için ▶ tıklayın.</div>';
+  }
 
   // Özel render: articles (Anayasal Dayanak)
   if (nodeType === 'constitutional_basis' && detail.articles) {

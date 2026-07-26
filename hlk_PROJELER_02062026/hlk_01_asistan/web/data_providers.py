@@ -301,6 +301,132 @@ def _find_events(events: list, *keywords: str) -> list:
     return result[:30]
 
 
+def _build_output_contract(wf_id: str, pkg: dict, status: str) -> dict:
+    """Her Workflow için Output Contract — WF'nin ürettiği gerçek çıktılar.
+
+    Explainable Workflow Explorer'ın birincil katmanıdır. Yönetici
+    ilk olarak WF'nin ne ürettiğini görmelidir.
+    """
+    brief = pkg.get("brief", {}) or {}
+    research = pkg.get("research_results", {}) or {}
+    refs = pkg.get("reference_images", []) or []
+    scenario = pkg.get("scenario", {}) or {}
+    tasks_pkg = pkg.get("task_packages", []) or []
+    service_usage = pkg.get("service_usage", {}) or {}
+    services = service_usage.get("services", {}) if isinstance(service_usage, dict) else {}
+    final_video = pkg.get("final_video", {}) or {}
+    delivery = pkg.get("delivery_info", {}) or {}
+    quality = pkg.get("quality_reports", {}) or {}
+    decisions = pkg.get("decision_history", []) or []
+
+    items = []
+
+    def _add(label, value, icon="✓"):
+        items.append({"label": label, "value": str(value)[:300], "icon": icon})
+
+    if wf_id == "WF-001":
+        has_url = bool(brief.get("url"))
+        _add("Link Doğrulama", brief.get("url", "Link yok"), "✓" if has_url else "✗")
+        _add("Ürün Adı", brief.get("product_name", "-") or "-")
+        _add("Marka", brief.get("brand", "-") or "-")
+        _add("Platform", brief.get("platform", "-") or "-")
+
+    elif wf_id == "WF-002":
+        product_name = brief.get("product_name", "") or ""
+        brand = brief.get("brand", "") or ""
+        _add("Ürün Analizi", f"{product_name} / {brand}" if product_name else "Veri yok",
+             "✓" if product_name else "✗")
+        _add("Marka Analizi", brand or "Veri yok", "✓" if brand else "✗")
+        _add("Referans Görseller", f"{len(refs)} adet",
+             "✓" if refs else "○")
+        research_keys = list(research.keys()) if isinstance(research, dict) else []
+        _add("Araştırma Sonuçları",
+             ", ".join(research_keys[:6]) if research_keys else "Veri yok",
+             "✓" if research_keys else "○")
+        svc_list = [f"{k} ({v})" for k, v in services.items()]
+        _add("Servis Kullanımı", ", ".join(svc_list) if svc_list else "Kayıt yok",
+             "✓" if svc_list else "○")
+        _add("Karar Geçmişi", f"{len(decisions)} karar",
+             "✓" if decisions else "○")
+
+    elif wf_id == "WF-003":
+        _add("Ürün Adı", brief.get("product_name", "-") or "-")
+        _add("Marka", brief.get("brand", "-") or "-")
+        _add("Platform", brief.get("platform", "-") or "-")
+        _add("Video Süresi", str(brief.get("duration", "-")) + "sn")
+        _add("Ses Dili", brief.get("voice_lang", "-") or "-")
+        _add("Ek Materyal", "Var" if brief.get("extra_materials") else "Yok")
+
+    elif wf_id == "WF-004":
+        _add("Brief Onayı", "Onaylandı" if status == "completed" else "Bekliyor")
+
+    elif wf_id == "WF-005":
+        has_scenario = bool(scenario)
+        sc_text = str(scenario.get("text", "") or scenario.get("summary", ""))
+        _add("Senaryo", sc_text[:200] if sc_text else "Henüz üretilmedi",
+             "✓" if has_scenario else "○")
+        sc_count = scenario.get("scene_count", 0) or len(scenario.get("scenes", []))
+        _add("Sahne Sayısı", str(sc_count or "-"))
+
+    elif wf_id == "WF-006":
+        _add("Senaryo Onayı", "Onaylandı" if status == "completed" else "Bekliyor")
+
+    elif wf_id == "WF-007":
+        pricing = pkg.get("pricing", {}) or {}
+        _add("Fiyat Teklifi",
+             f"{pricing.get('amount', '-')} {pricing.get('currency', '')}" if pricing.get("amount") else "Henüz belirlenmedi")
+        _add("Yönetici Onayı", "Onaylandı" if status == "completed" else "Bekliyor")
+
+    elif wf_id == "WF-008":
+        task_status = {}
+        for t in tasks_pkg:
+            task_status[t.get("agent", "?")] = t.get("status", "?")
+        img_ok = task_status.get("ImageGenerator") in ("COMPLETED", "SUCCESS")
+        voice_ok = task_status.get("VoiceGenerator") in ("COMPLETED", "SUCCESS")
+        video_ok = task_status.get("VideoRenderer") in ("COMPLETED", "SUCCESS")
+        delivery_ok = task_status.get("DeliveryAgent") in ("COMPLETED", "SUCCESS")
+        _add("Görsel (Image)", f"{'✓' if img_ok else '✗'} {task_status.get('ImageGenerator', '?')}",
+             "✓" if img_ok else "✗")
+        _add("Ses (Voice)", f"{'✓' if voice_ok else '✗'} {task_status.get('VoiceGenerator', '?')}",
+             "✓" if voice_ok else "✗")
+        _add("Video (VideoRenderer)", f"{'✓' if video_ok else '✗'} {task_status.get('VideoRenderer', '?')}",
+             "✓" if video_ok else "✗")
+        _add("Teslim (Delivery)", f"{'✓' if delivery_ok else '✗'} {task_status.get('DeliveryAgent', '?')}",
+             "✓" if delivery_ok else "✗")
+        # Provider denemeleri özeti
+        pa = pkg.get("provider_attempts", {}) or {}
+        for cat, attempts in pa.items():
+            ok_count = sum(1 for a in attempts if a.get("result") == "ok") if isinstance(attempts, list) else 0
+            fail_count = len(attempts) - ok_count if isinstance(attempts, list) else 0
+            _add(f"Provider ({cat})", f"{len(attempts)} deneme, {ok_count}✓ {fail_count}✗")
+
+    elif wf_id == "WF-009":
+        q_verdict = quality.get("verdict", "") or "Bekliyor"
+        _add("Kalite Verdict", q_verdict)
+        q_score = quality.get("score", quality.get("total_score", "-"))
+        _add("Kalite Skoru", str(q_score))
+
+    elif wf_id == "WF-010":
+        delivered = delivery.get("delivered", False) or bool(final_video.get("delivered"))
+        _add("Teslim Durumu", "✓ Kullanıcıya gönderildi" if delivered else "✗ Gönderilmedi",
+             "✓" if delivered else "✗")
+        _add("Video Teslimi", "Var" if delivery.get("video") else "Yok (rapor gönderildi)")
+        _add("Teslim Zamanı", str(delivery.get("delivered_at", "-"))[:19])
+
+    # Durum ikonu
+    status_icons = {"completed": "✅", "failed": "❌", "running": "🔄", "pending": "⏳"}
+    oc_status = status_icons.get(status, "⏳")
+
+    return {
+        "wf_id": wf_id,
+        "status": status,
+        "status_icon": oc_status,
+        "items": items,
+        "item_count": len(items),
+        "has_output": len(items) > 0,
+    }
+
+
 def _build_workflow_diagnostics(
     wf_id: str, pkg: dict, status: str,
     decisions: list, events: list, tasks: list,
@@ -576,6 +702,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             wf_events = events
 
         nodes = []
+        detail_nodes = []  # Output Contract sonrası ikincil node'lar
 
         # ── LAC Anayasal Uygunluk ve Denetim Merkezi: 14 bölümlü yapı ──
         scanner = _get_scanner()
@@ -592,14 +719,14 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             f"Üretilen Çıktı: {wf_summary['output_count']} | Beslenen İş Akışı: {wf_summary['feeds_to_count']}",
             f"İhlal: {wf_summary['violation_count']} | Güven: {trust['total']}/100 ({trust['label']})",
         ]
-        nodes.append(_make_node("executive_summary", "0. Yönetici Özeti",
+        detail_nodes.append(_make_node("executive_summary", "0. Yönetici Özeti",
                                 status=wf_summary['status'],
                                 summary=" | ".join(summary_lines),
                                 source="Anayasa Tarayıcısı (Constitution Scanner)",
                                 detail={"summary": wf_summary, "trust_score": trust}))
 
         # 1. AMAÇ — Anayasa maddelerinden türetilir
-        nodes.append(_make_node("purpose", "1. Amaç",
+        detail_nodes.append(_make_node("purpose", "1. Amaç",
                                 status="completed" if ctx.get("purpose") else "pending",
                                 summary=ctx.get("purpose", f"{wf_id} — Anayasa'da tanımlı değil")[:400],
                                 source="ANA YASA",
@@ -641,7 +768,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                 source="ANA YASA + Constitution Scanner",
                                 detail={"articles": article_statuses,
                                         "gc_params": ctx.get("gc_params", [])})
-        nodes.append(basis_node)
+        detail_nodes.append(basis_node)
 
         # 3. HLK KARARI
         if wf_decisions:
@@ -678,7 +805,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                   summary="Henüz karar üretilmedi" if status != "inactive"
                                   else "Bu aşamada karar üretilmez",
                                   source="Karar Geçmişi (Decision History)")
-        nodes.append(hlk_node)
+        detail_nodes.append(hlk_node)
 
         # 4. YAPILAN İŞLEMLER
         ops = []
@@ -722,7 +849,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             f"{'✅' if m == 'done' else '❌' if m == 'failed' else '⏳' if m == 'running' else '○'} {t}"
             for m, t in ops[:12]
         )
-        nodes.append(_make_node("operations", "4. Yapılan İşlemler",
+        detail_nodes.append(_make_node("operations", "4. Yapılan İşlemler",
                                 status="completed" if all(m == "done" for m, _ in ops)
                                 else "running" if any(m in ("running", "pending") for m, _ in ops) else "pending",
                                 summary=ops_summary or "Henüz işlem kaydı yok",
@@ -734,7 +861,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
         if wf_id == "WF-002":
             # WF-002 Evidence Explorer — her çıktı genişletilebilir kanıtlarla
             evidence_outputs = _build_wf002_evidence(pkg, pid, scanner)
-            nodes.append(_make_node("outputs_evidence", "5. Üretilen Çıktılar",
+            detail_nodes.append(_make_node("outputs_evidence", "5. Üretilen Çıktılar",
                                     status="completed" if evidence_outputs else "pending",
                                     summary=f"{len(evidence_outputs)} çıktı — detayları görmek için tıklayın"
                                     if evidence_outputs else "Anayasa'da tanımlı değil",
@@ -751,7 +878,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                 if "Araştırma" in o and research: has_evidence = True
                 if "Marka" in o and brief.get("brand"): has_evidence = True
                 outputs_verified.append({"name": o, "exists": has_evidence})
-            nodes.append(_make_node("outputs", "5. Üretilen Çıktılar",
+            detail_nodes.append(_make_node("outputs", "5. Üretilen Çıktılar",
                                     status="completed" if outputs_verified and all(o["exists"] for o in outputs_verified)
                                     else "running" if any(o["exists"] for o in outputs_verified) else "pending",
                                     summary=f"{len(outputs_verified)} çıktı — "
@@ -769,7 +896,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                 "wf_id": fw,
                 "purpose": (fw_ctx.get("purpose", "") or "")[:120],
             })
-        nodes.append(_make_node("consumers", "6. Bu Çıktıları Kullanacak İş Akışları",
+        detail_nodes.append(_make_node("consumers", "6. Bu Çıktıları Kullanacak İş Akışları",
                                 status="completed" if feeds_to else "inactive",
                                 summary=" → ".join(feeds_to) if feeds_to
                                 else "Son İş Akışı — başka İş Akışı beslemez",
@@ -781,7 +908,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
         feed_items = []
         for fw, desc in feed_descriptions.items():
             feed_items.append({"wf_id": fw, "description": desc})
-        nodes.append(_make_node("feed_descriptions", "7. Sonraki İş Akışları Kullanım Açıklaması",
+        detail_nodes.append(_make_node("feed_descriptions", "7. Sonraki İş Akışları Kullanım Açıklaması",
                                 status="completed" if feed_items else "inactive",
                                 summary=f"{len(feed_items)} İş Akışı için kullanım açıklaması mevcut"
                                 if feed_items else "Anayasa'da tanımlı değil",
@@ -814,7 +941,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                   "feeds_to": feeds_to,
                               }})
         dep_node["alt_dugumler"] = dep_nodes
-        nodes.append(dep_node)
+        detail_nodes.append(dep_node)
 
         # 9. ANAYASAL UYGUNLUK
         compliance = scanner.evaluate_compliance(wf_id, pkg)
@@ -856,7 +983,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                        f"Kod: {trust['breakdown']['kod_uyumu']}",
                        source="Anayasa Tarayıcısı (Constitution Scanner)",
                        detail={"trust_score": trust}))
-        nodes.append(comp_node)
+        detail_nodes.append(comp_node)
 
         # 10. KANITLAR
         evidence_all = []
@@ -886,9 +1013,9 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                    summary=f"{len(evidence_all)} kanıt paketi",
                                    detail={})
             ev_parent["alt_dugumler"] = evidence_all
-            nodes.append(ev_parent)
+            detail_nodes.append(ev_parent)
         else:
-            nodes.append(_make_node("evidence", "10. Kanıtlar",
+            detail_nodes.append(_make_node("evidence", "10. Kanıtlar",
                                     status="pending" if status not in ("inactive",)
                                     else "inactive",
                                     summary="Henüz kanıt üretilmedi — bu İş Akışına ait çıktı dosyaları (görsel, video, ses) henüz oluşturulmadı veya Production Package'e kaydedilmedi"))
@@ -911,7 +1038,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                   status="pending" if status not in ("inactive",)
                                   else "inactive",
                                   summary="Henüz olay kaydı yok — bu İş Akışına ait EEC (Execution Event Collector) veya Olay Kayıt Merkezi tarafından kaydedilmiş bir olay bulunmuyor")
-        nodes.append(evt_node)
+        detail_nodes.append(evt_node)
 
         # 12. KAYITLAR
         if agent_logs and wf_id in ("WF-002", "WF-005", "WF-008", "WF-009"):
@@ -931,7 +1058,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                   status="pending",
                                   summary="Kayıt bulunamadı — bu İş Akışına ait agent log kayıtları (çalışma günlüğü) henüz oluşturulmadı" if wf_id in ("WF-008",)
                                   else "Bu aşamada kayıt üretilmez")
-        nodes.append(log_node)
+        detail_nodes.append(log_node)
 
         # 13. API
         api_refs = _get_api_refs_for_wf(wf_id)
@@ -951,7 +1078,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             api_node = _make_node("api", "13. API",
                                   status="pending",
                                   summary="Bu aşamada API referansı yok")
-        nodes.append(api_node)
+        detail_nodes.append(api_node)
         # 14. SONUC (Workflow Result)
         recs = scanner.generate_recommendations(wf_id, pkg)
         is_success = recs["is_success"]
@@ -976,7 +1103,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                      "compliance_verdict": recs["compliance_verdict"],
                                      "affected_workflows": recs["affected_workflows"],
                                  })
-        nodes.append(result_node)
+        detail_nodes.append(result_node)
 
         # 15. YAPILMASI GEREKENLER (Recommended Actions)
         rec_parts = []
@@ -1003,12 +1130,12 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                   "estimated_fix_seconds": recs.get("estimated_fix_seconds", 0),
                                   "estimated_success_rate": recs.get("estimated_success_rate", 0),
                               })
-        nodes.append(rec_node)
+        detail_nodes.append(rec_node)
 
         # ── AR-002_59: Explainable Diagnostics ──────────────────────────
         diag = _build_workflow_diagnostics(wf_id, pkg, status,
                                            decisions, events, tasks)
-        nodes.append(_make_node("explainable_diagnostics",
+        detail_nodes.append(_make_node("explainable_diagnostics",
             "16. Aciklanabilir Tani Karti (Explainable Diagnostics Card)",
             status="failed" if status == "failed" else (
                 "completed" if status == "completed" else (
@@ -1022,6 +1149,29 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             source="Production Package + Decision History + Event Registry",
             detail=diag,
         ))
+
+        # ── AR-002_59: Output Contract (ANA ÇIKTI — birincil katman) ──
+        oc = _build_output_contract(wf_id, pkg, status)
+        oc_node = _make_node("output_contract",
+            "📦 Output Contract — Bu İş Akışının Ürettiği Çıktılar",
+            status="completed" if oc["has_output"] else "pending",
+            summary=f"{oc['status_icon']} {oc['item_count']} çıktı üretildi",
+            source="Production Package",
+            detail=oc,
+        )
+        nodes.append(oc_node)
+
+        # ── Detaylar: İkincil katmanlar tek accordion altında ──
+        detay_sayisi = len(detail_nodes)
+        details_parent = _make_node("details_group",
+            f"▶ Detaylar ({detay_sayisi} bölüm: Anayasal Dayanak, Kararlar, Eventler, Diagnostics…)",
+            status="completed",
+            summary="Tüm anayasal referanslar, karar geçmişi, olay kayıtları ve tanı kartı",
+            source="ANA YASA + Decision History + Event Registry",
+            detail={"section_count": detay_sayisi},
+        )
+        details_parent["alt_dugumler"] = detail_nodes
+        nodes.append(details_parent)
 
         workflows.append({
             "wf_id": wf_id,
