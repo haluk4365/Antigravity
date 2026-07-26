@@ -260,12 +260,10 @@ class ProductionRuntime:
                     # doğrulama olmadan başarı kararı verilemez.
 
                 # ── Tamamlanma ──────────────────────────────────────────
-                elapsed = time.time() - start_time
-                self._state = ProductionState.COMPLETED
-                self._result.state = ProductionState.COMPLETED.value
                 # AR-002_85: başarı kararı yalnızca doğrulanmış sonuçlardan
                 # hesaplanır — executor raporu başarısız task içermemeli
                 # VE CEE POST-CHECK anayasal doğrulamadan geçmeli.
+                elapsed = time.time() - start_time
                 _exec_failed = (
                     executor_report.get("failed_tasks", 0)
                     if isinstance(executor_report, dict) else 0
@@ -274,13 +272,17 @@ class ProductionRuntime:
                     post_check_report.get("verdict") != "FAIL"
                     if post_check_report else True
                 )
-                self._result.success = (_exec_failed == 0) and _cee_passed
+                _success = (_exec_failed == 0) and _cee_passed
+                self._state = ProductionState.COMPLETED if _success else ProductionState.FAILED
+                self._result.state = self._state.value
+                self._result.success = _success
                 self._result.duration_seconds = elapsed
                 self._result.completed_at = datetime.now(timezone.utc).isoformat()
 
                 logger.info(
-                    f"✅ [Production] Üretim tamamlandı: {pid} "
-                    f"({elapsed:.1f}s, {self._result.completed_steps}/10 adım)"
+                    f"{'✅' if _success else '❌'} [Production {'Completed' if _success else 'Failed'}] "
+                    f"{pid} ({elapsed:.1f}s, {self._result.completed_steps}/10 adım, "
+                    f"failed_tasks={_exec_failed})"
                 )
 
             except asyncio.CancelledError:
@@ -709,9 +711,6 @@ class ProductionRuntime:
                 self._result.executor_report = executor_report
                 self._result.completed_steps = 10
 
-                self._state = ProductionState.COMPLETED
-                self._result.state = ProductionState.COMPLETED.value
-
                 # ── CEE POST-CHECK (Anayasal Doğrulama) ────────────────
                 logger.info(f"🔍 [Production] Recovery CEE POST-CHECK başlıyor: {pid}")
                 from services.constitution_enforcement import constitution_enforcement
@@ -736,10 +735,16 @@ class ProductionRuntime:
                     executor_report.get("failed_tasks", 0)
                     if isinstance(executor_report, dict) else 0
                 )
-                self._result.success = (_exec_failed_rec == 0) and _cee_passed_rec
+                _rec_success = (_exec_failed_rec == 0) and _cee_passed_rec
+                self._state = ProductionState.COMPLETED if _rec_success else ProductionState.FAILED
+                self._result.state = self._state.value
+                self._result.success = _rec_success
                 self._result.completed_at = datetime.now(timezone.utc).isoformat()
 
-                logger.info(f"✅ [Production] Recovery tamamlandı: {pid}")
+                logger.info(
+                    f"{'✅' if _rec_success else '❌'} [Production] Recovery "
+                    f"{'tamamlandı' if _rec_success else 'başarısız'}: {pid}"
+                )
                 return self._result
 
             except Exception as e:
@@ -1326,14 +1331,14 @@ class ProductionRuntime:
             )
 
             elapsed = time.time() - start_time
-            self._state = ProductionState.COMPLETED
-            self._result.state = ProductionState.COMPLETED.value
+            self._state = ProductionState.COMPLETED if completion_success else ProductionState.FAILED
+            self._result.state = self._state.value
             self._result.success = completion_success
             self._result.duration_seconds = elapsed
             self._result.completed_at = datetime.now(timezone.utc).isoformat()
             logger.info(
-                f"🏁 [Reproduction Completed] {pid} ({elapsed:.1f}s, "
-                f"prosedür={procedure})"
+                f"🏁 [Reproduction {'Completed' if completion_success else 'Failed'}] "
+                f"{pid} ({elapsed:.1f}s, prosedür={procedure})"
             )
             return self._result
         finally:
@@ -2198,12 +2203,55 @@ class ProductionRuntime:
             })
             logger.info(f"📦 [Production Package Updated] {pid} (service_usage, delivery_info)")
 
+            # ── MASTER-013: Tamamlanma kararı HLK Runtime'ındır ──────────
+            # Production Runtime KARAR VERMEZ. Teknik kanıtları iletir,
+            # HLK Runtime COMPLETION kararını üretir.
+            try:
+                from services.hlk_runtime import (
+                    hlk_runtime as _hr_dec,
+                    DecisionRequest as _DecReq,
+                    DecisionCategory as _DecCat,
+                )
+                completion_decision = _hr_dec.request_decision(_DecReq(
+                    pid=pid,
+                    category=_DecCat.COMPLETION.value,
+                    requester="production_runtime.run_request",
+                    context={
+                        "delivered": ctx.delivered,
+                        "video": bool(ctx.video_path),
+                        "failed_tasks": executor_report.get("failed_tasks", 0),
+                    },
+                ))
+                completion_success = bool(
+                    completion_decision.params.get("success", False)
+                )
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ [ProductionRuntime] COMPLETION kararı alınamadı: {e}"
+                )
+                completion_success = False
+
+            # ── State Transition (SE-007_4) ──────────────────────────────
+            # AR-002_85: Başarı kararı yalnızca doğrulanmış sonuçlardan
+            # hesaplanır. Executor raporu başarısız task içeriyorsa VEYA
+            # HLK Runtime COMPLETION başarısızsa → FAILED state'e geç.
+            if completion_success:
+                se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
+                logger.info(
+                    "🔄 [State Transition] STATE_VIDEO_PRODUCTION "
+                    "--[EVENT_VIDEO_PRODUCTION_COMPLETED]--> STATE_SESSION_COMPLETED"
+                )
+            else:
+                se.fire(UserEvent.VIDEO_PRODUCTION_FAILED)
+                logger.info(
+                    "🔄 [State Transition] STATE_VIDEO_PRODUCTION "
+                    "--[EVENT_VIDEO_PRODUCTION_FAILED]--> STATE_SESSION_CLOSED"
+                )
+
             # ── Kullanıcı bildirimi (MASTER-013) ─────────────────────────
-            # Video teslim edilemediyse kullanıcı bilgilendirilir.
-            # task_delivery handler'ı DELIVER_INFO'da mesaj göndermez
-            # (executor retry döngüsünde tekrar tekrar mesaj göndermeyi önlemek için).
-            # Nihai bildirim burada, production akışının sonunda TEK SEFER yapılır.
-            if not ctx.delivered:
+            # YALNIZCA başarılı tamamlanma durumunda teslimat bildirimi.
+            # Başarısız durumda kullanıcıya hata bildirimi yapılır (EEC-001).
+            if completion_success and not ctx.delivered:
                 try:
                     if request.bot is not None:
                         from services.hlk_runtime import (
@@ -2228,54 +2276,44 @@ class ProductionRuntime:
                                 parse_mode=prod_notify.params.get("parse_mode", "HTML"),
                             )
                 except Exception as e:
-                    logger.warning(f"⚠️ [ProductionRuntime] Kullanıcı bildirimi gönderilemedi: {e}")
-
-            # ── State Transition (SE-007_4) ──────────────────────────────
-            se.fire(UserEvent.VIDEO_PRODUCTION_COMPLETED)
-            logger.info(
-                "🔄 [State Transition] STATE_VIDEO_PRODUCTION "
-                "--[EVENT_VIDEO_PRODUCTION_COMPLETED]--> STATE_SESSION_COMPLETED"
-            )
-
-            # ── Tamamlanma — COMPLETION kararı HLK Runtime'ındır ─────────
-            # MASTER-013 / AR-002_81: Production Runtime tamamlanma kararını
-            # kendisi ÜRETMEZ; teknik kanıtları iletir, HLK Runtime karar verir.
-            try:
-                from services.hlk_runtime import (
-                    hlk_runtime as _hr_dec,
-                    DecisionRequest as _DecReq,
-                    DecisionCategory as _DecCat,
-                )
-                completion_decision = _hr_dec.request_decision(_DecReq(
-                    pid=pid,
-                    category=_DecCat.COMPLETION.value,
-                    requester="production_runtime.run_request",
-                    context={
-                        "delivered": ctx.delivered,
-                        "video": bool(ctx.video_path),
-                        "failed_tasks": executor_report.get("failed_tasks", 0),
-                    },
-                ))
-                completion_success = bool(
-                    completion_decision.params.get("success", False)
-                )
-            except Exception as e:
-                logger.warning(
-                    f"⚠️ [ProductionRuntime] COMPLETION kararı alınamadı: {e}"
-                )
-                # AR-002_85: doğrulanmamış başarı kararı üretilemez.
-                # COMPLETION kararı alınamazsa varsayılan başarısızlıktır.
-                completion_success = False
+                    logger.warning(f"⚠️ [ProductionRuntime] Bildirim gönderilemedi: {e}")
+            elif not completion_success:
+                # AR-002_85: Başarısız üretim — kullanıcıya dürüst bilgilendirme
+                try:
+                    if request.bot is not None:
+                        from services.hlk_runtime import (
+                            hlk_runtime as _hr_fail,
+                            DecisionRequest as _DR_fail,
+                            DecisionCategory as _DC_fail,
+                        )
+                        fail_notify = _hr_fail.request_decision(_DR_fail(
+                            pid=pid,
+                            category=_DC_fail.USER_NOTIFICATION.value,
+                            requester="production_runtime._run_managed",
+                            context={
+                                "kind": "production_failure",
+                                "pid": pid,
+                            },
+                        ))
+                        if fail_notify.verdict == "NOTIFY":
+                            await request.bot.send_message(
+                                chat_id=request.chat_id,
+                                text=fail_notify.params.get("text", ""),
+                                parse_mode=fail_notify.params.get("parse_mode", "HTML"),
+                            )
+                except Exception as e:
+                    logger.warning(f"⚠️ [ProductionRuntime] Hata bildirimi gönderilemedi: {e}")
 
             elapsed = time.time() - start_time
-            self._state = ProductionState.COMPLETED
-            self._result.state = ProductionState.COMPLETED.value
+            self._state = ProductionState.COMPLETED if completion_success else ProductionState.FAILED
+            self._result.state = self._state.value
             self._result.success = completion_success
             self._result.duration_seconds = elapsed
             self._result.completed_at = datetime.now(timezone.utc).isoformat()
             logger.info(
-                f"🏁 [Production Completed] {pid} ({elapsed:.1f}s, "
-                f"{self._result.completed_steps}/10 adım)"
+                f"🏁 [Production {'Completed' if completion_success else 'Failed'}] "
+                f"{pid} ({elapsed:.1f}s, {self._result.completed_steps}/10 adım, "
+                f"failed_tasks={executor_report.get('failed_tasks', 0)})"
             )
             return self._result
         finally:
