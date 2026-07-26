@@ -2579,6 +2579,81 @@ Bu mimarinin amacı;
 
 ---
 
+## AR-002_46A
+
+### Başlık
+
+Link Validation Agent Selection Architecture (Link Doğrulama Ajan Seçim Mimarisi)
+
+### Amaç
+
+HLK, Link Validation (Ürün Linki Doğrulama) görevlerinde kullanılacak ajanları da anayasal karar mekanizmasına uygun şekilde dinamik olarak seçer.
+
+Link Validation ajanları, AR-002_46 Uzmanlık Alanı Ajan Kombinasyonu mimarisine dahil değildir. Ancak bu durum, Link Validation ajanlarının anayasal ajan seçim mimarisinden muaf olduğu anlamına gelmez.
+
+### Uygulanan Anayasal Kurallar
+
+Link Validation ajan seçiminde aşağıdaki anayasal kurallar aynen uygulanır:
+
+* Dinamik Ajan Seçimi
+* Dinamik Ajan Öncelik Sıralaması
+* Ajan Değiştirme
+* Yeniden Seçim
+* Operasyonel Eskalasyon
+* HLK Karar Mekanizması
+* Karar Gerekçesi Standardı
+
+Aday sayısı ve yedek aday sayısı Global Configuration içerisinde tanımlanan `GC_PRIMARY_CANDIDATE_COUNT` ve `GC_BACKUP_CANDIDATE_COUNT` parametrelerine göre belirlenir. Sayısal değerler bu maddede tekrar tanımlanmaz.
+
+### Link Validation Ajan Seçim Kriterleri
+
+HLK, Link Validation ajanlarını görevin gereksinimlerine göre objektif kriterlerle değerlendirir. Değerlendirme sırasında aşağıdaki kriterler kullanılabilir:
+
+* Ürün bağlantısını doğrulama başarı oranı
+* Desteklenen e-ticaret platformları
+* JavaScript Render desteği
+* Anti-Bot koruma başarısı
+* Cloudflare uyumluluğu
+* Sayfa doğrulama hızı
+* API erişilebilirliği
+* Servis kullanılabilirliği
+* Kredi / Kota durumu
+* Geçmiş operasyonel başarı oranı
+* Maliyet
+* Güvenilirlik
+* HLK tarafından gerekli görülen diğer objektif kriterler
+
+Bu liste sınırlayıcı değildir. HLK yeni servisler, yeni teknolojiler veya yeni ihtiyaçlar doğrultusunda anayasal ilkelere uygun yeni değerlendirme kriterleri ekleyebilir.
+
+### Temel İlke
+
+Link Validation ajanları ile Uzmanlık Alanı Araştırma ajanları farklı görevleri yerine getirseler de; ajan seçimi, aday önceliklendirmesi, yedek aday kullanımı, yeniden seçim ve karar gerekçelendirmesi aynı anayasal karar mekanizmasına tabidir.
+
+Tek fark, Link Validation ajanlarının AR-002_46 Uzmanlık Alanı Ajan Kombinasyonu mimarisi kapsamında değerlendirilmemesidir.
+
+### Anayasal Dayanak
+
+| Katman | Referans | Açıklama |
+|---|---|---|
+| **MASTER** | MASTER-004 | HLK Karar Mekanizması — ajan seçimi karar niteliğindedir |
+| **MASTER** | MASTER-013 | HLK Runtime tek karar otoritesi |
+| **AR** | AR-002_19 | Selection Architecture — dinamik öncelik sıralaması |
+| **AR** | AR-002_21 | Provider Switching — sıradaki adaya geçiş |
+| **AR** | AR-002_46 | Uzmanlık Alanı Ajan Kombinasyonu — kapsam dışı referans |
+| **AR** | AR-002_75 | Production Service Selection — hizmet seçim mekanizması |
+| **AR** | AR-002_87 | External Resource Recovery — ajan kurtarma protokolü |
+| **GC** | GC_PRIMARY_CANDIDATE_COUNT | Birincil aday sayısı |
+| **GC** | GC_BACKUP_CANDIDATE_COUNT | Yedek aday sayısı |
+
+### Beklenen Sonuç
+
+* Link Validation ajanları anayasal karar mekanizmasına bağlanır.
+* Link Validation'a özgü seçim kriterleri resmi olarak tanımlanır.
+* Tüm ajan seçimleri aynı anayasal mekanizma üzerinden yürütülür.
+* AR-002_46 kapsam dışı olan Link Validation, anayasal boşlukta kalmaz.
+
+---
+
 ## AR-002_47
 
 ### Task Package Engine Architecture
