@@ -624,6 +624,150 @@ class ConstitutionScanner:
                 "WF-006", "WF-007", "WF-008", "WF-009", "WF-010",
                 "WF-011", "WF-015", "WF-016", "WF-017"]
 
+    # ── Güven Puanı ───────────────────────────────────────────────────────
+
+    def calculate_trust_score(self, wf_id: str, package: Optional[dict]) -> dict:
+        """İş Akışı Güven Puanı hesapla (0-100)."""
+        if not self._built:
+            self.build_index()
+
+        scores = {"karar_kaniti": 0, "anayasal_uyum": 0, "cikti_butunlugu": 0,
+                   "bagimlilik_kontrol": 0, "kod_uyumu": 0}
+
+        if package:
+            pkg_str = str(package).upper()
+            tasks = package.get("task_packages", []) or []
+            decisions = package.get("decision_history", []) or []
+            events_count = len(self._wf_events.get(wf_id, []))
+
+            # Karar Kanıtı: Decision var mı? (max 20)
+            if decisions:
+                scores["karar_kaniti"] = min(20, len(decisions) * 10)
+
+            # Anayasal Uyum: Package'te anayasa referansı var mı? (max 20)
+            basis = self._wf_basis.get(wf_id)
+            if basis:
+                total_rules = len(basis.ar_articles) + len(basis.or_articles) + len(basis.qr_articles)
+                if total_rules > 0:
+                    applied = sum(1 for a in basis.ar_articles
+                                  if any(kw.upper() in pkg_str for kw in self._extract_keywords(a.article_id)[:5]))
+                    scores["anayasal_uyum"] = min(20, int((applied / max(total_rules, 1)) * 20))
+
+            # Çıktı Bütünlüğü: Beklenen çıktılar mevcut mu? (max 20)
+            deps = self._wf_deps.get(wf_id)
+            if deps and deps.produces:
+                present = 0
+                for o in deps.produces:
+                    if any(kw.upper() in pkg_str for kw in o.upper().split()):
+                        present += 1
+                scores["cikti_butunlugu"] = min(20, int((present / len(deps.produces)) * 20))
+
+            # Bağımlılık Kontrolü: Beslendiği WF'lerden veri gelmiş mi? (max 20)
+            if deps and deps.feeds_from:
+                scores["bagimlilik_kontrol"] = 15
+                if events_count > 0:
+                    scores["bagimlilik_kontrol"] = 20
+
+            # Kod Uyumu: Task'lar tamamlanmış mı? (max 20)
+            if tasks:
+                completed = sum(1 for t in tasks if t.get("status") in ("COMPLETED", "SUCCESS"))
+                scores["kod_uyumu"] = min(20, int((completed / max(len(tasks), 1)) * 20))
+
+        total = sum(scores.values())
+        return {
+            "total": total,
+            "max": 100,
+            "breakdown": scores,
+            "label": "Yüksek Güven" if total >= 85 else "Orta Güven" if total >= 60
+            else "Düşük Güven" if total >= 30 else "Güven Yetersiz",
+        }
+
+    def get_wf_summary(self, wf_id: str, package: Optional[dict]) -> dict:
+        """Yönetici Özeti için hızlı istatistikler."""
+        if not self._built:
+            self.build_index()
+        compliance = self.evaluate_compliance(wf_id, package)
+        deps = self._wf_deps.get(wf_id)
+        trust = self.calculate_trust_score(wf_id, package)
+        outputs_count = len(deps.produces) if deps else 0
+        feeds_to_count = len(deps.feeds_to) if deps else 0
+
+        status = "completed"
+        if package:
+            pkg_status = (package.get("metadata", {}) or {}).get("status", "")
+            if pkg_status == "FAILED":
+                status = "failed"
+            elif pkg_status in ("COMPLETED", "SUCCESS"):
+                status = "completed"
+            elif any(t.get("status") in ("PRODUCING", "PROCESSING") for t in
+                     (package.get("task_packages", []) or [])):
+                status = "running"
+            else:
+                status = "pending"
+
+        return {
+            "status": status,
+            "duration": "—",
+            "trust_score": trust["total"],
+            "trust_label": trust["label"],
+            "output_count": outputs_count,
+            "feeds_to_count": feeds_to_count,
+            "violation_count": len(compliance.violated_rules),
+            "compliance_verdict": compliance.verdict,
+        }
+
+    def get_article_status(self, article_id: str, wf_id: str,
+                           package: Optional[dict]) -> dict:
+        """Bir anayasa maddesinin bu WF'teki durumunu değerlendir."""
+        article = self._articles.get(article_id)
+        if not article:
+            return {"status": "not_found", "label": "Bulunamadı"}
+
+        if not package:
+            return {"status": "not_evaluated", "label": "Değerlendirilmedi"}
+
+        pkg_str = str(package).upper()
+        keywords = self._extract_keywords(article_id)
+        evidence_found = any(kw.upper() in pkg_str for kw in keywords)
+
+        # Event kontrolü
+        wf_events = self._wf_events.get(wf_id, [])
+        event_evidence = [e.event_id for e in wf_events
+                          if any(kw.upper() in e.description.upper() for kw in keywords[:3])]
+
+        decisions = package.get("decision_history", []) or []
+        decision_ids = [d.get("decision_id", "") for d in decisions[:5]]
+
+        tasks = package.get("task_packages", []) or []
+        task_ids = [t.get("task_id", "") for t in tasks[:5]]
+
+        if evidence_found and event_evidence:
+            status = "applied"
+            label = "Uygulandı"
+        elif evidence_found:
+            status = "partial"
+            label = "Kısmi Uyum"
+        else:
+            status = "not_applied"
+            label = "Uygulanmadı"
+
+        return {
+            "article_id": article_id,
+            "title": article.title,
+            "content": article.content,
+            "status": status,
+            "label": label,
+            "evidence": {
+                "decision_ids": decision_ids,
+                "task_ids": task_ids,
+                "event_ids": event_evidence,
+            },
+            "related": [a.article_id for a in self._articles.values()
+                       if a.article_id != article_id and
+                       any(kw.upper() in article.content.upper() for kw in
+                           self._extract_keywords(a.article_id)[:3])][:5],
+        }
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MODÜL DÜZEYİNDE KOLAYLIK FONKSİYONLARI
