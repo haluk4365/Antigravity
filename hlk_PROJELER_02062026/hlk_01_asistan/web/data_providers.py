@@ -870,6 +870,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                               summary=" | ".join(rec_parts)[:500],
                               source="Anayasa Tarayicisi (Constitution Scanner)",
                               detail={
+                                  "is_success": recs["is_success"],
                                   "auto_actions": recs["auto_actions"],
                                   "admin_actions": recs["admin_actions"],
                                   "affected_workflows": recs["affected_workflows"],

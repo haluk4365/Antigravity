@@ -151,38 +151,46 @@ async function load() {
   const openWFs = getOpenWFIds();
   const openChildren = getOpenChildPaths();
 
-  const data = await api('/pid/' + PID + '/workflow-tree');
-  if (!data || !data.workflows) {
+  try {
+    const data = await api('/pid/' + PID + '/workflow-tree');
+    if (!data || !data.workflows) {
+      document.getElementById('wfTree').innerHTML =
+        '<div class="wf-empty">⚠️ Workflow verisi alınamadı. Package henüz oluşmamış olabilir.<br><small>API yanıtı: ' + (data ? 'boş workflows' : 'null/bağlantı hatası') + '</small></div>';
+      document.getElementById('wfToolbar').style.display = 'none';
+      return;
+    }
+
+    // KPI'ları güncelle (içerik korumalı — sadece textContent)
+    const s = data.summary || {};
+    document.getElementById('valUrun').textContent = s.product_name || 'Bilinmiyor';
+    document.getElementById('valMarka').textContent = s.brand || 'Bilinmiyor';
+    document.getElementById('valPlatform').textContent = s.platform || 'Bilinmiyor';
+    document.getElementById('valDurum').textContent = s.status_label || s.status || '—';
+    document.getElementById('valAsama').textContent = s.stage || '—';
+
+    // Workflow ağacını render et
+    renderTree(data.workflows);
+
+    // İş Akışı Haritasını güncelle
+    updateWfMap(data.workflows);
+
+    // Açık panelleri geri yükle
+    if (!_firstLoad && (openWFs.length > 0 || openChildren.length > 0)) {
+      restoreOpenState(openWFs, openChildren);
+      window.scrollTo(0, scrollY);
+    }
+    _firstLoad = false;
+
+    // Butonları aktif et
+    document.getElementById('btnDevam').disabled = false;
+    document.getElementById('btnDur').disabled = false;
+    document.getElementById('btnYenile').disabled = false;
+  } catch(e) {
     document.getElementById('wfTree').innerHTML =
-      '<div class="wf-empty">⚠️ Workflow verisi alınamadı. Package henüz oluşmamış olabilir.</div>';
-    return;
+      '<div class="wf-empty">❌ JavaScript hatası: <b>' + esc(String(e.message || e)) + '</b><br><small>Sayfayı yenileyin veya tarayıcı önbelleğini temizleyin (Ctrl+Shift+R).</small></div>';
+    document.getElementById('wfToolbar').style.display = 'none';
+    console.error('LAC load error:', e);
   }
-
-  // KPI'ları güncelle (içerik korumalı — sadece textContent)
-  const s = data.summary || {};
-  document.getElementById('valUrun').textContent = s.product_name || 'Bilinmiyor';
-  document.getElementById('valMarka').textContent = s.brand || 'Bilinmiyor';
-  document.getElementById('valPlatform').textContent = s.platform || 'Bilinmiyor';
-  document.getElementById('valDurum').textContent = s.status_label || s.status || '—';
-  document.getElementById('valAsama').textContent = s.stage || '—';
-
-  // Workflow ağacını render et
-  renderTree(data.workflows);
-
-  // İş Akışı Haritasını güncelle
-  updateWfMap(data.workflows);
-
-  // Açık panelleri geri yükle
-  if (!_firstLoad && (openWFs.length > 0 || openChildren.length > 0)) {
-    restoreOpenState(openWFs, openChildren);
-    window.scrollTo(0, scrollY);
-  }
-  _firstLoad = false;
-
-  // Butonları aktif et
-  document.getElementById('btnDevam').disabled = false;
-  document.getElementById('btnDur').disabled = false;
-  document.getElementById('btnYenile').disabled = false;
 }
 
 /* ── Workflow Ağacı Render ─────────────────────────────────────────────── */
@@ -562,6 +570,7 @@ function renderDetailTable(detail, nodeType) {
 
   // Özel render: recommended_actions (15. Yapılması Gerekenler)
   if (nodeType === 'recommended_actions') {
+    const recIsSuccess = detail.is_success !== undefined ? detail.is_success : true;
     let html = '<div class="actions-card">';
     // A. HLK Otomatik
     if (detail.auto_actions && detail.auto_actions.length) {
@@ -602,7 +611,7 @@ function renderDetailTable(detail, nodeType) {
       html += '<div class="action-item">⏱ Tahmini Çözüm Süresi: <strong>' + esc(String(detail.estimated_fix_seconds)) + ' saniye</strong></div>';
       html += '<div class="action-item">\u{1F3AF} Tahmini Ba\u{015F}ar\u{0131} Olas\u{0131}l\u{0131}\u{011F}\u{0131}: <strong>%' + esc(String(detail.estimated_success_rate)) + '</strong></div>';
       html += '</div>';
-    } else if (!isSuccess) {
+    } else if (!recIsSuccess) {
       html += '<div class="action-block"><div class="action-title">E. Tahmini Çözüm Bilgisi</div>';
       html += '<div class="action-item">Hesaplanamad\u{0131}</div></div>';
     }
