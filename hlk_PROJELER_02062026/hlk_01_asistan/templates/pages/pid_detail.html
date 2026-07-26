@@ -10,26 +10,41 @@
 <!-- ÜST KPI -->
 <div class="kpi-row" id="pidKpi">
   <div class="kpi"><span class="label">PID</span><span class="value" id="valPid">{{ pid }}</span></div>
-  <div class="kpi"><span class="label">ÜRÜN / PRODUCT</span><span class="value" id="valUrun">—</span></div>
-  <div class="kpi"><span class="label">MARKA / BRAND</span><span class="value" id="valMarka">—</span></div>
+  <div class="kpi"><span class="label">ÜRÜN (PRODUCT)</span><span class="value" id="valUrun">—</span></div>
+  <div class="kpi"><span class="label">MARKA (BRAND)</span><span class="value" id="valMarka">—</span></div>
   <div class="kpi"><span class="label">PLATFORM</span><span class="value" id="valPlatform">—</span></div>
-  <div class="kpi"><span class="label">DURUM / STATUS</span><span class="value" id="valDurum">—</span></div>
-  <div class="kpi"><span class="label">AŞAMA / STAGE</span><span class="value" id="valAsama">—</span></div>
+  <div class="kpi"><span class="label">DURUM (STATUS)</span><span class="value" id="valDurum">—</span></div>
+  <div class="kpi"><span class="label">AŞAMA (STAGE)</span><span class="value" id="valAsama">—</span></div>
+</div>
+
+<!-- İŞ AKIŞI HARİTASI + ARAÇ ÇUBUĞU -->
+<div class="section" id="wfToolbar" style="display:none;">
+  <div class="toolbar-row">
+    <div class="wf-map" id="wfMap"></div>
+    <div class="toolbar-right">
+      <label class="mode-toggle">
+        <input type="checkbox" id="chkAdminMode" onchange="toggleAdminMode()">
+        <span>🔍 Denetim Modu (Audit Mode)</span>
+      </label>
+      <input type="text" class="article-search" id="txtArticleSearch"
+             placeholder="Madde Ara (AR-002, GC, Bilgi Açığı…)" oninput="filterArticles()">
+    </div>
+  </div>
 </div>
 
 <!-- WORKFLOW AĞACI -->
 <div class="section">
-  <div class="section-title">🌳 Explainable Workflow Explorer <small>(Açıklanabilir İş Akışı Gezgini)</small></div>
+  <div class="section-title">🌳 Açıklanabilir İş Akışı Gezgini <small>(Explainable Workflow Explorer)</small></div>
   <div class="wf-tree" id="wfTree">
-    <div class="wf-loading"><span class="wf-spinner"></span>Workflow ağacı yükleniyor — Loading workflow tree...</div>
+    <div class="wf-loading"><span class="wf-spinner"></span>İş Akışı ağacı yükleniyor…</div>
   </div>
 </div>
 
 <!-- BUTONLAR -->
 <div class="controls">
-  <button class="btn devam" id="btnDevam" onclick="doAction('devam')" disabled>▶ DEVAM / RESUME</button>
-  <button class="btn dur" id="btnDur" onclick="doAction('dur')" disabled>⏹ DUR / STOP</button>
-  <button class="btn yenile" id="btnYenile" onclick="doAction('yenile')" disabled>🔄 YENİLE / REFRESH</button>
+  <button class="btn devam" id="btnDevam" onclick="doAction('devam')" disabled>▶ DEVAM (RESUME)</button>
+  <button class="btn dur" id="btnDur" onclick="doAction('dur')" disabled>⏹ DUR (STOP)</button>
+  <button class="btn yenile" id="btnYenile" onclick="doAction('yenile')" disabled>🔄 YENİLE (REFRESH)</button>
   <a href="/debug/{{ pid }}?token={{ token }}" class="btn yenile" style="text-decoration:none;display:inline-flex;align-items:center;">🔬 Debug Console</a>
   <span class="refresh-indicator" id="controlMsg"></span>
 </div>
@@ -87,6 +102,41 @@ function restoreOpenState(openWFs, openChildren) {
 
 /* ── Ana Yükleme (Panel Korumalı) ─────────────────────────────────────── */
 let _firstLoad = true;
+let _adminMode = false;
+
+/* ── Yönetici Modu ──────────────────────────────────────────────────────── */
+function toggleAdminMode() {
+  _adminMode = document.getElementById('chkAdminMode').checked;
+  document.body.classList.toggle('admin-mode', _adminMode);
+  // Yeniden render et (denetim modunda ek detaylar gösterilir)
+  _firstLoad = true;
+  load();
+}
+
+/* ── Madde Arama ────────────────────────────────────────────────────────── */
+function filterArticles() {
+  const q = (document.getElementById('txtArticleSearch').value || '').toLowerCase();
+  document.querySelectorAll('.constitution-article-item').forEach(el => {
+    const text = (el.textContent || '').toLowerCase();
+    el.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+
+/* ── İş Akışı Haritası ──────────────────────────────────────────────────── */
+function updateWfMap(workflows) {
+  const map = document.getElementById('wfMap');
+  if (!map) return;
+  const items = workflows.map(wf => {
+    const dot = wf.status === 'completed' ? '🟢' : wf.status === 'running' ? '🟡'
+      : wf.status === 'failed' ? '🔴' : wf.status === 'pending' ? '🔵' : '⚫';
+    const active = wf.status !== 'inactive' ? ' active' : '';
+    return '<span class="wf-map-item' + active + '" title="' + esc(wf.wf_name) + ' — ' + esc(wf.status) + '">'
+      + dot + ' <small>' + esc(wf.wf_id) + '</small></span>';
+  });
+  map.innerHTML = items.join(' <span class="wf-map-arrow">↓</span> ');
+  document.getElementById('wfToolbar').style.display = 'block';
+}
+
 async function load() {
   const scrollY = window.scrollY;
   const openWFs = getOpenWFIds();
@@ -109,6 +159,9 @@ async function load() {
 
   // Workflow ağacını render et
   renderTree(data.workflows);
+
+  // İş Akışı Haritasını güncelle
+  updateWfMap(data.workflows);
 
   // Açık panelleri geri yükle
   if (!_firstLoad && (openWFs.length > 0 || openChildren.length > 0)) {
@@ -529,11 +582,16 @@ function renderDetailTable(detail, nodeType) {
 
 /* ── Accordion Toggle (Paneller KENDILIĞINDEN KAPANMAZ) ────────────────── */
 function toggleWF(el) {
-  // SADECE tıklamayla toggle — başka hiçbir şey paneli kapatamaz
   el.classList.toggle('open');
 }
 function toggleChild(el) {
-  // SADECE tıklamayla toggle — başka hiçbir şey paneli kapatamaz
+  // Tekli accordion: Anayasal Dayanak altındaki maddeler için
+  // bir seferde yalnızca biri açık kalır (diğerleri kapanır)
+  const parent = el.parentElement;
+  if (parent && parent.classList.contains('constitution-articles')) {
+    const siblings = parent.querySelectorAll(':scope > .child-node.open');
+    siblings.forEach(sib => { if (sib !== el) sib.classList.remove('open'); });
+  }
   el.classList.toggle('open');
 }
 

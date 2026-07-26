@@ -473,3 +473,27 @@
 .kpi.compliance-kpi.compliant { border-left-color: #16a34a; }
 .kpi.compliance-kpi.partial { border-left-color: #eab308; }
 .kpi.compliance-kpi.violation { border-left-color: #dc2626; }
+
+/* ── İş Akışı Haritası (Workflow Map) ──────────────────────────────────── */
+.toolbar-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 8px 12px; background: #f8fafc; border-radius: 8px; margin-bottom: 12px; }
+.wf-map { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; flex: 1; overflow-x: auto; padding: 6px 0; }
+.wf-map-item { display: inline-flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap; background: #f1f5f9; border: 1px solid #e5e7eb; opacity: 0.5; }
+.wf-map-item.active { opacity: 1; background: #fff; border-color: #94a3b8; }
+.wf-map-item small { font-size: 10px; color: #64748b; }
+.wf-map-arrow { color: #94a3b8; font-size: 14px; }
+.toolbar-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+/* ── Yönetici Modu ──────────────────────────────────────────────────────── */
+.mode-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; padding: 4px 10px; border-radius: 4px; background: #fefce8; border: 1px solid #fde68a; }
+.mode-toggle input { margin: 0; }
+body.admin-mode .child-node.inactive { display: block !important; }
+body.admin-mode .child-source { display: inline !important; }
+
+/* ── Madde Arama ────────────────────────────────────────────────────────── */
+.article-search { padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; width: 220px; background: #fff; }
+.article-search:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+
+/* ── Constitution Article Items ─────────────────────────────────────────── */
+.constitution-articles { padding: 0; }
+.constitution-article-item { cursor: pointer; transition: background 0.1s; }
+.constitution-article-item:hover { background: #f8fafc; }
