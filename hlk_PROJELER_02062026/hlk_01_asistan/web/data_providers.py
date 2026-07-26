@@ -343,11 +343,8 @@ def _build_output_contract(wf_id: str, pkg: dict, status: str) -> dict:
         _add("Araştırma Sonuçları",
              ", ".join(research_keys[:6]) if research_keys else "Veri yok",
              "✓" if research_keys else "○")
-        svc_list = [f"{k} ({v})" for k, v in services.items()]
-        _add("Servis Kullanımı", ", ".join(svc_list) if svc_list else "Kayıt yok",
-             "✓" if svc_list else "○")
-        _add("Karar Geçmişi", f"{len(decisions)} karar",
-             "✓" if decisions else "○")
+        # NOT: Service Usage → WF-008 üretir (WORKFLOW DATA OWNERSHIP RULE Madde 2)
+        # NOT: Decision History → WF-001/WF-007/WF-008 üretir
 
     elif wf_id == "WF-003":
         _add("Ürün Adı", brief.get("product_name", "-") or "-")
@@ -399,6 +396,10 @@ def _build_output_contract(wf_id: str, pkg: dict, status: str) -> dict:
             ok_count = sum(1 for a in attempts if a.get("result") == "ok") if isinstance(attempts, list) else 0
             fail_count = len(attempts) - ok_count if isinstance(attempts, list) else 0
             _add(f"Provider ({cat})", f"{len(attempts)} deneme, {ok_count}✓ {fail_count}✗")
+        # Service Usage — bu WF tarafından üretilir
+        svc_list = [f"{k} ({v})" for k, v in services.items()]
+        if svc_list:
+            _add("Servis Kullanımı", ", ".join(svc_list), "✓")
 
     elif wf_id == "WF-009":
         q_verdict = quality.get("verdict", "") or "Bekliyor"
