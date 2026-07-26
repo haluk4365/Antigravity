@@ -1690,6 +1690,9 @@ async def _run_sahne13_flow(
                     chat_id=chat_id, video=vf,
                     width=720, height=1280,
                     duration=video_duration,
+                    write_timeout=180,
+                    read_timeout=90,
+                    connect_timeout=30,
                 )
             logger.info(f"🎬 SAHNE-13 video gönderildi: {language} msg={sahne13_msg.message_id}")
         except Exception as e:
