@@ -61,6 +61,8 @@ FREEZE v1.0 — Referans Workflow (Değişiklik Kısıtlı)
 
 **Değişiklik Kuralları:** WF-001 yalnızca Bug Fix veya Anayasa Revizyonu sonrası referans güncellemesi kapsamında değiştirilebilir. Yeni özellik eklenemez, workflow akışı değiştirilemez, anayasa maddeleri workflow içine kopyalanamaz. WF-002 veya sonraki workflow'lar WF-001'i değiştiremez. İhtiyaç oluşursa önce Anayasa güncellenir, WF-001 yalnızca referans takibi yapar. Tüm workflow'lar tamamlandığında aynı freeze kuralı uygulanacaktır.
 
+**Reference Workflow Standard:** WF-001, HLK Workflow mimarisinin referans uygulamasıdır. WF-002 ve sonraki tüm workflow'lar; tasarım dili, workflow mimarisi, karar mekanizması, anayasa referans kullanımı, dokümantasyon standardı, Workflow Readiness Evaluation mantığı, Work Package yapısı, Production Package entegrasyonu ve Handover yaklaşımı açısından WF-001 ile uyumlu olacak şekilde tasarlanmalıdır. Yeni workflow geliştirmelerinde mevcut standarttan sapılamaz. Bir workflow farklı mimariye ihtiyaç duyarsa önce Anayasa değerlendirilir, gerekirse Anayasa revize edilir, workflow'lar yalnızca ilgili anayasa referanslarını takip edecek şekilde güncellenir. Hiçbir workflow kendisinden önce freeze edilmiş bir workflow'un mimarisini doğrudan değiştiremez. Anayasa = Tek doğruluk kaynağı (Single Source of Truth). WF-001 = Referans uygulama (Reference Implementation).
+
 ---
 
 ## WF-002
