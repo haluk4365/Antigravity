@@ -616,24 +616,34 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
 
         # 5. ÜRETİLEN ÇIKTILAR
         outputs = ctx.get("outputs", [])
-        outputs_verified = []
-        for o in outputs:
-            has_evidence = False
-            if "Link" in o and brief.get("url"): has_evidence = True
-            if "PID" in o and pid: has_evidence = True
-            if "Video" in o and (final_video or {}).get("path"): has_evidence = True
-            if "Görsel" in o and (refs or research): has_evidence = True
-            if "Araştırma" in o and research: has_evidence = True
-            if "Marka" in o and brief.get("brand"): has_evidence = True
-            outputs_verified.append({"name": o, "exists": has_evidence})
-        nodes.append(_make_node("outputs", "5. Üretilen Çıktılar",
-                                status="completed" if outputs_verified and all(o["exists"] for o in outputs_verified)
-                                else "running" if any(o["exists"] for o in outputs_verified) else "pending",
-                                summary=f"{len(outputs_verified)} çıktı — "
-                                f"{sum(1 for o in outputs_verified if o['exists'])} mevcut"
-                                if outputs_verified else "Anayasa'da tanımlı değil",
-                                source="Anayasa Tarayıcısı (Constitution Scanner)",
-                                detail={"outputs": outputs_verified}))
+        if wf_id == "WF-002":
+            # WF-002 Evidence Explorer — her çıktı genişletilebilir kanıtlarla
+            evidence_outputs = _build_wf002_evidence(pkg, pid, scanner)
+            nodes.append(_make_node("outputs_evidence", "5. Üretilen Çıktılar",
+                                    status="completed" if evidence_outputs else "pending",
+                                    summary=f"{len(evidence_outputs)} çıktı — detayları görmek için tıklayın"
+                                    if evidence_outputs else "Anayasa'da tanımlı değil",
+                                    source="Production Package + Archive + Catalog",
+                                    detail={"evidence_outputs": evidence_outputs}))
+        else:
+            outputs_verified = []
+            for o in outputs:
+                has_evidence = False
+                if "Link" in o and brief.get("url"): has_evidence = True
+                if "PID" in o and pid: has_evidence = True
+                if "Video" in o and (final_video or {}).get("path"): has_evidence = True
+                if "Görsel" in o and (refs or research): has_evidence = True
+                if "Araştırma" in o and research: has_evidence = True
+                if "Marka" in o and brief.get("brand"): has_evidence = True
+                outputs_verified.append({"name": o, "exists": has_evidence})
+            nodes.append(_make_node("outputs", "5. Üretilen Çıktılar",
+                                    status="completed" if outputs_verified and all(o["exists"] for o in outputs_verified)
+                                    else "running" if any(o["exists"] for o in outputs_verified) else "pending",
+                                    summary=f"{len(outputs_verified)} çıktı — "
+                                    f"{sum(1 for o in outputs_verified if o['exists'])} mevcut"
+                                    if outputs_verified else "Anayasa'da tanımlı değil",
+                                    source="Anayasa Tarayıcısı (Constitution Scanner)",
+                                    detail={"outputs": outputs_verified}))
 
         # 6. BU ÇIKTILARI KULLANACAK İŞ AKIŞLARI
         feeds_to = ctx.get("feeds_to", [])
@@ -1232,6 +1242,217 @@ async def check_providers_health() -> list[dict]:
         except Exception as e:
             results.append({"provider": name, "status_code": 0, "healthy": False, "error": str(e)[:100]})
     return results
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# WF-002 Evidence Explorer — detaylı output kanıt görüntüleyici
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _build_wf002_evidence(pkg: Optional[dict], pid: str, scanner) -> list[dict]:
+    """WF-002 için her output'u genişletilebilir kanıt paketi olarak hazırla."""
+    if not pkg:
+        return []
+    brief = pkg.get("brief", {}) or {}
+    research = pkg.get("research_results", {}) or {}
+    refs = pkg.get("reference_images", []) or []
+    decisions = pkg.get("decision_history", []) or []
+    events = get_events(pid=pid, limit=50) or []
+    service_usage = pkg.get("service_usage", {}) or {}
+    tasks = pkg.get("task_packages", []) or []
+
+    outputs = []
+
+    # 1. Ürün Analizi (Product Analysis)
+    product_info = {
+        "name": brief.get("product_name", ""),
+        "brand": brief.get("brand", ""),
+        "url": brief.get("url", ""),
+        "platform": brief.get("platform", ""),
+    }
+    product_has_data = any(product_info.values())
+    product_events = [e for e in events if any(kw in str(e).upper() for kw in
+                     ("PRODUCT", "ANALYSIS", "ÜRÜN"))]
+    outputs.append({
+        "id": "product_analysis",
+        "name": "Ürün Analizi (Product Analysis)",
+        "type": "analysis",
+        "status": "ok" if product_has_data else "missing",
+        "producer": "WF-001 / WF-002",
+        "content": {
+            "text": f"Ürün: {product_info['name']}\nMarka: {product_info['brand']}\n"
+                    f"URL: {product_info['url']}\nPlatform: {product_info['platform']}"
+                    if product_has_data else "",
+            "urls": [product_info["url"]] if product_info["url"] else [],
+        },
+        "traceability": {
+            "source_wf": "WF-001",
+            "archive_id": "",
+            "catalog_id": "",
+            "decision_ids": [d.get("decision_id","") for d in decisions[:3]],
+            "event_ids": [e.get("event","") for e in product_events[:3]],
+        },
+        "downstream_wfs": ["WF-003", "WF-005", "WF-008"],
+        "evidence": {
+            "runtime": "Production Package'te brief bölümü mevcut" if product_has_data else "KANIT BULUNAMADI",
+            "decisions": [{"id": d.get("decision_id",""), "verdict": d.get("verdict","")}
+                          for d in decisions[:2]],
+            "events": [{"id": e.get("event",""), "desc": str(e.get("aciklama",""))[:100]}
+                       for e in product_events[:3]],
+        },
+    })
+
+    # 2. Marka Analizi (Brand Analysis)
+    brand_has_data = bool(brief.get("brand"))
+    brand_events = [e for e in events if any(kw in str(e).upper() for kw in
+                    ("BRAND", "MARKA"))]
+    outputs.append({
+        "id": "brand_analysis",
+        "name": "Marka Analizi (Brand Analysis)",
+        "type": "analysis",
+        "status": "ok" if brand_has_data else "missing",
+        "producer": "WF-002",
+        "content": {
+            "text": f"Marka: {brief.get('brand', '')}" if brand_has_data else "",
+        },
+        "traceability": {
+            "source_wf": "WF-002",
+            "decision_ids": [d.get("decision_id","") for d in decisions[:2]],
+            "event_ids": [e.get("event","") for e in brand_events[:2]],
+        },
+        "downstream_wfs": ["WF-003", "WF-006", "WF-007"],
+        "evidence": {
+            "runtime": "Production Package'te brief.brand mevcut" if brand_has_data else "KANIT BULUNAMADI",
+            "events": [{"id": e.get("event",""), "desc": str(e.get("aciklama",""))[:100]}
+                       for e in brand_events[:2]],
+        },
+    })
+
+    # 3. Referans Görseller (Reference Images)
+    ref_count = len(refs) if isinstance(refs, list) else 0
+    ref_events = [e for e in events if any(kw in str(e).upper() for kw in
+                  ("IMAGE", "GÖRSEL", "REFERENCE"))]
+    ref_detail = {
+        "count": ref_count,
+        "images": [],
+    }
+    for i, img in enumerate((refs if isinstance(refs, list) else [])[:8]):
+        ref_detail["images"].append({
+            "index": i + 1,
+            "url": img if isinstance(img, str) else img.get("url", str(img)),
+            "source": img.get("source", "") if isinstance(img, dict) else "",
+        })
+    outputs.append({
+        "id": "reference_images",
+        "name": f"Referans Görseller (Reference Images) — {ref_count} adet",
+        "type": "images",
+        "status": "ok" if ref_count > 0 else "missing",
+        "producer": "WF-002 / ImageGenerator",
+        "content": {
+            "count": ref_count,
+            "images": ref_detail["images"],
+        },
+        "traceability": {
+            "source_wf": "WF-002",
+            "archive_id": "",
+            "catalog_id": "",
+            "decision_ids": [d.get("decision_id","") for d in decisions[:2]],
+            "event_ids": [e.get("event","") for e in ref_events[:3]],
+        },
+        "downstream_wfs": ["WF-003", "WF-005", "WF-008"],
+        "evidence": {
+            "runtime": f"Production Package'te {ref_count} görsel kaydı mevcut" if ref_count > 0
+                       else "KANIT BULUNAMADI",
+            "images": ref_detail["images"],
+            "events": [{"id": e.get("event",""), "desc": str(e.get("aciklama",""))[:100]}
+                       for e in ref_events[:3]],
+        },
+    })
+
+    # 4. Araştırma Sonuçları (Research Results)
+    research_has_data = bool(research)
+    research_text = ""
+    if isinstance(research, dict):
+        parts = []
+        for k, v in research.items():
+            if isinstance(v, str) and len(v) < 500:
+                parts.append(f"{k}: {v}")
+        research_text = "\n".join(parts[:10])
+    research_events = [e for e in events if any(kw in str(e).upper() for kw in
+                       ("RESEARCH", "ARAŞTIRMA"))]
+    outputs.append({
+        "id": "research_results",
+        "name": "Araştırma Sonuçları (Research Results)",
+        "type": "analysis",
+        "status": "ok" if research_has_data else "missing",
+        "producer": "WF-002",
+        "content": {
+            "text": research_text[:1000] if research_text else "",
+            "raw_keys": list(research.keys()) if isinstance(research, dict) else [],
+        },
+        "traceability": {
+            "source_wf": "WF-002",
+            "decision_ids": [d.get("decision_id","") for d in decisions[:3]],
+            "event_ids": [e.get("event","") for e in research_events[:3]],
+        },
+        "downstream_wfs": ["WF-003", "WF-004", "WF-005", "WF-006", "WF-007", "WF-008"],
+        "evidence": {
+            "runtime": f"Production Package'te research_results mevcut ({len(str(research))} chars)"
+                       if research_has_data else "KANIT BULUNAMADI",
+            "events": [{"id": e.get("event",""), "desc": str(e.get("aciklama",""))[:100]}
+                       for e in research_events[:3]],
+        },
+    })
+
+    # 5. Servis Kullanımı (Service Usage)
+    services = service_usage.get("services", {}) if isinstance(service_usage, dict) else {}
+    outputs.append({
+        "id": "service_usage",
+        "name": f"Servis Kullanımı (Service Usage) — {len(services)} servis",
+        "type": "analysis",
+        "status": "ok" if services else "missing",
+        "producer": "WF-002 / WF-008",
+        "content": {
+            "text": "\n".join(f"{k}: {v}" for k, v in services.items()) if services else "",
+        },
+        "traceability": {
+            "source_wf": "WF-002",
+            "decision_ids": [d.get("decision_id","") for d in decisions[:2]],
+        },
+        "downstream_wfs": ["WF-007", "WF-008"],
+        "evidence": {
+            "runtime": f"Production Package'te service_usage kaydı mevcut"
+                       if services else "KANIT BULUNAMADI",
+        },
+    })
+
+    # 6. Decision History özeti
+    if decisions:
+        outputs.append({
+            "id": "decision_history",
+            "name": f"Karar Geçmişi (Decision History) — {len(decisions)} karar",
+            "type": "analysis",
+            "status": "ok",
+            "producer": "HLK Runtime",
+            "content": {
+                "text": "\n".join(
+                    f"{d.get('decision_id','')}: {d.get('verdict','')} ({d.get('category','')})"
+                    for d in decisions[:10]
+                ),
+            },
+            "traceability": {
+                "source_wf": "WF-001 / WF-002 / WF-008",
+                "decision_ids": [d.get("decision_id","") for d in decisions[:10]],
+                "event_ids": [],
+            },
+            "downstream_wfs": ["WF-003", "WF-004", "WF-005", "WF-006", "WF-007", "WF-008"],
+            "evidence": {
+                "runtime": f"Production Package'te {len(decisions)} karar kaydı mevcut",
+                "decisions": [{"id": d.get("decision_id",""), "verdict": d.get("verdict","")}
+                              for d in decisions[:5]],
+            },
+        })
+
+    return outputs
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

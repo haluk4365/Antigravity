@@ -479,7 +479,94 @@ function renderDetailTable(detail, nodeType) {
     return html;
   }
 
-  // Özel render: outputs
+  // Özel render: WF-002 Evidence Explorer
+  if (nodeType === 'outputs_evidence' && detail.evidence_outputs) {
+    let html = '<div class="evidence-explorer">';
+    detail.evidence_outputs.forEach(out => {
+      const statusIcon = out.status === 'ok' ? '✅' : '⚠️';
+      html += '<div class="evidence-item">';
+      html += '<div class="evidence-header" onclick="toggleChild(this.parentElement)">';
+      html += '<span class="evidence-dot">' + statusIcon + '</span>';
+      html += '<span class="evidence-name">' + esc(out.name) + '</span>';
+      html += '<span class="evidence-type">' + esc(out.type || '') + '</span>';
+      html += '<span class="child-chevron">▶</span>';
+      html += '</div>';
+      html += '<div class="child-body evidence-body">';
+      // İçerik
+      if (out.content) {
+        if (out.content.text) {
+          html += '<div class="ev-section"><div class="ev-title">İçerik (Content)</div>';
+          html += '<pre class="ev-text">' + esc(out.content.text) + '</pre></div>';
+        }
+        if (out.content.urls && out.content.urls.length) {
+          html += '<div class="ev-section"><div class="ev-title">URL Bilgileri</div>';
+          out.content.urls.forEach(u => {
+            html += '<div class="ev-url"><a href="' + escAttr(u) + '" target="_blank">' + esc(u) + '</a></div>';
+          });
+          html += '</div>';
+        }
+        if (out.content.images && out.content.images.length) {
+          html += '<div class="ev-section"><div class="ev-title">Görseller (' + out.content.images.length + ' adet)</div>';
+          out.content.images.slice(0, 6).forEach(img => {
+            html += '<div class="ev-image"><span class="ev-img-id">#' + img.index + '</span> '
+                 + (img.url ? '<a href="' + escAttr(String(img.url)) + '" target="_blank">' + esc(String(img.url).substring(0, 80)) + '</a>'
+                            : esc(String(img.source || '').substring(0, 80)))
+                 + '</div>';
+          });
+          html += '</div>';
+        }
+        if (out.content.raw_keys && out.content.raw_keys.length) {
+          html += '<div class="ev-section"><div class="ev-title">Veri Alanları</div>';
+          html += out.content.raw_keys.map(k => '<span class="ev-tag">' + esc(k) + '</span>').join('');
+          html += '</div>';
+        }
+      }
+      // Traceability
+      if (out.traceability) {
+        html += '<div class="ev-section"><div class="ev-title">İzlenebilirlik (Traceability)</div>';
+        html += '<div class="ev-grid">';
+        if (out.traceability.source_wf) html += '<div><strong>Üreten:</strong> ' + esc(out.traceability.source_wf) + '</div>';
+        if (out.traceability.archive_id) html += '<div><strong>Archive ID:</strong> ' + esc(out.traceability.archive_id) + '</div>';
+        if (out.traceability.catalog_id) html += '<div><strong>Catalog ID:</strong> ' + esc(out.traceability.catalog_id) + '</div>';
+        if (out.traceability.decision_ids && out.traceability.decision_ids.length) {
+          html += '<div><strong>Decision:</strong> ' + out.traceability.decision_ids.filter(Boolean).map(esc).join(', ') + '</div>';
+        }
+        if (out.traceability.event_ids && out.traceability.event_ids.length) {
+          html += '<div><strong>Event:</strong> ' + out.traceability.event_ids.filter(Boolean).map(esc).join(', ') + '</div>';
+        }
+        html += '</div></div>';
+      }
+      // Downstream
+      if (out.downstream_wfs && out.downstream_wfs.length) {
+        html += '<div class="ev-section"><div class="ev-title">Kullanan İş Akışları</div>';
+        html += out.downstream_wfs.map(wf => '<span class="wf-tag">' + esc(wf) + '</span>').join('');
+        html += '</div>';
+      }
+      // Evidence
+      if (out.evidence) {
+        html += '<div class="ev-section"><div class="ev-title">Kanıtlar (Evidence)</div>';
+        if (out.evidence.runtime) {
+          html += '<div class="ev-evidence">' + esc(out.evidence.runtime) + '</div>';
+        }
+        if (out.evidence.images && out.evidence.images.length) {
+          html += '<div class="ev-images">' + out.evidence.images.map(img =>
+            '<div class="ev-thumb"><span class="ev-img-id">#' + img.index + '</span> '
+            + esc(String(img.url || '').substring(0, 80)) + '</div>'
+          ).join('') + '</div>';
+        }
+        if (out.evidence.decisions && out.evidence.decisions.length) {
+          html += '<div class="ev-decisions"><strong>Kararlar:</strong> '
+               + out.evidence.decisions.map(d => esc(d.id + ': ' + d.verdict)).join(' | ') + '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // Özel render: outputs (diğer WF'ler için)
   if (nodeType === 'outputs' && detail.outputs) {
     return '<div>' + detail.outputs.map(o =>
       '<div style="padding:2px 0;">' + (o.exists ? '✅' : '○') + ' ' + esc(o.name) + '</div>'
