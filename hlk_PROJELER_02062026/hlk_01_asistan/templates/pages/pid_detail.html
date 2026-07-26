@@ -298,14 +298,14 @@ function getBilingualTitle(baslik, nodeType) {
   if (eng) {
     return esc(baslik) + ' <small style="color:#94a3b8;font-weight:400;">(' + esc(eng) + ')</small>';
   }
-  // Sayılı başlıklar için: "1. Amaç" → "1. Purpose (Amaç)" benzeri
+  // Sayılı başlıklar: "1. Amaç" → "1. Amaç (Purpose)" — Türkçe öncelikli
   const match = baslik.match(/^(\d+\.\s)(.+)$/);
   if (match) {
     const num = match[1];
     const title = match[2];
     const engTitle = BILINGUAL_TITLES[title];
     if (engTitle) {
-      return esc(num) + esc(engTitle) + ' <small style="color:#94a3b8;font-weight:400;">(' + esc(title) + ')</small>';
+      return esc(num) + esc(title) + ' <small style="color:#94a3b8;font-weight:400;">(' + esc(engTitle) + ')</small>';
     }
   }
   return esc(baslik);

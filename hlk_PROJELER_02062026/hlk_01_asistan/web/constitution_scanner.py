@@ -680,7 +680,25 @@ class ConstitutionScanner:
             "breakdown": scores,
             "label": "Yüksek Güven" if total >= 85 else "Orta Güven" if total >= 60
             else "Düşük Güven" if total >= 30 else "Güven Yetersiz",
+            "reasons": self._build_trust_reasons(scores, package),
         }
+
+    def _build_trust_reasons(self, scores: dict, package: Optional[dict]) -> list[str]:
+        """Güven puanının neden bu değerde olduğunu açıklayan sebepler."""
+        reasons = []
+        if scores["karar_kaniti"] < 15:
+            reasons.append("Karar kanıtı eksik — HLK Runtime tarafından yeterli karar kaydı oluşturulmamış")
+        if scores["anayasal_uyum"] < 15:
+            reasons.append("Anayasal uyum düşük — bazı Anayasa maddeleri için kanıt bulunamadı")
+        if scores["cikti_butunlugu"] < 15:
+            reasons.append("Çıktı bütünlüğü eksik — beklenen çıktıların tamamı mevcut değil")
+        if scores["bagimlilik_kontrol"] < 15:
+            reasons.append("Bağımlılık kontrolü zayıf — önceki İş Akışlarından yeterli veri gelmemiş olabilir")
+        if scores["kod_uyumu"] < 15:
+            reasons.append("Kod uyumu düşük — Production task'ları tamamlanmamış veya başarısız")
+        if not reasons:
+            reasons.append("Tüm kategoriler yüksek — İş Akışı anayasal olarak sağlıklı görünüyor")
+        return reasons
 
     def get_wf_summary(self, wf_id: str, package: Optional[dict]) -> dict:
         """Yönetici Özeti için hızlı istatistikler."""

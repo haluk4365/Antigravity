@@ -480,7 +480,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
         nodes.append(_make_node("executive_summary", "0. Yönetici Özeti",
                                 status=wf_summary['status'],
                                 summary=" | ".join(summary_lines),
-                                source="Constitution Scanner",
+                                source="Anayasa Tarayıcısı (Constitution Scanner)",
                                 detail={"summary": wf_summary, "trust_score": trust}))
 
         # 1. AMAÇ — Anayasa maddelerinden türetilir
@@ -539,7 +539,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             hlk_node = _make_node("hlk_decision", "3. HLK Kararı",
                                   status="completed",
                                   summary=f"{decision_id}: {verdict}"[:200],
-                                  source="decision_history",
+                                  source="Karar Geçmişi (Decision History)",
                                   detail={"decision_id": decision_id, "verdict": verdict,
                                           "full_decision": latest_d},
                                   reference=decision_id)
@@ -556,13 +556,13 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                     _make_node("decision", f"Karar #{i+1}",
                                status="completed",
                                summary=f"{did}: {d.get('verdict','')}"[:200],
-                               source="decision_history", detail=d))
+                               source="Karar Geçmişi (Decision History)", detail=d))
         else:
             hlk_node = _make_node("hlk_decision", "3. HLK Kararı",
                                   status="pending" if status in ("pending", "running") else "inactive",
                                   summary="Henüz karar üretilmedi" if status != "inactive"
                                   else "Bu aşamada karar üretilmez",
-                                  source="decision_history")
+                                  source="Karar Geçmişi (Decision History)")
         nodes.append(hlk_node)
 
         # 4. YAPILAN İŞLEMLER
@@ -632,7 +632,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                 summary=f"{len(outputs_verified)} çıktı — "
                                 f"{sum(1 for o in outputs_verified if o['exists'])} mevcut"
                                 if outputs_verified else "Anayasa'da tanımlı değil",
-                                source="Constitution Scanner",
+                                source="Anayasa Tarayıcısı (Constitution Scanner)",
                                 detail={"outputs": outputs_verified}))
 
         # 6. BU ÇIKTILARI KULLANACAK İŞ AKIŞLARI
@@ -648,7 +648,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                 status="completed" if feeds_to else "inactive",
                                 summary=" → ".join(feeds_to) if feeds_to
                                 else "Son İş Akışı — başka İş Akışı beslemez",
-                                source="Constitution Scanner",
+                                source="Anayasa Tarayıcısı (Constitution Scanner)",
                                 detail={"consumers": consumers_detail}))
 
         # 7. SONRAKİ İŞ AKIŞLARI BU ÇIKTILARI NASIL KULLANACAK?
@@ -660,7 +660,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                                 status="completed" if feed_items else "inactive",
                                 summary=f"{len(feed_items)} İş Akışı için kullanım açıklaması mevcut"
                                 if feed_items else "Anayasa'da tanımlı değil",
-                                source="Constitution Scanner",
+                                source="Anayasa Tarayıcısı (Constitution Scanner)",
                                 detail={"feeds": feed_items}))
 
         # 8. İŞ AKIŞI BAĞIMLILIKLARI
@@ -682,7 +682,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                               status="completed" if dep_nodes else "pending",
                               summary=f"← {', '.join(input_from)} → {', '.join(feeds_to)}"
                               if input_from or feeds_to else "Bağımlılık zinciri kurulamadı",
-                              source="Constitution Scanner",
+                              source="Anayasa Tarayıcısı (Constitution Scanner)",
                               detail={"chain": {
                                   "input_from": input_from,
                                   "outputs": outputs,
@@ -700,7 +700,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
         comp_node = _make_node("compliance", "9. Anayasal Uygunluk",
                                status=comp_status_map.get(compliance.verdict, "pending"),
                                summary=comp_label_map.get(compliance.verdict, compliance.verdict),
-                               source="Constitution Scanner",
+                               source="Anayasa Tarayıcısı (Constitution Scanner)",
                                detail={
                                    "verdict": compliance.verdict,
                                    "applied": compliance.applied_rules,
@@ -729,7 +729,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
                        f"Çıktı: {trust['breakdown']['cikti_butunlugu']} | "
                        f"Bağımlılık: {trust['breakdown']['bagimlilik_kontrol']} | "
                        f"Kod: {trust['breakdown']['kod_uyumu']}",
-                       source="Constitution Scanner",
+                       source="Anayasa Tarayıcısı (Constitution Scanner)",
                        detail={"trust_score": trust}))
         nodes.append(comp_node)
 
@@ -766,7 +766,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             nodes.append(_make_node("evidence", "10. Kanıtlar",
                                     status="pending" if status not in ("inactive",)
                                     else "inactive",
-                                    summary="Henüz kanıt üretilmedi"))
+                                    summary="Henüz kanıt üretilmedi — bu İş Akışına ait çıktı dosyaları (görsel, video, ses) henüz oluşturulmadı veya Production Package'e kaydedilmedi"))
 
         # 11. OLAYLAR
         if wf_events:
@@ -785,7 +785,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
             evt_node = _make_node("events", "11. Olaylar",
                                   status="pending" if status not in ("inactive",)
                                   else "inactive",
-                                  summary="Henüz olay kaydı yok")
+                                  summary="Henüz olay kaydı yok — bu İş Akışına ait EEC (Execution Event Collector) veya Olay Kayıt Merkezi tarafından kaydedilmiş bir olay bulunmuyor")
         nodes.append(evt_node)
 
         # 12. KAYITLAR
@@ -804,7 +804,7 @@ def get_workflow_tree(pid: str) -> Optional[dict]:
         else:
             log_node = _make_node("logs", "12. Kayıtlar",
                                   status="pending",
-                                  summary="Kayıt bulunamadı" if wf_id in ("WF-008",)
+                                  summary="Kayıt bulunamadı — bu İş Akışına ait agent log kayıtları (çalışma günlüğü) henüz oluşturulmadı" if wf_id in ("WF-008",)
                                   else "Bu aşamada kayıt üretilmez")
         nodes.append(log_node)
 
