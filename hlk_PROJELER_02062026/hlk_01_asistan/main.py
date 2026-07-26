@@ -272,13 +272,14 @@ def main():
     logger.info(f"🤖 HLK AI Reklam Asistanı başlatılıyor... PID={_os.getpid()}")
 
     # Application oluştur — uzun timeout'lar (video upload için)
+    # Railway SFO → Telegram API: 1MB video ~20-60sn sürebilir
     app = (
         Application.builder()
         .token(settings.TELEGRAM_TOKEN)
-        .connect_timeout(30)
-        .read_timeout(60)
-        .write_timeout(120)
-        .pool_timeout(30)
+        .connect_timeout(60)
+        .read_timeout(120)
+        .write_timeout(300)
+        .pool_timeout(60)
         .build()
     )
 

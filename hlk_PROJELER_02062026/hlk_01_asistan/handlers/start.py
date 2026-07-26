@@ -289,8 +289,8 @@ async def _send_intro_video(update: Update, reply_markup: InlineKeyboardMarkup |
                     parse_mode="HTML",
 
                     reply_markup=ReplyKeyboardRemove(),
-                    write_timeout=60,
-                    read_timeout=60,
+                    write_timeout=180,
+                    read_timeout=90,
                     connect_timeout=30,
                 )
 
@@ -628,43 +628,66 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return  # ← Runtime exception YOK, bot çalışmaya devam eder
 
-    # ══════════════════════════════════════════════════════════════════════
-    # DEBUG FILE CHECK — gönderilen dosya ile diskteki aynı mı?
-    # ══════════════════════════════════════════════════════════════════════
-    _vp_resolved = video_path.resolve()
-    _vp_stat = video_path.stat()
-    with open(video_path, 'rb') as _hash_f:
-        _vp_sha256 = hashlib.sha256(_hash_f.read()).hexdigest()
-    # Referans dosya
-    _ref_path = Path(r"VİDEO Dosyaları/sahne-1 giriş/hlk_sahne1.mp4").resolve()
-    _ref_stat = _ref_path.stat()
-    with open(_ref_path, 'rb') as _hash_f2:
-        _ref_sha256 = hashlib.sha256(_hash_f2.read()).hexdigest()
-    logger.info("=" * 60)
-    logger.info("DEBUG FILE COMPARE — sendVideo() öncesi")
-    logger.info(f"GÖNDERİLEN: {_vp_resolved}")
-    logger.info(f"  exists   = {video_path.exists()}")
-    logger.info(f"  size     = {_vp_stat.st_size} bytes")
-    logger.info(f"  mtime    = {_vp_stat.st_mtime}")
-    logger.info(f"  SHA-256  = {_vp_sha256}")
-    logger.info(f"REFERANS : {_ref_path}")
-    logger.info(f"  exists   = {_ref_path.exists()}")
-    logger.info(f"  size     = {_ref_stat.st_size} bytes")
-    logger.info(f"  mtime    = {_ref_stat.st_mtime}")
-    logger.info(f"  SHA-256  = {_ref_sha256}")
-    logger.info(f"AYNI DOSYA? {'EVET' if _vp_sha256 == _ref_sha256 else 'HAYIR - FARKLI!'}")
-    logger.info("=" * 60)
+    # ── AR-002_91: SAHNE-1 video — file_id cache + timeout korumalı ─────
+    # Telegram file_id ile tekrar upload engellenir; Railway SFO → Telegram
+    # API upload süresi değişkendir. İlk gönderimde file_id cache'e alınır,
+    # sonraki /start'larda anında iletilir.
+    _cache_key = "sahne1_video_file_id"
+    cached_file_id = context.bot_data.get(_cache_key)
 
-    with open(video_path, 'rb') as vf:
-        logger.info(f"🚩 [VIDEO_PLAYBACK_STARTED] user={user.id} — send_video x1 (duration={SAHNE1_SURE}sn)")
-        video_msg = await update.message.reply_video(
-            video=vf,
-            width=720,
-            height=1280,
-            duration=SAHNE1_SURE,
-            supports_streaming=True,
-            reply_markup=ReplyKeyboardRemove()
+    if cached_file_id:
+        # Cache'li file_id ile anında gönder (upload yok)
+        logger.info(f"🚩 [VIDEO_PLAYBACK_STARTED] user={user.id} — send_video by file_id (cached)")
+        try:
+            video_msg = await update.message.reply_video(
+                video=cached_file_id,
+                width=720,
+                height=1280,
+                duration=SAHNE1_SURE,
+                supports_streaming=True,
+                reply_markup=ReplyKeyboardRemove(),
+            )
+        except Exception as _e:
+            logger.warning(f"⚠️ [SAHNE-1] Cache'li file_id geçersiz: {_e} — yeniden upload edilecek")
+            cached_file_id = None
+            context.bot_data.pop(_cache_key, None)
+
+    if not cached_file_id:
+        # İlk gönderim — dosya upload'ı (uzun timeout)
+        logger.info(
+            f"🚩 [VIDEO_PLAYBACK_STARTED] user={user.id} — send_video upload "
+            f"(size={video_path.stat().st_size} bytes, duration={SAHNE1_SURE}sn)"
         )
+        try:
+            with open(video_path, 'rb') as vf:
+                video_msg = await update.message.reply_video(
+                    video=vf,
+                    width=720,
+                    height=1280,
+                    duration=SAHNE1_SURE,
+                    supports_streaming=True,
+                    reply_markup=ReplyKeyboardRemove(),
+                    write_timeout=180,
+                    read_timeout=90,
+                    connect_timeout=30,
+                )
+            # Başarılı upload — file_id'yi cache'le (sonraki /start'lar için)
+            if hasattr(video_msg, 'video') and video_msg.video:
+                context.bot_data[_cache_key] = video_msg.video.file_id
+                logger.info(f"💾 [SAHNE-1] file_id cache'lendi: {video_msg.video.file_id[:20]}...")
+        except Exception as _e:
+            # Upload başarısız — scene lock temizle, kullanıcıya bildir
+            logger.error(f"❌ [SAHNE-1] Video gönderilemedi: {type(_e).__name__}: {_e}")
+            SceneLock.set_state(context.user_data, SceneLockState.COMPLETED)
+            SceneLock.set_state(context.user_data, SceneLockState.CLEANUP)
+            SceneLock.set_state(context.user_data, SceneLockState.DONE)
+            await update.message.reply_text(
+                "❌ <b>Sistem başlatılamadı.</b>\n\n"
+                "<i>Lütfen birkaç dakika sonra</i> <b>/start</b> <i>yazarak tekrar deneyin.</i>",
+                parse_mode="HTML",
+            )
+            return
+
     actual_msg_id = video_msg.message_id if hasattr(video_msg, 'message_id') else 'N/A'
     logger.info(f"🚩 [VIDEO_SENT] message_id={actual_msg_id}")
 
@@ -837,6 +860,9 @@ async def handle_language_selection(update: Update, context: ContextTypes.DEFAUL
                 height=1280,
                 duration=sahne2_sure,
                 reply_markup=ReplyKeyboardRemove(),
+                write_timeout=180,
+                read_timeout=90,
+                connect_timeout=30,
             )
         logger.info(f"🎬 SAHNE-2 video gonderildi: msg_id={sahne2_msg.message_id}")
 
