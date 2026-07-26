@@ -3,7 +3,7 @@
 {% block page_title %}🔍 PID {{ pid }} — Constitution Compliance Monitor (Anayasal Uygunluk ve Denetim Merkezi){% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="/static/css/workflow_explorer.css">
+<link rel="stylesheet" href="/static/css/workflow_explorer.css?v=20260726">
 {% endblock %}
 
 {% block content %}
@@ -54,7 +54,15 @@
 <script>
 const PID = '{{ pid }}';
 const TOKEN = '{{ token }}';
-function api(p) { return fetch('/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN).then(r => r.json()).catch(() => null); }
+function api(p) {
+  const url = '/api' + p + (p.includes('?')?'&':'?') + 'token=' + TOKEN + '&_v=20260726';
+  // 2 deneme — ilk başarısız olursa 1sn sonra tekrar dene
+  return fetch(url).then(r => r.json()).catch(() => {
+    return new Promise(resolve => setTimeout(() => {
+      fetch(url).then(r => r.json()).then(resolve).catch(() => resolve(null));
+    }, 1000));
+  });
+}
 
 /* ── Durum → Renk / Emoji ──────────────────────────────────────────────── */
 const STATUS_ICONS = {
