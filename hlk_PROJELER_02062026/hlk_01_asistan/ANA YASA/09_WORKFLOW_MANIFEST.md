@@ -14,7 +14,7 @@ HLK Decision and Management Center — Karar ve Yönetim Merkezi
 
 WF-001, HLK'nın oturum boyunca çalışan Karar ve Yönetim Merkezidir. Sistemdeki ilk karar vericidir; araştırma yapmaz, üretim sürecini yönetir.
 
-**İş Akışı (12 Adım):**
+**İş Akışı (13 Adım):**
 
 1. **Product Link Validation** — Kullanıcıdan alınan ürün linki doğrulanır (GK-001_1..12). Link doğrulanmadan hiçbir alt süreç başlatılamaz.
 
@@ -42,7 +42,9 @@ WF-001, HLK'nın oturum boyunca çalışan Karar ve Yönetim Merkezidir. Sistemd
 
 11. **WF-001 Work Package** — WF-001 kendi çalışma paketini oluşturur. Bu paket en az şu bölümleri içerir: Link Validation, Product Profile, Product Classification, Information Gaps, Task Plan, Agent Selection, Service Provider Selection, Assigned Tasks, Agent Results, Decision History, Production Package, Handover Report.
 
-12. **Handover** — HLK "READY FOR WF-002" kararını verir. Hazır hale gelen Production Package WF-002'ye devredilir.
+12. **Workflow Readiness Evaluation** — WF-001 Tamamlama Kriterleri, Production Package ve WF-001 Work Package anayasal olarak doğrulanır. Bu adım veri üretmez, workflow başlatmaz ve workflow'a devir yapmaz. Yalnızca iki karardan birini üretir: `READY FOR NEXT WORKFLOW` veya `NOT READY`. Karar, HLK Runtime tarafından üretilir (MASTER-013). Workflow devri yalnızca bu karar üretildikten sonra Workflow Engine tarafından gerçekleştirilir.
+
+13. **Handover** — HLK "READY FOR NEXT WORKFLOW" kararını vermişse, Workflow Engine hazır hale gelen Production Package'i WF-002'ye devreder. "NOT READY" kararı verilmişse eksikler giderilir ve değerlendirme tekrarlanır.
 
 **Temel İlkeler:**
 - HLK = WF-001. Üretim süreci boyunca tek karar verici WF-001'dir.
@@ -51,7 +53,7 @@ WF-001, HLK'nın oturum boyunca çalışan Karar ve Yönetim Merkezidir. Sistemd
 - Fake Progress üretilmez. Tüm kararlar izlenebilirdir.
 - Production Package ve Work Package birbirinden bağımsız tutulur.
 
-**Görev Tamamlama Kriteri:** Link doğrulanmış, Product Profile oluşturulmuş, Dynamic Information Gaps oluşturulmuş, Görev Planı hazırlanmış, Selection Architecture uygulanmış, Task Package'ler oluşturulmuş, araştırma sonuçları değerlendirilmiş, Information Gaps güncellenmiş, Production Package hazırlanmış, WF-001 Work Package hazırlanmış, Handover Report oluşturulmuş ve HLK "READY FOR WF-002" kararını vermiş olmalıdır.
+**Görev Tamamlama Kriteri (13 koşul):** Link doğrulanmış, Product Profile oluşturulmuş, Dynamic Information Gaps oluşturulmuş, Görev Planı hazırlanmış, Selection Architecture uygulanmış, Task Package'ler oluşturulmuş, araştırma sonuçları değerlendirilmiş, Information Gaps güncellenmiş, Production Package hazırlanmış, WF-001 Work Package hazırlanmış, Workflow Readiness Evaluation tamamlanmış, HLK "READY FOR NEXT WORKFLOW" kararını vermiş, Workflow Engine tarafından WF-002'ye devir gerçekleştirilmiş olmalıdır.
 
 ### Durum
 
