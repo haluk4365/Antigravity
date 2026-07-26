@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}PID {{ pid }} — Explainable Workflow Explorer{% endblock %}
-{% block page_title %}🔍 PID {{ pid }}{% endblock %}
+{% block title %}PID {{ pid }} — Explainable Workflow Explorer (Açıklanabilir İş Akışı Gezgini){% endblock %}
+{% block page_title %}🔍 PID {{ pid }} — Constitution Compliance Monitor (Anayasal Uygunluk ve Denetim Merkezi){% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="/static/css/workflow_explorer.css">
@@ -10,26 +10,26 @@
 <!-- ÜST KPI -->
 <div class="kpi-row" id="pidKpi">
   <div class="kpi"><span class="label">PID</span><span class="value" id="valPid">{{ pid }}</span></div>
-  <div class="kpi"><span class="label">ÜRÜN</span><span class="value" id="valUrun">—</span></div>
-  <div class="kpi"><span class="label">MARKA</span><span class="value" id="valMarka">—</span></div>
+  <div class="kpi"><span class="label">ÜRÜN / PRODUCT</span><span class="value" id="valUrun">—</span></div>
+  <div class="kpi"><span class="label">MARKA / BRAND</span><span class="value" id="valMarka">—</span></div>
   <div class="kpi"><span class="label">PLATFORM</span><span class="value" id="valPlatform">—</span></div>
-  <div class="kpi"><span class="label">DURUM</span><span class="value" id="valDurum">—</span></div>
-  <div class="kpi"><span class="label">AŞAMA</span><span class="value" id="valAsama">—</span></div>
+  <div class="kpi"><span class="label">DURUM / STATUS</span><span class="value" id="valDurum">—</span></div>
+  <div class="kpi"><span class="label">AŞAMA / STAGE</span><span class="value" id="valAsama">—</span></div>
 </div>
 
 <!-- WORKFLOW AĞACI -->
 <div class="section">
-  <div class="section-title">🌳 Explainable Workflow Explorer</div>
+  <div class="section-title">🌳 Explainable Workflow Explorer <small>(Açıklanabilir İş Akışı Gezgini)</small></div>
   <div class="wf-tree" id="wfTree">
-    <div class="wf-loading"><span class="wf-spinner"></span>Workflow ağacı yükleniyor...</div>
+    <div class="wf-loading"><span class="wf-spinner"></span>Workflow ağacı yükleniyor — Loading workflow tree...</div>
   </div>
 </div>
 
 <!-- BUTONLAR -->
 <div class="controls">
-  <button class="btn devam" id="btnDevam" onclick="doAction('devam')" disabled>▶ DEVAM</button>
-  <button class="btn dur" id="btnDur" onclick="doAction('dur')" disabled>⏹ DUR</button>
-  <button class="btn yenile" id="btnYenile" onclick="doAction('yenile')" disabled>🔄 YENİLE</button>
+  <button class="btn devam" id="btnDevam" onclick="doAction('devam')" disabled>▶ DEVAM / RESUME</button>
+  <button class="btn dur" id="btnDur" onclick="doAction('dur')" disabled>⏹ DUR / STOP</button>
+  <button class="btn yenile" id="btnYenile" onclick="doAction('yenile')" disabled>🔄 YENİLE / REFRESH</button>
   <a href="/debug/{{ pid }}?token={{ token }}" class="btn yenile" style="text-decoration:none;display:inline-flex;align-items:center;">🔬 Debug Console</a>
   <span class="refresh-indicator" id="controlMsg"></span>
 </div>
@@ -53,8 +53,45 @@ const STATUS_DOT = {
 function statusIcon(s) { return STATUS_ICONS[s] || '⚪'; }
 function dotClass(s) { return STATUS_DOT[s] || 'gray'; }
 
-/* ── Ana Yükleme ───────────────────────────────────────────────────────── */
+/* ── Panel State Persistence ───────────────────────────────────────────── */
+function getOpenWFIds() {
+  const open = [];
+  document.querySelectorAll('.wf-node.open').forEach(el => {
+    const idEl = el.querySelector('.wf-id');
+    if (idEl) open.push(idEl.textContent.trim());
+  });
+  return open;
+}
+function getOpenChildPaths() {
+  const open = [];
+  document.querySelectorAll('.child-node.open').forEach(el => {
+    const titleEl = el.querySelector('.child-title');
+    if (titleEl) open.push(titleEl.textContent.trim());
+  });
+  return open;
+}
+function restoreOpenState(openWFs, openChildren) {
+  document.querySelectorAll('.wf-node').forEach(el => {
+    const idEl = el.querySelector('.wf-id');
+    if (idEl && openWFs.includes(idEl.textContent.trim())) {
+      el.classList.add('open');
+    }
+  });
+  document.querySelectorAll('.child-node').forEach(el => {
+    const titleEl = el.querySelector('.child-title');
+    if (titleEl && openChildren.includes(titleEl.textContent.trim())) {
+      el.classList.add('open');
+    }
+  });
+}
+
+/* ── Ana Yükleme (Panel Korumalı) ─────────────────────────────────────── */
+let _firstLoad = true;
 async function load() {
+  const scrollY = window.scrollY;
+  const openWFs = getOpenWFIds();
+  const openChildren = getOpenChildPaths();
+
   const data = await api('/pid/' + PID + '/workflow-tree');
   if (!data || !data.workflows) {
     document.getElementById('wfTree').innerHTML =
@@ -62,7 +99,7 @@ async function load() {
     return;
   }
 
-  // KPI'ları güncelle
+  // KPI'ları güncelle (içerik korumalı — sadece textContent)
   const s = data.summary || {};
   document.getElementById('valUrun').textContent = s.product_name || 'Bilinmiyor';
   document.getElementById('valMarka').textContent = s.brand || 'Bilinmiyor';
@@ -72,6 +109,13 @@ async function load() {
 
   // Workflow ağacını render et
   renderTree(data.workflows);
+
+  // Açık panelleri geri yükle
+  if (!_firstLoad && (openWFs.length > 0 || openChildren.length > 0)) {
+    restoreOpenState(openWFs, openChildren);
+    window.scrollTo(0, scrollY);
+  }
+  _firstLoad = false;
 
   // Butonları aktif et
   document.getElementById('btnDevam').disabled = false;
@@ -99,7 +143,7 @@ function renderTree(workflows) {
     html += '  <div class="wf-header" onclick="toggleWF(this.parentElement)">';
     html += '    <span class="wf-dot ' + dotClass(wf.status) + '"></span>';
     html += '    <span class="wf-id">' + esc(wf.wf_id) + '</span>';
-    html += '    <span class="wf-name">' + esc(wf.wf_name) + '</span>';
+    html += '    <span class="wf-name">' + esc(wf.wf_name) + ' <small>(' + esc(wf.wf_id) + ')</small></span>';
     html += '    <span class="wf-badges">' + badges.join('') + '</span>';
     html += '    <span class="wf-chevron">▶</span>';
     html += '  </div>';
@@ -108,7 +152,6 @@ function renderTree(workflows) {
       html += '    <div class="wf-description">' + esc(wf.description) + '</div>';
     }
     html += '    <div class="wf-child-tree">';
-    // Her node'u render et
     (wf.nodes || []).forEach(node => {
       html += renderChildNode(node, 0);
     });
@@ -119,11 +162,13 @@ function renderTree(workflows) {
 
   container.innerHTML = html;
 
-  // Root cause workflow'ya scroll
-  setTimeout(() => {
-    const rc = container.querySelector('.wf-node.root-cause');
-    if (rc) rc.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, 200);
+  // Root cause workflow'ya scroll (sadece ilk yüklemede)
+  if (_firstLoad) {
+    setTimeout(() => {
+      const rc = container.querySelector('.wf-node.root-cause');
+      if (rc) rc.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
+  }
 }
 
 /* ── Child Node Render (rekürsif) ──────────────────────────────────────── */
@@ -137,12 +182,15 @@ function renderChildNode(node, depth) {
   if (node.is_root_cause_node) classes.push('root-cause-node');
   if (s === 'affected') classes.push('affected');
 
+  // Çift dilli başlık
+  const bilingualTitle = getBilingualTitle(node.baslik, node.type);
+
   let html = '<div class="' + classes.join(' ') + '">';
   html += '  <div class="child-header"'
        + (isExpandable ? ' onclick="toggleChild(this.parentElement)"' : '')
        + '>';
   html += '    <span class="child-dot ' + dotClass(s) + '"></span>';
-  html += '    <span class="child-title">' + esc(node.baslik) + '</span>';
+  html += '    <span class="child-title">' + bilingualTitle + '</span>';
   html += '    <span class="child-summary" title="' + escAttr(node.aciklama || '') + '">'
        + esc(node.aciklama || '') + '</span>';
   if (node.kaynak) {
@@ -154,7 +202,6 @@ function renderChildNode(node, depth) {
   }
   html += '  </div>';
 
-  // Body — her zaman aciklama göster, expandable ise detay + children da göster
   if (isExpandable || hasAciklama) {
     html += '  <div class="child-body">';
     if (node.referans) {
@@ -180,9 +227,232 @@ function renderChildNode(node, depth) {
   return html;
 }
 
+/* ── Çift Dilli Başlık Eşlemesi ────────────────────────────────────────── */
+const BILINGUAL_TITLES = {
+  // Ana bölümler
+  'Yönetici Özeti': 'Executive Summary',
+  'Amaç': 'Purpose',
+  'Anayasal Dayanak': 'Constitutional Basis',
+  'HLK Kararı': 'HLK Decision',
+  'Yapılan İşlemler': 'Operations Performed',
+  'Üretilen Çıktılar': 'Outputs Produced',
+  'Bu Çıktıları Kullanacak İş Akışları': 'Downstream Workflows',
+  'Sonraki İş Akışları Kullanım Açıklaması': 'Downstream Usage',
+  'İş Akışı Bağımlılıkları': 'Workflow Dependencies',
+  'Anayasal Uygunluk': 'Constitutional Compliance',
+  'Kanıtlar': 'Evidence',
+  'Olaylar': 'Events',
+  'Kayıtlar': 'Logs',
+  'API': 'API',
+  // Alt bölümler
+  'Uygulanan Maddeler': 'Applied Articles',
+  'Eksik veya İhlal Edilen Maddeler': 'Missing / Violated Articles',
+  'Karar Gerekçesi': 'Decision Rationale',
+  'Uygulanmayan Maddeler': 'Unapplied Articles',
+  'Referans Görseller': 'Reference Images',
+  'Nihai Video': 'Final Video',
+  'Kalite Raporu': 'Quality Report',
+  'Teslim Kaydı': 'Delivery Record',
+  'İş Akışı Güven Puanı': 'Workflow Trust Score',
+  'Henüz karar üretilmedi': 'No decision yet',
+  'Henüz işlem kaydı yok': 'No operations recorded',
+  'Henüz kanıt üretilmedi': 'No evidence yet',
+  'Henüz olay kaydı yok': 'No events yet',
+  'Kayıt bulunamadı': 'No logs found',
+  'Bu aşamada API referansı yok': 'No API references',
+  'Anayasa\'da tanımlı değil': 'Not defined in Constitution',
+  'Bu aşamada karar üretilmez': 'No decision at this stage',
+  'Bu aşamada log üretilmez': 'No logs at this stage',
+  'Bu aşamada kayıt üretilmez': 'No logs at this stage',
+  'Son İş Akışı — başka İş Akışı beslemez': 'Last WF — feeds no other WF',
+  'Henüz işlem yapılmadı': 'No operations yet',
+  'Bağımlılık zinciri kurulamadı': 'Dependency chain unavailable',
+  'Henüz görev atanmadı': 'No tasks assigned',
+  'Bu aşamada görev atanmaz': 'No tasks at this stage',
+  'Bu aşamada ajan adaylığı yok': 'No agent candidates',
+  'Henüz aday değerlendirilmedi': 'No candidates evaluated',
+  'Bu aşamada ajan seçimi yok': 'No agent selection',
+  'Bu aşamada ajan çalışmaz': 'No agents run',
+  'Henüz ajan çalışmadı': 'No agents have run',
+  'Henüz seçim yapılmadı': 'No selection made',
+  // WF isimleri
+  'Product Link Validation': 'Ürün Bağlantısı Doğrulama',
+  'Background Research': 'Arka Plan Araştırması',
+  'Brief Collection': 'Brief Toplama',
+  'Brief Approval': 'Brief Onayı',
+  'Scenario Generation': 'Senaryo Üretimi',
+  'Scenario Approval': 'Senaryo Onayı',
+  'Pricing': 'Fiyatlandırma',
+  'Video Production': 'Video Üretimi',
+  'Quality Control': 'Kalite Kontrol',
+  'Delivery': 'Teslim',
+  'Session Completed': 'Oturum Tamamlandı',
+  'Constitution Enforcement': 'Anayasal Uygulatma',
+  'Execution Event Collection': 'Yürütme Olay Toplama',
+  'Runtime Decision Request': 'Çalışma Zamanı Karar Talebi',
+};
+
+function getBilingualTitle(baslik, nodeType) {
+  if (!baslik) return '';
+  const eng = BILINGUAL_TITLES[baslik];
+  if (eng) {
+    return esc(baslik) + ' <small style="color:#94a3b8;font-weight:400;">(' + esc(eng) + ')</small>';
+  }
+  // Sayılı başlıklar için: "1. Amaç" → "1. Purpose (Amaç)" benzeri
+  const match = baslik.match(/^(\d+\.\s)(.+)$/);
+  if (match) {
+    const num = match[1];
+    const title = match[2];
+    const engTitle = BILINGUAL_TITLES[title];
+    if (engTitle) {
+      return esc(num) + esc(engTitle) + ' <small style="color:#94a3b8;font-weight:400;">(' + esc(title) + ')</small>';
+    }
+  }
+  return esc(baslik);
+}
+
 /* ── Detail Tablosu ─────────────────────────────────────────────────────── */
 function renderDetailTable(detail, nodeType) {
   if (!detail || Object.keys(detail).length === 0) return '';
+
+  // Özel render: articles (Anayasal Dayanak)
+  if (nodeType === 'constitutional_basis' && detail.articles) {
+    let html = '<div class="constitution-articles">';
+    detail.articles.forEach(a => {
+      const icons = {applied:'🟢', partial:'🟡', not_applied:'🔴', not_evaluated:'⚫'};
+      const icon = icons[a.status] || '⚪';
+      html += '<div class="constitution-article-item" style="padding:6px 0;border-bottom:1px solid #e5e7eb;">';
+      html += '<strong>' + icon + ' ' + esc(a.id) + '</strong>: ' + esc(a.title);
+      html += ' <small style="color:#94a3b8;">(' + esc(a.type) + ' — ' + esc(a.label) + ')</small>';
+      if (a.decision_ids && a.decision_ids.length > 0) {
+        html += ' <span style="font-size:10px;color:#64748b;">Karar: ' + a.decision_ids.join(', ') + '</span>';
+      }
+      if (a.task_ids && a.task_ids.length > 0) {
+        html += ' <span style="font-size:10px;color:#64748b;">Görev: ' + a.task_ids.join(', ') + '</span>';
+      }
+      if (a.event_ids && a.event_ids.length > 0) {
+        html += ' <span style="font-size:10px;color:#64748b;">Olay: ' + a.event_ids.join(', ') + '</span>';
+      }
+      html += '</div>';
+    });
+    // GC parametreleri
+    if (detail.gc_params && detail.gc_params.length > 0) {
+      html += '<div style="margin-top:8px;"><strong>GC Parameters (Küresel Yapılandırma):</strong></div>';
+      detail.gc_params.forEach(gc => {
+        html += '<div style="font-size:12px;padding:2px 0;">'
+             + '<code>' + esc(gc.name) + '</code> = ' + esc(gc.value)
+             + ' — <small>' + esc(gc.description) + '</small></div>';
+      });
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // Özel render: trust_score
+  if (detail.trust_score) {
+    const t = detail.trust_score;
+    let html = '<div class="trust-score-card" style="padding:12px;background:#f8fafc;border-radius:8px;margin:8px 0;">';
+    html += '<div style="font-size:24px;font-weight:700;color:#2563eb;">' + t.total + '/100 <small style="font-size:14px;">(' + esc(t.label) + ')</small></div>';
+    html += '<div style="margin-top:8px;">';
+    const cats = [
+      {key:'karar_kaniti', label:'Karar Kanıtı / Decision Evidence'},
+      {key:'anayasal_uyum', label:'Anayasal Uyum / Constitutional Compliance'},
+      {key:'cikti_butunlugu', label:'Çıktı Bütünlüğü / Output Completeness'},
+      {key:'bagimlilik_kontrol', label:'Bağımlılık Kontrolü / Dependency Check'},
+      {key:'kod_uyumu', label:'Kod Uyumu / Code Alignment'},
+    ];
+    cats.forEach(c => {
+      const pct = Math.round((t.breakdown[c.key]/20)*100);
+      const barColor = pct >= 80 ? '#16a34a' : pct >= 50 ? '#eab308' : '#dc2626';
+      html += '<div style="margin:4px 0;">';
+      html += '<span style="display:inline-block;width:200px;font-size:12px;">' + esc(c.label) + '</span>';
+      html += '<span style="display:inline-block;width:40px;text-align:right;font-weight:600;font-size:12px;">' + t.breakdown[c.key] + '/20</span>';
+      html += '<div style="display:inline-block;width:120px;height:6px;background:#e5e7eb;border-radius:3px;margin-left:8px;vertical-align:middle;">';
+      html += '<div style="width:' + pct + '%;height:6px;background:' + barColor + ';border-radius:3px;"></div></div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+    return html;
+  }
+
+  // Özel render: executive_summary
+  if (nodeType === 'executive_summary' && detail.summary) {
+    const sum = detail.summary;
+    return '<div class="exec-summary" style="display:flex;gap:16px;flex-wrap:wrap;padding:8px 0;">'
+      + '<div><strong>Durum:</strong> ' + esc(sum.status) + '</div>'
+      + '<div><strong>Güven:</strong> ' + (sum.trust_score||'—') + '/100</div>'
+      + '<div><strong>Çıktı:</strong> ' + (sum.output_count||0) + '</div>'
+      + '<div><strong>Beslenen:</strong> ' + (sum.feeds_to_count||0) + '</div>'
+      + '<div><strong>İhlal:</strong> ' + (sum.violation_count||0) + '</div>'
+      + '</div>';
+  }
+
+  // Özel render: operations
+  if (nodeType === 'operations' && detail.operations) {
+    let html = '<div class="op-list">';
+    detail.operations.forEach(op => {
+      const icons = {done:'✅', running:'⏳', failed:'❌', pending:'○'};
+      html += '<div class="op-item ' + esc(op.status) + '">'
+           + (icons[op.status]||'○') + ' ' + esc(op.text) + '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // Özel render: outputs
+  if (nodeType === 'outputs' && detail.outputs) {
+    return '<div>' + detail.outputs.map(o =>
+      '<div style="padding:2px 0;">' + (o.exists ? '✅' : '○') + ' ' + esc(o.name) + '</div>'
+    ).join('') + '</div>';
+  }
+
+  // Özel render: consumers
+  if (nodeType === 'consumers' && detail.consumers) {
+    return '<div>' + detail.consumers.map(c =>
+      '<div style="padding:3px 0;"><strong>' + esc(c.wf_id) + '</strong>: ' + esc(c.purpose || '') + '</div>'
+    ).join('') + '</div>';
+  }
+
+  // Özel render: feeds
+  if (nodeType === 'feed_descriptions' && detail.feeds) {
+    return '<div>' + detail.feeds.map(f =>
+      '<div style="padding:4px 0;border-bottom:1px solid #f1f5f9;">'
+      + '<strong>→ ' + esc(f.wf_id) + ':</strong> ' + esc(f.description || '') + '</div>'
+    ).join('') + '</div>';
+  }
+
+  // Özel render: chain (dependencies)
+  if (nodeType === 'dependencies' && detail.chain) {
+    const c = detail.chain;
+    let html = '<div class="dep-chain-row">';
+    (c.input_from||[]).forEach(wf => {
+      html += '<span class="dep-chain-node">← ' + esc(wf) + '</span>';
+    });
+    html += '<span class="dep-chain-node current">● Mevcut</span>';
+    (c.feeds_to||[]).forEach(wf => {
+      html += '<span class="dep-chain-node">→ ' + esc(wf) + '</span>';
+    });
+    html += '</div>';
+    if (c.outputs && c.outputs.length) {
+      html += '<div style="margin-top:6px;"><strong>Çıktılar:</strong> ' + c.outputs.map(o => esc(o)).join(', ') + '</div>';
+    }
+    return html;
+  }
+
+  // Özel render: compliance
+  if (nodeType === 'compliance' && detail.verdict) {
+    const verdictIcons = {COMPLIANT:'🟢', PARTIAL:'🟡', VIOLATION:'🔴', UNKNOWN:'⚫'};
+    let html = '<div style="font-size:16px;font-weight:700;padding:8px 0;">'
+      + (verdictIcons[detail.verdict]||'⚪') + ' ' + esc(detail.verdict)
+      + ' — Anayasal Uygunluk / Constitutional Compliance</div>';
+    if (detail.applied && detail.applied.length) {
+      html += '<div style="margin:4px 0;"><strong>✅ Uygulanan / Applied:</strong> ' + detail.applied.map(esc).join(', ') + '</div>';
+    }
+    if (detail.missing && detail.missing.length) {
+      html += '<div style="margin:4px 0;"><strong>⚠️ Eksik / Missing:</strong> ' + detail.missing.map(esc).join(', ') + '</div>';
+    }
+    return html;
+  }
 
   // Özel render: task_list
   if (nodeType === 'tasks' && detail.task_list) {
@@ -191,7 +461,7 @@ function renderDetailTable(detail, nodeType) {
       + '<td>' + esc(t.status || '') + '</td>'
       + '<td>' + esc(t.description || '') + '</td></tr>'
     ).join('');
-    return '<table class="wf-detail-table"><thead><tr><th>Ajan</th><th>Durum</th><th>Açıklama</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    return '<table class="wf-detail-table"><thead><tr><th>Ajan / Agent</th><th>Durum / Status</th><th>Açıklama / Description</th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
 
   // Özel render: candidates
@@ -218,17 +488,17 @@ function renderDetailTable(detail, nodeType) {
 
   // Özel render: evidence images
   if (nodeType === 'evidence' && detail.images) {
-    return '<div>' + detail.images.length + ' referans görsel</div>';
+    return '<div>' + detail.images.length + ' referans görsel / reference images</div>';
   }
 
   // Özel render: events
   if (nodeType === 'events' && detail.count) {
-    return '<div class="child-kaynak">Toplam ' + detail.count + ' event kaydı (aşağıda listeli)</div>';
+    return '<div class="child-kaynak">Toplam ' + detail.count + ' olay kaydı / event records (aşağıda listeli)</div>';
   }
 
   // Özel render: log_count
   if (nodeType === 'logs' && detail.log_count) {
-    return '<div class="child-kaynak">Toplam ' + detail.log_count + ' log satırı</div>';
+    return '<div class="child-kaynak">Toplam ' + detail.log_count + ' kayıt satırı / log lines</div>';
   }
   if (nodeType === 'log' && detail.level) {
     return '<div class="child-kaynak"><strong>Level:</strong> ' + esc(detail.level) + ' | <strong>Module:</strong> ' + esc(detail.module || '') + '</div>';
@@ -239,14 +509,17 @@ function renderDetailTable(detail, nodeType) {
     let rows = detail.endpoints.map(e =>
       '<tr><td>' + esc(e.name || '') + '</td><td>' + esc(e.module || '') + '</td><td style="font-family:monospace;font-size:11px;">' + esc(e.url || '') + '</td></tr>'
     ).join('');
-    return '<table class="wf-detail-table"><thead><tr><th>Endpoint</th><th>Modül</th><th>URL</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    return '<table class="wf-detail-table"><thead><tr><th>Endpoint</th><th>Modül / Module</th><th>URL</th></tr></thead><tbody>' + rows + '</tbody></table>';
   }
   if (nodeType === 'api_ref' && detail.name) {
     return '<div class="child-kaynak"><strong>Modül:</strong> ' + esc(detail.module || '') + ' | <strong>URL:</strong> ' + esc(detail.url || '') + '</div>';
   }
 
-  // Genel: key-value tablosu (boş olmayanlar)
-  let keys = Object.keys(detail).filter(k => detail[k] !== null && detail[k] !== undefined && detail[k] !== '' && !['task_list', 'candidates', 'selected', 'images', 'count', 'log_count', 'level', 'module', 'name', 'url', 'endpoints'].includes(k));
+  // Genel: key-value tablosu
+  let keys = Object.keys(detail).filter(k => detail[k] !== null && detail[k] !== undefined && detail[k] !== ''
+    && !['task_list', 'candidates', 'selected', 'images', 'count', 'log_count', 'level', 'module', 'name', 'url',
+         'endpoints', 'articles', 'gc_params', 'trust_score', 'summary', 'operations', 'outputs',
+         'consumers', 'feeds', 'chain', 'verdict', 'applied', 'missing', 'violated'].includes(k));
   if (keys.length === 0) return '';
   let rows = keys.map(k =>
     '<tr><td><strong>' + esc(k) + '</strong></td><td>' + esc(String(detail[k]).substring(0, 500)) + '</td></tr>'
@@ -254,24 +527,27 @@ function renderDetailTable(detail, nodeType) {
   return '<table class="wf-detail-table"><tbody>' + rows + '</tbody></table>';
 }
 
-/* ── Accordion Toggle ──────────────────────────────────────────────────── */
+/* ── Accordion Toggle (Paneller KENDILIĞINDEN KAPANMAZ) ────────────────── */
 function toggleWF(el) {
+  // SADECE tıklamayla toggle — başka hiçbir şey paneli kapatamaz
   el.classList.toggle('open');
 }
 function toggleChild(el) {
+  // SADECE tıklamayla toggle — başka hiçbir şey paneli kapatamaz
   el.classList.toggle('open');
 }
 
 /* ── Kontrol Butonları ─────────────────────────────────────────────────── */
 async function doAction(action) {
+  const actionLabels = {devam: 'Devam', dur: 'Dur', yenile: 'Yenile'};
   const btn = document.getElementById('btn' + action.charAt(0).toUpperCase() + action.slice(1));
   const msg = document.getElementById('controlMsg');
   if (!btn) return;
-  btn.disabled = true; msg.textContent = 'İşleniyor...';
+  btn.disabled = true; msg.textContent = 'İşleniyor / Processing...';
   try {
     const r = await fetch('/api/controls/' + PID + '/' + action + '?token=' + TOKEN, {method:'POST'});
     const d = await r.json();
-    msg.textContent = d.ok ? d.message : (d.error || 'Hata');
+    msg.textContent = d.ok ? (d.message || 'OK') : (d.error || 'Hata / Error');
     if (d.ok) setTimeout(load, 1500);
   } catch(e) { msg.textContent = e.message; }
   btn.disabled = false;
@@ -281,7 +557,7 @@ async function doAction(action) {
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 function escAttr(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// İlk yükleme + auto-refresh
+// İlk yükleme + auto-refresh (15 saniyede bir, panel korumalı)
 load();
 setInterval(load, 15000);
 </script>
