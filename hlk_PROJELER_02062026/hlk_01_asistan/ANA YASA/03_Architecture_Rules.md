@@ -8585,3 +8585,172 @@ Bu mimarinin amacı;
 * Telegram yalnızca gerçek Production Event'lerinden sonra bildirim gönderir.
 * Workflow, Event, State, OPS Dashboard ve Telegram aynı yaşam döngüsünü yansıtır.
 * HLK, eksik veya başarısız Workflow'ları görmezden gelmez; anayasal olarak analiz eder, gerekirse tekrar çalıştırır ve yalnızca tüm zorunlu Workflow'lar doğrulandığında video üretimine izin verir.
+
+---
+
+## AR-002_91
+
+### Başlık
+
+Task Self-Healing Architecture (Task Kendi Kendini İyileştirme Mimarisi)
+
+### Amaç
+
+HLK sisteminde hiçbir Task; eksik bağımlılık, geçici hata, henüz oluşmamış kaynak veya gecikmeli çalışan sistem bileşenleri nedeniyle hemen sonlanamaz.
+
+Recovery Policy başlamadan önce, Task kendi görevini anayasal sınırlar içerisinde kendi kendine tamamlamaya çalışmalıdır.
+
+Bu mimari; AR-002_82 Mission Persistence ile AR-002_83 Recovery Policy arasındaki eksik anayasal katmandır.
+
+### Kapsam
+
+Bu madde; tüm Runtime Task'ları, tüm Workflow Task'ları, tüm Agent Task'ları, tüm Provider Task'ları, tüm Production Task'ları, START_AS_NEW, REPLAY, Retry, Restart ve Recovery süreçleri için zorunludur.
+
+### Constitutional Principle
+
+Task'ın görevi yalnızca `execute()` edilmek değildir. Task'ın görevi; kendisine verilen anayasal görevi SUCCESS durumuna ulaştırmaktır.
+
+İlk başarısızlık, Task'ın sonlanması için yeterli gerekçe değildir.
+
+### Self-Healing Workflow
+
+Bir Task aşağıdaki anayasal sırayı uygulamak zorundadır:
+
+1. **Mevcut kaynak kullanılabiliyorsa kullan.**
+2. **Eksik Resource varsa yeniden oluştur.**
+3. **Eksik Task Package varsa yeniden üret.**
+4. **Eksik Workflow Package varsa yeniden oluştur.**
+5. **Eksik Event oluşmasını bekle.** Gerekliyse yeniden üret.
+6. **Eksik Digital Asset oluşmasını bekle.** Gerekliyse yeniden oluştur.
+7. **Eksik Provider sonucu varsa anayasal polling mekanizmasını uygula.**
+8. **Self-Healing başarısız olursa Recovery Policy'ye geç.**
+9. **Recovery Policy başarısız olursa HLK Runtime yeniden anayasal karar üretir.**
+10. **Tüm anayasal yollar tüketildikten sonra FAILED kararı verilebilir.**
+
+### Controlled Waiting Policy
+
+Task; geçici (Transient) olduğu değerlendirilen durumlarda hemen FAILED olamaz.
+
+Geçici durumlar en az aşağıdakileri kapsar:
+
+* Provider cevap bekleniyor
+* Provider polling devam ediyor
+* Task Package oluşturuluyor
+* Workflow Package oluşturuluyor
+* Production Package hazırlanıyor
+* Event henüz oluşmadı
+* Digital Asset oluşturuluyor
+* Artifact doğrulaması tamamlanmadı
+* Dosya yazılıyor
+* Queue işleniyor
+
+### Waiting Policy Rules
+
+* Bekleme süreleri sabit kod olarak yazılamaz.
+* Bekleme süreleri yalnızca Global Configuration üzerinden okunacaktır.
+* Her bekleme nedeni Decision History ve Execution Event Collector içerisine kayıt edilmek zorundadır.
+* Her yeniden deneme Decision History'ye gerekçesiyle yazılacaktır.
+
+### Yasaklar
+
+Task aşağıdaki nedenlerle sonlanamaz:
+
+* `None`
+* `[]`
+* boş Task Package
+* eksik Resource
+* eksik Event
+* eksik Artifact
+* ilk Exception
+* ilk Timeout
+* ilk Provider Hatası
+* geçici servis hatası
+* ilk Queue hatası
+* ilk dosya oluşturma hatası
+
+### Constitution Enforcement
+
+Constitution Enforcement Engine; Task'ın Self-Healing uygulanmadan, Recovery uygulanmadan ve anayasal yollar tüketilmeden FAILED olduğunu tespit ederse:
+
+* Constitution Violation oluşturacaktır.
+* Violation Event oluşturacaktır.
+* Decision History'ye kaydedecektir.
+* HLK Runtime yöneticiye rapor verecektir.
+
+### Runtime Requirement
+
+Aşağıdaki süreçler aynı anayasal Self-Healing davranışını kullanacaktır:
+
+* START_AS_NEW
+* REPLAY
+* Retry
+* Recovery
+* Restart
+* Crash Recovery
+* Scheduled Restart
+
+Hiçbiri kendi özel Self-Healing mekanizmasını oluşturamaz. Tek anayasal Self-Healing Architecture kullanılacaktır.
+
+### Tekilleştirme İlkesi
+
+Kod tekrarına izin verilmez:
+
+* Tek Waiting Policy
+* Tek Retry Policy
+* Tek Recovery Policy
+* Tek Self-Healing Policy
+* Tek Runtime Decision mekanizması
+
+### Global Configuration
+
+Aşağıdaki GC parametreleri bu mimariyi desteklemek üzere tanımlanmıştır:
+
+| Parametre | Açıklama |
+|---|---|
+| `GC_TASK_SELF_HEAL_MAX_COUNT` | Self-Healing maksimum deneme sayısı |
+| `GC_TASK_SELF_HEAL_DELAY` | Self-Healing adımları arası bekleme (saniye) |
+| `GC_PACKAGE_REBUILD_MAX_COUNT` | Package yeniden oluşturma maksimum deneme |
+| `GC_PACKAGE_REBUILD_DELAY` | Package rebuild denemeleri arası bekleme (saniye) |
+| `GC_RESOURCE_RECOVERY_DELAY` | Resource kurtarma bekleme süresi (saniye) |
+| `GC_EVENT_RECOVERY_DELAY` | Event oluşmasını bekleme süresi (saniye) |
+| `GC_EVENT_RECOVERY_MAX_COUNT` | Event bekleme maksimum deneme sayısı |
+| `GC_FILE_RECOVERY_DELAY` | Dosya oluşmasını bekleme süresi (saniye) |
+| `GC_FILE_RECOVERY_MAX_COUNT` | Dosya bekleme maksimum deneme sayısı |
+| `GC_ARTIFACT_RECOVERY_DELAY` | Artifact doğrulama bekleme süresi (saniye) |
+| `GC_ARTIFACT_RECOVERY_MAX_COUNT` | Artifact bekleme maksimum deneme sayısı |
+
+Bu parametreler mevcut `GC_EXECUTOR_MAX_RETRY`, `GC_EXECUTOR_RETRY_DELAY`, `GC_MAX_RE_EVALUATION_COUNT`, `GC_PROVIDER_POLL_COUNT`, `GC_IMAGE_POLL_INTERVAL`, `GC_VIDEO_POLL_INTERVAL` ile uyumlu çalışır. Hiçbir mevcut GC parametresi değiştirilmez veya devre dışı bırakılmaz.
+
+### Anayasal Dayanak
+
+| Katman | Referans | Açıklama |
+|---|---|---|
+| **MASTER** | MASTER-001 | ANA YASA üstünlüğü |
+| **MASTER** | MASTER-003 | PipelineContext anayasal gerçeği yansıtır |
+| **MASTER** | MASTER-004 | Self-Healing karar vermez; HLK Runtime karar verir |
+| **MASTER** | MASTER-011 | Runtime aktiflik doğrulaması |
+| **MASTER** | MASTER-013 | Self-Healing başarısız → HLK Runtime kararı |
+| **AR** | AR-002_22 | Feedback Loop — Self-Healing sonrası yeniden değerlendirme |
+| **AR** | AR-002_57 | PID Standardı — Self-Healing kayıtlarında PID zorunlu |
+| **AR** | AR-002_60 | CEE — Self-Healing atlanırsa violation |
+| **AR** | AR-002_70 | Production Runtime — Self-Healing Gateway |
+| **AR** | AR-002_76 | Production Execution — Self-Healing entegrasyonu |
+| **AR** | AR-002_79 | Üretim Sürekliliği — Self-Healing → Recovery zinciri |
+| **AR** | AR-002_81 | Karar Talep Protokolü — SELF_HEALING karar kategorisi |
+| **AR** | AR-002_82 | Mission Persistence — Self-Healing'in üst katmanı |
+| **AR** | AR-002_83 | Recovery Policy — Self-Healing başarısız olursa geçiş |
+| **AR** | AR-002_84 | Yönetici Yeniden Üretim — START_AS_NEW Self-Healing |
+| **AR** | AR-002_86 | Anayasal Yürütme — Self-Healing uygulanmaması ihlal |
+| **AR** | AR-002_87 | External Resource Recovery — Provider Self-Healing referansı |
+| **AR** | AR-002_90 | Production Gate — Pre-production Self-Healing |
+
+### Beklenen Sonuç
+
+* Hiçbir Task eksik bağımlılık nedeniyle hemen FAILED olmaz.
+* Task'lar kendi Package, Resource, Event ve Artifact'lerini onarabilir.
+* Self-Healing başarısız olursa Recovery Policy otomatik devreye girer.
+* START_AS_NEW ve REPLAY prosedürleri boş task_packages ile karşılaşmaz.
+* Tüm bekleme süreleri GC parametrelerinden okunur, hard-coded değer kalmaz.
+* Tek Waiting Policy, tek Retry Policy, tek Recovery Policy kullanılır.
+* CEE, Self-Healing atlanarak FAILED olan task'ları violation olarak kaydeder.
+* Tüm Self-Healing adımları Decision History ve Event Log'a kaydedilir.
