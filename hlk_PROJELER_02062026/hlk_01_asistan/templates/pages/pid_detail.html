@@ -123,15 +123,24 @@ function filterArticles() {
 }
 
 /* ── İş Akışı Haritası ──────────────────────────────────────────────────── */
+const WF_SHORT_NAMES = {
+  'WF-001':'Ürün Bağlantısı Doğrulama', 'WF-002':'Arka Plan Araştırması',
+  'WF-003':'Brief Toplama', 'WF-004':'Brief Onayı', 'WF-005':'Senaryo Üretimi',
+  'WF-006':'Senaryo Onayı', 'WF-007':'Fiyatlandırma', 'WF-008':'Video Üretimi',
+  'WF-009':'Kalite Kontrol', 'WF-010':'Teslimat', 'WF-011':'Oturum Tamamlandı',
+  'WF-015':'Anayasal Uygulatma', 'WF-016':'Olay Toplama', 'WF-017':'Karar Talebi',
+};
+
 function updateWfMap(workflows) {
   const map = document.getElementById('wfMap');
   if (!map) return;
   const items = workflows.map(wf => {
-    const dot = wf.status === 'completed' ? '🟢' : wf.status === 'running' ? '🟡'
-      : wf.status === 'failed' ? '🔴' : wf.status === 'pending' ? '🔵' : '⚫';
+    const dot = wf.status === 'completed' ? '\u{1F7E2}' : wf.status === 'running' ? '\u{1F7E1}'
+      : wf.status === 'failed' ? '\u{1F534}' : wf.status === 'pending' ? '\u{1F535}' : '⚫';
     const active = wf.status !== 'inactive' ? ' active' : '';
+    const shortName = WF_SHORT_NAMES[wf.wf_id] || wf.wf_name;
     return '<span class="wf-map-item' + active + '" title="' + esc(wf.wf_name) + ' — ' + esc(wf.status) + '">'
-      + dot + ' <small>' + esc(wf.wf_id) + '</small></span>';
+      + dot + ' <strong>' + esc(wf.wf_id) + '</strong> <small>' + esc(shortName) + '</small></span>';
   });
   map.innerHTML = items.join(' <span class="wf-map-arrow">↓</span> ');
   document.getElementById('wfToolbar').style.display = 'block';
@@ -196,7 +205,9 @@ function renderTree(workflows) {
     html += '  <div class="wf-header" onclick="toggleWF(this.parentElement)">';
     html += '    <span class="wf-dot ' + dotClass(wf.status) + '"></span>';
     html += '    <span class="wf-id">' + esc(wf.wf_id) + '</span>';
-    html += '    <span class="wf-name">' + esc(wf.wf_name) + ' <small>(' + esc(wf.wf_id) + ')</small></span>';
+    const wfShortName = WF_SHORT_NAMES[wf.wf_id] || '';
+    html += '    <span class="wf-name"><strong>' + esc(wf.wf_id) + '</strong> ' + esc(wf.wf_name)
+         + (wfShortName ? ' — <span style="color:#64748b;">' + esc(wfShortName) + '</span>' : '') + '</span>';
     html += '    <span class="wf-badges">' + badges.join('') + '</span>';
     html += '    <span class="wf-chevron">▶</span>';
     html += '  </div>';
@@ -504,6 +515,98 @@ function renderDetailTable(detail, nodeType) {
     if (detail.missing && detail.missing.length) {
       html += '<div style="margin:4px 0;"><strong>⚠️ Eksik / Missing:</strong> ' + detail.missing.map(esc).join(', ') + '</div>';
     }
+    return html;
+  }
+
+  // Özel render: workflow_result (14. Sonuç)
+  if (nodeType === 'workflow_result') {
+    const isSuccess = detail.is_success;
+    const icon = isSuccess ? '\u{1F7E2}' : '\u{1F534}';
+    const statusLabel = isSuccess ? 'Ba\u{015F}ar\u{0131}l\u{0131}' : 'Ba\u{015F}ar\u{0131}s\u{0131}z';
+    const verdictIcons = {COMPLIANT:'\u{1F7E2}', PARTIAL:'\u{1F7E1}', VIOLATION:'\u{1F534}', UNKNOWN:'⚫'};
+    let html = '<div class="result-card ' + (isSuccess ? 'success' : 'failure') + '">';
+    html += '<div class="result-header">';
+    html += '<span class="result-icon">' + icon + '</span>';
+    html += '<span class="result-title">' + esc(statusLabel) + '</span>';
+    html += '</div>';
+    // Sebep / Nedenler
+    if (detail.reasons && detail.reasons.length) {
+      html += '<div class="result-section"><div class="result-section-title">'
+           + (isSuccess ? 'Ba\u{015F}ar\u{0131} Sebebi' : 'Ba\u{015F}ar\u{0131}s\u{0131}zl\u{0131}k Nedeni')
+           + '</div>';
+      detail.reasons.forEach(r => {
+        const parts = r.split(': ');
+        if (parts.length >= 2) {
+          html += '<div class="result-reason"><span class="article-ref" onclick="event.stopPropagation();alert(\'Anayasa Maddesi: ' + esc(parts[0]) + '\')">\u{1F535} ' + esc(parts[0]) + '</span><span class="reason-desc">' + esc(parts.slice(1).join(': ')) + '</span></div>';
+        } else {
+          html += '<div class="result-reason"><span class="reason-desc">• ' + esc(r) + '</span></div>';
+        }
+      });
+      html += '</div>';
+    }
+    // Anayasal Uyum
+    html += '<div class="result-section"><div class="result-section-title">Anayasal Uyum</div>';
+    html += '<span class="compliance-badge ' + esc(detail.compliance_verdict || 'UNKNOWN').toLowerCase() + '">'
+         + (verdictIcons[detail.compliance_verdict] || '⚫') + ' '
+         + esc(detail.compliance_verdict || 'De\u{011F}erlendirilmedi') + '</span>';
+    html += '</div>';
+    // Etkilenen İş Akışları
+    if (detail.affected_workflows && detail.affected_workflows.length) {
+      html += '<div class="result-section"><div class="result-section-title">Etkilenen \u{0130}\u{015F} Ak\u{0131}\u{015F}lar\u{0131}</div>';
+      html += detail.affected_workflows.map(wf => '<span class="wf-tag">' + esc(wf) + '</span>').join('');
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  // Özel render: recommended_actions (15. Yapılması Gerekenler)
+  if (nodeType === 'recommended_actions') {
+    let html = '<div class="actions-card">';
+    // A. HLK Otomatik
+    if (detail.auto_actions && detail.auto_actions.length) {
+      html += '<div class="action-block"><div class="action-title">A. HLK`n\u{0131}n Otomatik Yapaca\u{011F}\u{0131} \u{0130}\u{015F}lemler</div>';
+      detail.auto_actions.forEach(a => {
+        html += '<div class="action-item auto">✓ ' + esc(a) + '</div>';
+      });
+      html += '</div>';
+    }
+    // B. Yönetici
+    if (detail.admin_actions && detail.admin_actions.length) {
+      html += '<div class="action-block"><div class="action-title">B. Yöneticinin Yapmas\u{0131} Gerekenler</div>';
+      detail.admin_actions.forEach((a, i) => {
+        html += '<div class="action-item admin">' + (i + 1) + '. ' + esc(a) + '</div>';
+      });
+      html += '</div>';
+    }
+    // C. Etkilenen
+    if (detail.affected_workflows && detail.affected_workflows.length) {
+      html += '<div class="action-block"><div class="action-title">C. Etkilenen \u{0130}\u{015F} Ak\u{0131}\u{015F}lar\u{0131}</div>';
+      detail.affected_workflows.forEach(wf => {
+        html += '<div class="action-item affected">' + esc(wf) + ' <span class="wf-arrow">↓</span> <span class="wf-desc">Etkilendi</span></div>';
+      });
+      html += '</div>';
+    }
+    // D. Tekrar Çalıştırma
+    if (detail.rerun) {
+      const possible = detail.rerun.possible;
+      html += '<div class="action-block"><div class="action-title">D. Tekrar Çal\u{0131}\u{015F}t\u{0131}rma</div>';
+      html += '<div class="action-item ' + (possible ? 'success' : 'failed') + '">'
+           + (possible ? '✓ Mümkün' : '✗ Mümkün De\u{011F}il')
+           + ' <span class="reason-desc">— ' + esc(detail.rerun.condition || '') + '</span></div>';
+      html += '</div>';
+    }
+    // E. Tahmini
+    if (detail.estimated_fix_seconds > 0) {
+      html += '<div class="action-block"><div class="action-title">E. Tahmini Çözüm Bilgisi</div>';
+      html += '<div class="action-item">⏱ Tahmini Çözüm Süresi: <strong>' + esc(String(detail.estimated_fix_seconds)) + ' saniye</strong></div>';
+      html += '<div class="action-item">\u{1F3AF} Tahmini Ba\u{015F}ar\u{0131} Olas\u{0131}l\u{0131}\u{011F}\u{0131}: <strong>%' + esc(String(detail.estimated_success_rate)) + '</strong></div>';
+      html += '</div>';
+    } else if (!isSuccess) {
+      html += '<div class="action-block"><div class="action-title">E. Tahmini Çözüm Bilgisi</div>';
+      html += '<div class="action-item">Hesaplanamad\u{0131}</div></div>';
+    }
+    html += '</div>';
     return html;
   }
 

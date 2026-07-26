@@ -497,3 +497,40 @@ body.admin-mode .child-source { display: inline !important; }
 .constitution-articles { padding: 0; }
 .constitution-article-item { cursor: pointer; transition: background 0.1s; }
 .constitution-article-item:hover { background: #f8fafc; }
+
+/* ── Sonuç Kartı (Workflow Result) ──────────────────────────────────────── */
+.result-card { border-radius: 10px; padding: 20px; margin: 8px 0; }
+.result-card.success { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.result-card.failure { background: #fef2f2; border: 1px solid #fecaca; }
+.result-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.result-icon { font-size: 28px; }
+.result-title { font-size: 20px; font-weight: 700; }
+.result-section { margin: 12px 0; }
+.result-section-title { font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.result-reason { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+.result-reason .article-ref { color: #2563eb; cursor: pointer; font-weight: 500; font-size: 13px; white-space: nowrap; }
+.result-reason .article-ref:hover { text-decoration: underline; }
+.result-reason .reason-desc { color: #475569; font-size: 13px; }
+.wf-tag { display: inline-block; padding: 3px 10px; margin: 2px 4px 2px 0; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; }
+.wf-arrow { color: #94a3b8; margin: 0 4px; }
+.wf-desc { color: #64748b; font-size: 12px; }
+.compliance-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-weight: 600; font-size: 13px; }
+.compliance-badge.compliant { background: #eafaf0; color: #16a34a; }
+.compliance-badge.partial { background: #fefce8; color: #b45309; }
+.compliance-badge.violation { background: #fef2f2; color: #dc2626; }
+.compliance-badge.unknown { background: #f8fafc; color: #64748b; }
+
+/* ── Aksiyon Kartı (Recommended Actions) ───────────────────────────────── */
+.actions-card { border-radius: 10px; padding: 16px; background: #f8fafc; border: 1px solid #e5e7eb; margin: 8px 0; }
+.action-block { margin: 12px 0; padding: 12px; background: #fff; border-radius: 8px; border: 1px solid #f1f5f9; }
+.action-title { font-size: 14px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+.action-item { padding: 5px 0; font-size: 13px; color: #334155; display: flex; align-items: baseline; gap: 6px; }
+.action-item.auto { color: #16a34a; }
+.action-item.admin { color: #2563eb; }
+.action-item.affected { color: #b45309; }
+.action-item.success { color: #16a34a; font-weight: 600; }
+.action-item.failed { color: #dc2626; font-weight: 600; }
+
+/* ── Article Ref (clickable constitution reference) ────────────────────── */
+.article-ref { color: #2563eb; cursor: pointer; font-weight: 500; font-family: monospace; font-size: 12px; padding: 2px 6px; background: #eff6ff; border-radius: 3px; }
+.article-ref:hover { background: #dbeafe; text-decoration: underline; }
