@@ -450,7 +450,7 @@ class ConstitutionScanner:
     def _build_wf_purposes(self) -> None:
         """Her WF için anayasal amaç metni oluştur."""
         defaults = {
-            "WF-001": "Kullanıcıdan alınan ürün linkinin doğrulanması. GK-001_1..12 kurallarına göre link erişilebilirliği, ürün bilgisi yeterliliği ve güven puanı kontrol edilir. Doğrulanmamış link ile hiçbir alt süreç başlatılamaz.",
+            "WF-001": "HLK'nın karar ve yönetim merkezi. İlk görevi ürün linkini doğrulamaktır (GK-001_1..12). Link doğrulandıktan sonra ürünü tanır, dinamik Bilgi Açığı Listesi oluşturur, uzman ajanları görevlendirir (Link Validation, Product Research, Image Research, Brand Research, Technical Research, Asset Organizer), sonuçları değerlendirir ve eksiksiz Production Package'i hazırlayarak WF-002'ye devreder. Üretim süreci boyunca tek karar vericidir. Hiçbir ajan karar veremez. HLK = WF-001.",
             "WF-002": "Doğrulanmış ürün linki üzerinden arka plan araştırması. AR-002_13 Ürün Referans Paketi ve AR-002_20 Görsel Araştırma mimarilerine göre ürün, marka, görsel, rakip ve fiyat analizi yapılır. Bilgi Açığı Analizi ile eksik veriler tespit edilir.",
             "WF-003": "Kullanıcıdan reklam üretimi için gerekli teknik parametrelerin toplanması. OR-004_2/3/4 kurallarına göre platform, çözünürlük, süre, tanıtım tarzı, hedef kitle ve ses tercihleri belirlenir.",
             "WF-004": "Toplanan brief verilerinin kullanıcı tarafından kontrol edilip onaylanması. OR-004_5'e göre tik-düzeltme mekanizması ile son kontroller yapılır. Onay sonrası brief kilitlenir.",

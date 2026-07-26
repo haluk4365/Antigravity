@@ -8,11 +8,27 @@ Business Workflow kayıtları.
 
 ### Workflow
 
-Product Link Validation
+HLK Karar ve Yönetim Merkezi — Product Link Validation & Production Planning
 
 ### Açıklama
 
-Kullanıcıdan alınan ürün linkinin doğrulanması sürecini temsil eder.
+WF-001, HLK'nın çalışma oturumudur. Sistemdeki ilk çalışan ajan değil, ilk karar vericidir.
+
+WF-001'in temel görevi araştırma yapmak değil, üretim sürecini yönetmektir:
+- Kullanıcıdan alınan ürün linkini doğrulamak (GK-001_1..12)
+- Ürünü tanımak ve analiz etmek
+- "Bu ürünü eksiksiz, güvenilir ve en kaliteli şekilde tanıtabilmem için hangi bilgilere ihtiyacım var?" sorusunu cevaplamak
+- Ürün tipine göre dinamik Bilgi Açığı Listesi oluşturmak
+- Yapılacak işleri, öncelik sırasını ve uygun uzman ajanları belirlemek
+- Uzman ajanları görevlendirmek (Link Validation, Product Research, Image Research, Brand Research, Technical Research, Asset Organizer)
+- Ajan sonuçlarını değerlendirmek, eksik bilgi varsa yeni görev oluşturmak
+- Toplanan tüm doğrulanmış bilgileri standart klasör yapısına yerleştirmek
+- Production Package'i eksiksiz oluşturmak
+- Hazır hale gelen Production Package'i WF-002'ye devretmek
+
+HLK = WF-001. Üretim süreci boyunca tek karar verici WF-001'dir. Hiçbir ajan karar veremez. Tüm kararlar WF-001 tarafından alınır.
+
+Link doğrulanmadan hiçbir araştırma başlatılamaz. Ürün tanınmadan araştırma başlatılmaz.
 
 ### Durum
 
