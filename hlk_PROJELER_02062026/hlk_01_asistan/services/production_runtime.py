@@ -1458,23 +1458,44 @@ class ProductionRuntime:
         except Exception as _e:
             pass
 
-        # CEE PRE-CHECK (AR-002_60 — anayasal görev paketi)
-        ctp = constitution_enforcement.pre_check(
-            task_description=f"Reproduction ({procedure}) for {pid}",
-            affected_files=[
-                "services/production_runtime.py",
-                "services/production_pipeline.py",
-                "services/production_executor.py",
-            ],
-            master_rules=["MASTER-001", "MASTER-003", "MASTER-013"],
-            arch_rules=["AR-002_57", "AR-002_79", "AR-002_82", "AR-002_83", "AR-002_84"],
-            oper_rules=["OR-004_12"],
-            flow_steps=["AR-002_84: Yönetici Yeniden Üretim Prosedürü"],
-            state_rules=["SE-007_3"],
-            expected_outputs=["Video delivered or constitutional termination"],
-        )
-        logger.info(f"📋 [CEE PRE-CHECK] CTP: {ctp.ctp_id}")
-        self._result.pre_check_report = {"ctp_id": ctp.ctp_id}
+        # FAZ-2B K4: guard_check() — reproduction blocking guard #1
+        try:
+            _guard_ok_r1 = hlk_runtime.guard_check(admin_user_id)
+            if not _guard_ok_r1:
+                self._result.guard_failure_reason = "guard_check() #1 FAILED — reproduction öncesi"
+                logger.error("🛡️ [Reproduction Guard-1] FAILED — reproduction durduruldu")
+                self._state = ProductionState.FAILED
+                self._result.state = ProductionState.FAILED.value
+                self._result.success = False
+                self._result.error = self._result.guard_failure_reason
+                self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                return self._result
+            logger.info("🛡️ [Reproduction Guard-1] PASSED")
+        except Exception as _guard_err_r1:
+            self._result.guard_failure_reason = f"guard_check() #1 exception: {type(_guard_err_r1).__name__}: {_guard_err_r1}"
+            logger.error(f"🛡️ [Reproduction Guard-1] EXCEPTION — reproduction durduruldu: {_guard_err_r1}")
+            self._state = ProductionState.FAILED
+            self._result.state = ProductionState.FAILED.value
+            self._result.success = False
+            self._result.error = self._result.guard_failure_reason
+            self._result.completed_at = datetime.now(timezone.utc).isoformat()
+            return self._result
+
+        # CEE PRE-CHECK (FAZ-2B K4: enforce() ile hard block — bypass kapatıldı)
+        logger.info("🔍 [Reproduction] CEE PRE-CHECK başlıyor (FAZ-2B K4)")
+        pre_check_report = await self._run_cee_pre_check()
+        self._result.pre_check_report = pre_check_report
+        if pre_check_report:
+            self._result.cee_verdict = pre_check_report.get("verdict", "UNKNOWN")
+        if pre_check_report and pre_check_report.get("verdict") == "FAIL":
+            logger.error("❌ [Reproduction] CEE PRE-CHECK FAIL — reproduction durduruldu")
+            self._state = ProductionState.FAILED
+            self._result.state = ProductionState.FAILED.value
+            self._result.success = False
+            self._result.error = "CEE PRE-CHECK FAIL — anayasal denetim başarısız"
+            self._result.completed_at = datetime.now(timezone.utc).isoformat()
+            return self._result
+        logger.info(f"🔍 [Reproduction] CEE PRE-CHECK PASS — devam ediliyor")
 
         # OLAY-108: Yeniden üretim başladı (Adım 19 kayıt mekanizması)
         execution_event_collector.listen(pid=pid)
@@ -1543,6 +1564,29 @@ class ProductionRuntime:
         )
         set_context(pid, ctx)
 
+        # FAZ-2B K4: guard_check() — reproduction blocking guard #2
+        try:
+            _guard_ok_r2 = hlk_runtime.guard_check(admin_user_id)
+            if not _guard_ok_r2:
+                self._result.guard_failure_reason = "guard_check() #2 FAILED — reproduction pipeline sonrasi"
+                logger.error("🛡️ [Reproduction Guard-2] FAILED — reproduction durduruldu")
+                self._state = ProductionState.FAILED
+                self._result.state = ProductionState.FAILED.value
+                self._result.success = False
+                self._result.error = self._result.guard_failure_reason
+                self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                return self._result
+            logger.info("🛡️ [Reproduction Guard-2] PASSED")
+        except Exception as _guard_err_r2:
+            self._result.guard_failure_reason = f"guard_check() #2 exception: {type(_guard_err_r2).__name__}: {_guard_err_r2}"
+            logger.error(f"🛡️ [Reproduction Guard-2] EXCEPTION — reproduction durduruldu: {_guard_err_r2}")
+            self._state = ProductionState.FAILED
+            self._result.state = ProductionState.FAILED.value
+            self._result.success = False
+            self._result.error = self._result.guard_failure_reason
+            self._result.completed_at = datetime.now(timezone.utc).isoformat()
+            return self._result
+
         try:
             # ── Adım 17.5: Önceki üretimden kalan kalıcı asset'leri
             # pipeline context'e geri yükle (AR-002_84 — görsel/ses
@@ -1568,6 +1612,30 @@ class ProductionRuntime:
 
             # ── Adım 18: Üretim yönetimi (Executor recovery — AR-002_79) ─
             self._state = ProductionState.EXECUTING
+
+            # FAZ-2B K4: guard_check() — reproduction blocking guard #3
+            try:
+                _guard_ok_r3 = hlk_runtime.guard_check(admin_user_id)
+                if not _guard_ok_r3:
+                    self._result.guard_failure_reason = "guard_check() #3 FAILED — reproduction executor öncesi"
+                    logger.error("🛡️ [Reproduction Guard-3] FAILED — reproduction durduruldu")
+                    self._state = ProductionState.FAILED
+                    self._result.state = ProductionState.FAILED.value
+                    self._result.success = False
+                    self._result.error = self._result.guard_failure_reason
+                    self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                    return self._result
+                logger.info("🛡️ [Reproduction Guard-3] PASSED")
+            except Exception as _guard_err_r3:
+                self._result.guard_failure_reason = f"guard_check() #3 exception: {type(_guard_err_r3).__name__}: {_guard_err_r3}"
+                logger.error(f"🛡️ [Reproduction Guard-3] EXCEPTION — reproduction durduruldu: {_guard_err_r3}")
+                self._state = ProductionState.FAILED
+                self._result.state = ProductionState.FAILED.value
+                self._result.success = False
+                self._result.error = self._result.guard_failure_reason
+                self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                return self._result
+
             from services.production_executor import production_executor
             executor_report = await production_executor.recover(pid)
             report_dict = executor_report.to_dict() if hasattr(
