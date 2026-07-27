@@ -968,11 +968,16 @@ class ProductionRuntime:
     # ═══════════════════════════════════════════════════════════════════════
 
     async def start_with_timeout(
-        self, timeout: float = None
+        self, request: "ProductionRequest", timeout: float = None
     ) -> ProductionResult:
         """Production'ı timeout korumalı başlatır.
 
+        FAZ-2B (K2): request parametresi anayasal yaşam döngüsünün
+        zorunlu parçasıdır. Production başlatılıyorsa request nesnesi
+        açık şekilde aktarılmalıdır.
+
         Args:
+            request: ProductionRequest — üretim talebi.
             timeout: Özel timeout (saniye). None ise GC_PRODUCTION_TIMEOUT.
 
         Returns:
@@ -983,7 +988,7 @@ class ProductionRuntime:
 
         try:
             result = await asyncio.wait_for(
-                self.start_production(),
+                self.start_production(request),
                 timeout=timeout,
             )
             return result
