@@ -451,6 +451,15 @@ class ProductionRuntime:
                 self._result.completed_steps = 9
                 self._check_cancellation()
 
+                # FAZ-3C: register_handlers() — gerçek pipeline handler'ları
+                # Production Executor'a kaydet (AR-002_76).
+                # FAZ-2A Commit-6'da _run_managed() kaldırılırken bu çağrı
+                # start_production()'a taşınmamıştı. FAZ-3B denetimi bu
+                # regresyonu tespit etti. İdempotenttir — reproduction
+                # yolundaki çağrı ile çakışmaz.
+                from services.production_pipeline import register_handlers
+                register_handlers()
+
                 # FAZ-2A: guard_check() — Blocking Guard #3
                 try:
                     from services.hlk_runtime import hlk_runtime as _guard_hr3
