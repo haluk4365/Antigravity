@@ -100,6 +100,7 @@ class ProductionResult:
     post_check_report: Optional[dict] = None    # CEE POST-CHECK sonucu
     cee_verdict: str = ""                       # FAZ-2A: CEE nihai kararı (PASS/FAIL)
     gate_check: Optional[dict] = None           # FAZ-2A: Production Gate sonucu
+    guard_failure_reason: str = ""              # FAZ-2A: guard_check() başarısızlık nedeni
 
     def to_dict(self) -> dict:
         return {
@@ -117,6 +118,7 @@ class ProductionResult:
             "post_check_report": self.post_check_report,
             "cee_verdict": self.cee_verdict,
             "gate_check": self.gate_check,
+            "guard_failure_reason": self.guard_failure_reason,
         }
 
 
@@ -203,6 +205,35 @@ class ProductionRuntime:
                 self._result.completed_steps = 4
                 self._check_cancellation()
 
+                # FAZ-2A: guard_check() — Blocking Guard (Advisory → Hard Block)
+                try:
+                    from services.hlk_runtime import hlk_runtime as _guard_hr
+                    _guard_ok = _guard_hr.guard_check(request.user_id)
+                    if not _guard_ok:
+                        self._result.guard_failure_reason = (
+                            "HLK Runtime guard_check() FAILED — "
+                            "Runtime aktiflik doğrulaması başarısız"
+                        )
+                        logger.error(f"🛡️ [Guard] FAILED — üretim durduruldu")
+                        self._state = ProductionState.FAILED
+                        self._result.state = ProductionState.FAILED.value
+                        self._result.success = False
+                        self._result.error = self._result.guard_failure_reason
+                        self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                        return self._result
+                    logger.info("🛡️ [Guard-1] PASSED — Runtime aktif")
+                except Exception as _guard_err:
+                    self._result.guard_failure_reason = (
+                        f"guard_check() exception: {type(_guard_err).__name__}: {_guard_err}"
+                    )
+                    logger.error(f"🛡️ [Guard] EXCEPTION — üretim durduruldu: {_guard_err}")
+                    self._state = ProductionState.FAILED
+                    self._result.state = ProductionState.FAILED.value
+                    self._result.success = False
+                    self._result.error = self._result.guard_failure_reason
+                    self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                    return self._result
+
                 # ── Adım 5: Production Runtime Başlatılması ─────────────
                 self._state = ProductionState.STARTING
                 logger.info("🚀 [Production] Runtime başlatılıyor (Adım 5)")
@@ -276,12 +307,60 @@ class ProductionRuntime:
                 logger.info(f"📦 [Production] Package oluşturuldu: {pid}")
                 self._check_cancellation()
 
+                # FAZ-2A: guard_check() — Blocking Guard #2
+                try:
+                    from services.hlk_runtime import hlk_runtime as _guard_hr2
+                    _guard_ok2 = _guard_hr2.guard_check(request.user_id)
+                    if not _guard_ok2:
+                        self._result.guard_failure_reason = "guard_check() #2 FAILED — Package sonrası"
+                        logger.error(f"🛡️ [Guard-2] FAILED — üretim durduruldu")
+                        self._state = ProductionState.FAILED
+                        self._result.state = ProductionState.FAILED.value
+                        self._result.success = False
+                        self._result.error = self._result.guard_failure_reason
+                        self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                        return self._result
+                    logger.info("🛡️ [Guard-2] PASSED — Package sonrası runtime aktif")
+                except Exception as _guard_err2:
+                    self._result.guard_failure_reason = f"guard_check() #2 exception: {type(_guard_err2).__name__}: {_guard_err2}"
+                    logger.error(f"🛡️ [Guard-2] EXCEPTION — üretim durduruldu: {_guard_err2}")
+                    self._state = ProductionState.FAILED
+                    self._result.state = ProductionState.FAILED.value
+                    self._result.success = False
+                    self._result.error = self._result.guard_failure_reason
+                    self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                    return self._result
+
                 # ── Adım 9: Task Package Hazırlığı ──────────────────────
                 self._state = ProductionState.PREPARING_TASKS
                 logger.info(f"📋 [Production] Task Package hazırlığı: {pid} (Adım 9)")
                 await self._prepare_tasks(pid)
                 self._result.completed_steps = 9
                 self._check_cancellation()
+
+                # FAZ-2A: guard_check() — Blocking Guard #3
+                try:
+                    from services.hlk_runtime import hlk_runtime as _guard_hr3
+                    _guard_ok3 = _guard_hr3.guard_check(request.user_id)
+                    if not _guard_ok3:
+                        self._result.guard_failure_reason = "guard_check() #3 FAILED — Task sonrası"
+                        logger.error(f"🛡️ [Guard-3] FAILED — üretim durduruldu")
+                        self._state = ProductionState.FAILED
+                        self._result.state = ProductionState.FAILED.value
+                        self._result.success = False
+                        self._result.error = self._result.guard_failure_reason
+                        self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                        return self._result
+                    logger.info("🛡️ [Guard-3] PASSED — Task sonrası runtime aktif")
+                except Exception as _guard_err3:
+                    self._result.guard_failure_reason = f"guard_check() #3 exception: {type(_guard_err3).__name__}: {_guard_err3}"
+                    logger.error(f"🛡️ [Guard-3] EXCEPTION — üretim durduruldu: {_guard_err3}")
+                    self._state = ProductionState.FAILED
+                    self._result.state = ProductionState.FAILED.value
+                    self._result.success = False
+                    self._result.error = self._result.guard_failure_reason
+                    self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                    return self._result
 
                 # ── Adım 10: Production Executor ─────────────────────────
                 self._state = ProductionState.EXECUTING
