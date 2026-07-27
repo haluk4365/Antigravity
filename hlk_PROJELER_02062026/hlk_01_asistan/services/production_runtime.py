@@ -920,12 +920,20 @@ class ProductionRuntime:
                 f"🔍 [CEE PRE-CHECK] {report.verdict.value} — {report.report_id}"
             )
             return report.to_dict()
-        except ImportError:
-            logger.warning("⚠️ [Production] CEE bulunamadı, PRE-CHECK atlanıyor")
-            return None
+        except ImportError as e:
+            logger.critical(
+                f"🚨 [CEE PRE-CHECK] Constitution Enforcement Engine BULUNAMADI — "
+                f"CEE anayasal zorunlu bileşendir. Üretim başlatılamaz."
+            )
+            raise RuntimeError(
+                "CEE PRE-CHECK: Constitution Enforcement Engine bulunamadı "
+                "(ImportError). CEE olmadan üretim başlatılamaz (FAZ-2B K3)."
+            ) from e
         except Exception as e:
-            logger.error(f"❌ [Production] CEE PRE-CHECK hatası: {e}")
-            return None
+            logger.critical(f"🚨 [CEE PRE-CHECK] Beklenmeyen hata: {e}")
+            raise RuntimeError(
+                f"CEE PRE-CHECK: Anayasal denetim başarısız — {type(e).__name__}: {e}"
+            ) from e
 
     async def _run_cee_post_check(self, pid: str) -> Optional[dict]:
         """CEE POST-CHECK: Production tamamlandıktan sonra anayasal doğrulama.
@@ -956,12 +964,22 @@ class ProductionRuntime:
                 f"🔍 [CEE POST-CHECK] {report.verdict.value} — {report.report_id}"
             )
             return report.to_dict()
-        except ImportError:
-            logger.warning("⚠️ [Production] CEE bulunamadı, POST-CHECK atlanıyor")
-            return None
+        except ImportError as e:
+            logger.critical(
+                f"🚨 [CEE POST-CHECK] Constitution Enforcement Engine BULUNAMADI — "
+                f"CEE anayasal zorunlu bileşendir. Production anayasal doğrulama "
+                f"olmadan tamamlanamaz."
+            )
+            raise RuntimeError(
+                "CEE POST-CHECK: Constitution Enforcement Engine bulunamadı "
+                "(ImportError). CEE olmadan üretim tamamlanamaz (FAZ-2B K3)."
+            ) from e
         except Exception as e:
-            logger.error(f"❌ [Production] CEE POST-CHECK hatası: {e}")
-            return None
+            logger.critical(f"🚨 [CEE POST-CHECK] Beklenmeyen hata: {e}")
+            raise RuntimeError(
+                f"CEE POST-CHECK: Anayasal doğrulama başarısız — "
+                f"{type(e).__name__}: {e}"
+            ) from e
 
     # ═══════════════════════════════════════════════════════════════════════
     # Timeout Yönetimi
