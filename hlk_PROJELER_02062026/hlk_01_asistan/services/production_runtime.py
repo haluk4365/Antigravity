@@ -299,6 +299,29 @@ class ProductionRuntime:
                 logger.info(f"🆔 [Production] PID oluşturuldu: {pid}")
                 self._check_cancellation()
 
+                # FAZ-2A: HLK Runtime lifecycle + EEC/LAC (Commit-5)
+                try:
+                    from services.hlk_runtime import hlk_runtime as _hr_pl
+                    _hr_pl.on_production_start(request.user_id, pid)
+                except Exception as _e:
+                    pass
+                from services.execution_event_collector import (
+                    execution_event_collector, EECEventType, ExecutionPhase,
+                )
+                from services.olay_kayit_merkezi import event_registry
+                from services.live_activity_center import live_activity_center
+                execution_event_collector.listen(pid=pid)
+                start_evt = execution_event_collector.emit_event(
+                    event_type=EECEventType.TASK_STARTED,
+                    description=f"Production started: {pid}",
+                    phase=ExecutionPhase.EXECUTE,
+                    result="Production Runtime yaşam döngüsü başladı",
+                )
+                event_registry.register_from_eec(start_evt)
+                live_activity_center.register(start_evt)
+                logger.info(f"📤 [EEC Event] TASK_STARTED | PID={pid}")
+                logger.info(f"📺 [LAC] TASK_STARTED | PID={pid}")
+
                 # ── Adım 8: Production Package (Package Runtime) ────────
                 self._state = ProductionState.CREATING_PACKAGE
                 logger.info(f"📦 [Production] Package oluşturuluyor: {pid} (Adım 8)")
@@ -306,6 +329,82 @@ class ProductionRuntime:
                 self._result.completed_steps = 8
                 logger.info(f"📦 [Production] Package oluşturuldu: {pid}")
                 self._check_cancellation()
+
+                # FAZ-2A: Brief + Video Parameters + Research + Decision Engine (Commit-5)
+                from services.production_package_runtime import package_runtime
+                ud = request.user_data or {}
+                brief_section = {
+                    "url": request.url,
+                    "product_name": request.product_name,
+                    "brand": request.brand,
+                    "platform": ud.get("platform", ""),
+                    "resolution": ud.get("resolution", ""),
+                    "style": ud.get("style", ""),
+                    "audience": ud.get("audience", ""),
+                    "voice_language": request.voice_lang,
+                    "user_id": request.user_id,
+                    "chat_id": request.chat_id,
+                }
+                await package_runtime.update_section(pid, "brief", brief_section)
+                await package_runtime.update_section(pid, "video_parameters", {
+                    "duration_seconds": request.duration,
+                    "voice_language": request.voice_lang,
+                    "platform": ud.get("platform", ""),
+                    "resolution": ud.get("resolution", ""),
+                })
+                # Research Results (WF-002)
+                research_task = ud.get("_research_task")
+                research_result = None
+                if research_task is not None:
+                    try:
+                        if not research_task.done():
+                            research_result = await research_task
+                        else:
+                            research_result = research_task.result()
+                    except Exception as _research_err:
+                        logger.warning(f"⚠️ Research task sonucu alınamadı: {_research_err}")
+                if research_result and not research_result.get("error"):
+                    results = research_result.get("results", {})
+                    await package_runtime.update_section(pid, "research_results", results)
+                    logger.info(f"📊 [WF-002] Research results kaydedildi: {list(results.keys())}")
+                    refs = []
+                    img_data = results.get("image") or results.get("A-PAGE-IMG") or {}
+                    if img_data:
+                        ref_gorsel = img_data.get("referans_gorsel", "")
+                        ilgili = img_data.get("ilgili_gorseller", [])
+                        if ref_gorsel:
+                            refs.append({"type": "reference", "url": ref_gorsel, "source": "product_page"})
+                        for img in ilgili:
+                            refs.append({"type": "related", "url": img, "source": "product_page"})
+                    og_data = results.get("A-OG-IMG") or {}
+                    if not refs and og_data.get("referans_gorsel"):
+                        refs.append({"type": "reference", "url": og_data["referans_gorsel"], "source": "opengraph"})
+                    await package_runtime.update_section(pid, "reference_images", refs)
+                    logger.info(f"🖼️ [WF-002] Referans Görseller kaydedildi: {len(refs)} adet")
+                else:
+                    logger.warning(f"⚠️ [WF-002] Research result yok veya hatalı — reference_images boş kalacak")
+                # Decision Engine (MASTER-004 / FEAT-002)
+                from services.decision_engine import decision_engine, ProductionContext
+                logger.info("🧠 [Decision Engine Started] HLK karar üretimi başlıyor")
+                prod_context = ProductionContext(
+                    pid=pid, user_id=request.user_id,
+                    product_name=request.product_name, brand=request.brand,
+                    duration=request.duration, voice_lang=request.voice_lang,
+                    url=request.url,
+                )
+                decision_packet = decision_engine.decide(prod_context)
+                logger.info(
+                    f"🧠 [Decision Packet Ready] {decision_packet.decision_id} | "
+                    f"Gorsel: {decision_packet.primary_image_provider.provider if decision_packet.primary_image_provider else 'YOK'}"
+                    f"{' > ' + decision_packet.fallback_image_provider.provider if decision_packet.fallback_image_provider else ''} | "
+                    f"Ses: {decision_packet.primary_voice_provider.provider if decision_packet.primary_voice_provider else 'YOK'} | "
+                    f"Video: {decision_packet.primary_video_provider.provider if decision_packet.primary_video_provider else 'YOK'}"
+                    f"{' > ' + decision_packet.fallback_video_provider.provider if decision_packet.fallback_video_provider else ''}"
+                )
+                request.user_data["decision_packet"] = decision_packet.to_dict()
+                await package_runtime.update_section(
+                    pid, "decision_history", [decision_packet.to_dict()]
+                )
 
                 # FAZ-2A: guard_check() — Blocking Guard #2
                 try:
@@ -331,10 +430,24 @@ class ProductionRuntime:
                     self._result.completed_at = datetime.now(timezone.utc).isoformat()
                     return self._result
 
-                # ── Adım 9: Task Package Hazırlığı ──────────────────────
+                # ── Adım 9: Task Package Hazırlığı (gerçek pipeline task'ları) ──
                 self._state = ProductionState.PREPARING_TASKS
-                logger.info(f"📋 [Production] Task Package hazırlığı: {pid} (Adım 9)")
-                await self._prepare_tasks(pid)
+                real_tasks = [
+                    {"task_id": f"TASK-{pid}-001", "agent": "ImageGenerator",
+                     "status": "PENDING", "pid": pid,
+                     "description": "Ürün görseli üretimi (Decision Packet provider'ları ile)"},
+                    {"task_id": f"TASK-{pid}-002", "agent": "VoiceGenerator",
+                     "status": "PENDING", "pid": pid,
+                     "description": "AI seslendirme üretimi"},
+                    {"task_id": f"TASK-{pid}-003", "agent": "VideoRenderer",
+                     "status": "PENDING", "pid": pid,
+                     "description": "Video render (lipsync/img2vid)"},
+                    {"task_id": f"TASK-{pid}-004", "agent": "DeliveryAgent",
+                     "status": "PENDING", "pid": pid,
+                     "description": "Nihai çıktının kullanıcıya teslimi (AR-002_36)"},
+                ]
+                await package_runtime.update_section(pid, "task_packages", real_tasks)
+                logger.info(f"📋 [Task Package Loaded] {len(real_tasks)} adet task hazırlandı: {pid}")
                 self._result.completed_steps = 9
                 self._check_cancellation()
 
