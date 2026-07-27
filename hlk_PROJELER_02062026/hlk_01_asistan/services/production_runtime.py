@@ -201,7 +201,7 @@ class ProductionRuntime:
                 # ── Adım 1-4: Ön Koşul Doğrulamaları ──────────────────
                 self._state = ProductionState.VALIDATING
                 logger.info("🔍 [Production] Ön koşul doğrulamaları başlıyor (Adım 1-4)")
-                await self._validate_prerequisites()
+                await self._validate_prerequisites(request)
                 self._result.completed_steps = 4
                 self._check_cancellation()
 
@@ -572,13 +572,18 @@ class ProductionRuntime:
     # AR-002_70 Adım 1-4: Ön Koşul Doğrulamaları
     # ═══════════════════════════════════════════════════════════════════════
 
-    async def _validate_prerequisites(self) -> None:
+    async def _validate_prerequisites(self, request) -> None:
         """AR-002_70 Adım 1-4: Ön koşul doğrulamaları.
 
-        Adım 1: STATE doğrulaması
-        Adım 2: Brief Lock doğrulaması
-        Adım 3: Senaryo Onay doğrulaması
-        Adım 4: Yönetici Video Üretim Onayı doğrulaması
+        Adım 1 (SE-007_3/4): STATE doğrulaması — üretim yalnızca
+            STATE_VIDEO_PRODUCTION veya STATE_PAYMENT_VERIFICATION
+            state'lerinde başlatılabilir.
+        Adım 2 (AR-002_70, OR-004_8): Brief Lock — brief verileri
+            (ürün linki, ürün adı, marka, süre) kilitlenmiş olmalıdır.
+        Adım 3 (AR-002_70, OR-004_6): Senaryo Onay — EVENT_SCENARIO_APPROVED
+            gerçekleşmiş olmalıdır.
+        Adım 4 (AR-002_56, OR-004_10): Yönetici Üretim Onayı —
+            EVENT_PAYMENT_APPROVED gerçekleşmiş olmalıdır.
 
         Production Runtime; karar vermez, yalnızca doğrular.
         Gerçek state yönetimi State Engine'indir (SE-007).
@@ -587,22 +592,76 @@ class ProductionRuntime:
             ValueError: Herhangi bir ön koşul sağlanmıyorsa.
         """
         errors: list[str] = []
+        ud = request.user_data or {}
 
-        # Adım 1: STATE doğrulaması (best-effort — State Engine yönetir)
+        # ── Adım 1: STATE doğrulaması (SE-007_3, SE-007_4) ──────────
         logger.info("  Adım 1: STATE doğrulaması")
+        try:
+            from utils.state_engine import StateEngine
+            se = StateEngine(ud)
+            current = getattr(se, "current", None)
+            current_val = getattr(current, "value", str(current)) if current else None
+            allowed_states = {
+                "STATE_VIDEO_PRODUCTION",
+                "STATE_PAYMENT_VERIFICATION",
+                "STATE_VIDEO_PRODUCTION_ACTIVE",
+            }
+            if current_val not in allowed_states:
+                errors.append(
+                    f"STATE={current_val or 'UNKNOWN'} — üretim yalnızca "
+                    f"{' / '.join(sorted(allowed_states))} state'lerinde başlatılabilir"
+                )
+            else:
+                logger.info(f"    ✅ STATE={current_val} — geçerli")
+        except Exception as _e:
+            errors.append(f"STATE doğrulama hatası: {type(_e).__name__}: {_e}")
 
-        # Adım 2: Brief Lock doğrulaması
+        # ── Adım 2: Brief Lock doğrulaması (AR-002_70 Adım 2, OR-004_8) ──
         logger.info("  Adım 2: Brief Lock doğrulaması")
+        if not request.url:
+            errors.append("Brief Lock: ürün linki (url) eksik")
+        if not request.product_name:
+            errors.append("Brief Lock: ürün adı (product_name) eksik")
+        if not request.duration or request.duration <= 0:
+            errors.append(f"Brief Lock: geçersiz video süresi ({request.duration})")
+        if not errors:
+            logger.info(f"    ✅ Brief Lock: url={request.url[:50]}..., "
+                        f"ürün={request.product_name}, süre={request.duration}s")
 
-        # Adım 3: Senaryo Onay doğrulaması
+        # ── Adım 3: Senaryo Onay doğrulaması (AR-002_70 Adım 3, OR-004_6) ──
         logger.info("  Adım 3: Senaryo Onay doğrulaması")
+        scenario_approved = (
+            ud.get("scenario_approved")
+            or ud.get("_scenario_approved")
+            or ud.get("scenario")
+        )
+        if not scenario_approved:
+            errors.append(
+                "Senaryo Onay: EVENT_SCENARIO_APPROVED gerçekleşmemiş — "
+                "senaryo onaylanmadan üretim başlatılamaz (OR-004_6)"
+            )
+        else:
+            logger.info("    ✅ Senaryo Onay: onaylanmış")
 
-        # Adım 4: Yönetici Video Üretim Onayı doğrulaması
-        logger.info("  Adım 4: Yönetici Onay doğrulaması")
+        # ── Adım 4: Yönetici Video Üretim Onayı (AR-002_56, OR-004_10) ──
+        logger.info("  Adım 4: Yönetici Üretim Onayı doğrulaması")
+        payment_approved = (
+            ud.get("payment_approved")
+            or ud.get("_payment_approved")
+            or ud.get("_admin_approved")
+        )
+        if not payment_approved:
+            errors.append(
+                "Yönetici Onayı: EVENT_PAYMENT_APPROVED gerçekleşmemiş — "
+                "ödeme onaylanmadan üretim başlatılamaz (AR-002_56, OR-004_10)"
+            )
+        else:
+            logger.info("    ✅ Yönetici Onayı: onaylanmış")
 
         if errors:
             raise ValueError(
-                f"Ön koşul doğrulaması başarısız: {'; '.join(errors)}"
+                f"Ön koşul doğrulaması başarısız ({len(errors)} hata): "
+                f"{'; '.join(errors)}"
             )
 
     # ═══════════════════════════════════════════════════════════════════════
