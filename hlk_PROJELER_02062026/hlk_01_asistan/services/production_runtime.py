@@ -98,6 +98,8 @@ class ProductionResult:
     executor_report: Optional[dict] = None
     pre_check_report: Optional[dict] = None     # CEE PRE-CHECK sonucu
     post_check_report: Optional[dict] = None    # CEE POST-CHECK sonucu
+    cee_verdict: str = ""                       # FAZ-2A: CEE nihai kararı (PASS/FAIL)
+    gate_check: Optional[dict] = None           # FAZ-2A: Production Gate sonucu
 
     def to_dict(self) -> dict:
         return {
@@ -113,6 +115,8 @@ class ProductionResult:
             "executor_report": self.executor_report,
             "pre_check_report": self.pre_check_report,
             "post_check_report": self.post_check_report,
+            "cee_verdict": self.cee_verdict,
+            "gate_check": self.gate_check,
         }
 
 
@@ -209,6 +213,9 @@ class ProductionRuntime:
                 logger.info("🔍 [Production] CEE PRE-CHECK başlıyor (Adım 6)")
                 pre_check_report = await self._run_cee_pre_check()
                 self._result.pre_check_report = pre_check_report
+                # FAZ-2A: CEE PRE-CHECK verdict'ini kaydet
+                if pre_check_report:
+                    self._result.cee_verdict = pre_check_report.get("verdict", "UNKNOWN")
                 self._result.completed_steps = 6
 
                 if pre_check_report and pre_check_report.get("verdict") == "FAIL":
@@ -287,6 +294,10 @@ class ProductionRuntime:
                 logger.info(f"🔍 [Production] CEE POST-CHECK başlıyor: {pid}")
                 post_check_report = await self._run_cee_post_check(pid)
                 self._result.post_check_report = post_check_report
+                # FAZ-2A: CEE verdict'ini ProductionResult'a açıkça kaydet
+                # (COMPLETION kararı ve denetim izlenebilirliği için)
+                if post_check_report:
+                    self._result.cee_verdict = post_check_report.get("verdict", "UNKNOWN")
 
                 if post_check_report and post_check_report.get("verdict") == "FAIL":
                     logger.warning(
