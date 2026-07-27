@@ -154,8 +154,14 @@ class ProductionRuntime:
     # Ana Akış: Production Başlatma (AR-002_70 — 10 Adım)
     # ═══════════════════════════════════════════════════════════════════════
 
-    async def start_production(self) -> ProductionResult:
+    async def start_production(self, request: "ProductionRequest") -> ProductionResult:
         """AR-002_70: Production sürecini anayasal sırayla başlatır.
+
+        FAZ-2A: Bu metot, HLK üretim yaşam döngüsünün TEK resmî giriş noktasıdır
+        (Bkz. FAZ2A_TASARIM_BELGESI_27072026.md §0.2).
+
+        Args:
+            request: ProductionRequest — üretim talebi (ürün, kullanıcı, brief verileri).
 
         Çalışma Sırası (AR-002_70 — 10 Adım):
         Adım 1-4: Ön koşul doğrulamaları (VALIDATING)
@@ -2017,8 +2023,17 @@ class ProductionRuntime:
         # Heartbeat başlat — Production boyunca runtime aktifliğini kanıtlamak için
         _heartbeat_task = self._start_heartbeat(request.user_id)
         try:
+            # FAZ-2A: Feature flag — birleşik production yolunu etkinleştir
+            # GC_UNIFIED_PRODUCTION=true → yeni start_production(request) yolu
+            # GC_UNIFIED_PRODUCTION=false (varsayılan) → eski _run_managed(request) yolu
+            _use_unified = os.getenv("GC_UNIFIED_PRODUCTION", "false").lower() == "true"
+            if _use_unified:
+                logger.info("🚀 [FAZ-2A] Birleşik production yolu etkin — start_production(request)")
+                _target = self.start_production(request)
+            else:
+                _target = self._run_managed(request)
             return await asyncio.wait_for(
-                self._run_managed(request),
+                _target,
                 timeout=_GC_PRODUCTION_TIMEOUT,
             )
         except asyncio.TimeoutError:
