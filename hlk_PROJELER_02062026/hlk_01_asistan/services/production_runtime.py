@@ -2335,10 +2335,32 @@ class ProductionRuntime:
                 task.add_done_callback(self._on_task_done)
                 return task
         except ImportError:
-            logger.warning(
-                "⚠️ [Production Runtime] HLK Runtime modülü bulunamadı — "
-                "yetkilendirme atlanıyor"
+            # FAZ-2B K5: HLK Runtime bulunamazsa üretim BAŞLATILAMAZ.
+            # Bu bir anayasal ön koşuldur — CEE K3 ile aynı ilke.
+            # Sessizce atlanamaz, advisory değildir.
+            logger.critical(
+                "🚨 [Production Runtime] HLK Runtime modülü BULUNAMADI — "
+                "anayasal yetkilendirme yapılamaz. Production BAŞLATILMIYOR."
             )
+            async def _no_hr():
+                if self._result is None:
+                    self._result = ProductionResult(total_steps=10)
+                self._state = ProductionState.FAILED
+                self._result.state = ProductionState.FAILED.value
+                self._result.success = False
+                self._result.error = (
+                    "Constitutional Boot Chain: HLK Runtime modülü bulunamadı "
+                    "(ImportError) — üretim başlatılamaz (FAZ-2B K5)"
+                )
+                self._result.completed_at = datetime.now(timezone.utc).isoformat()
+                logger.error(
+                    "🏁 [Production Start Blocked] HLK Runtime eksik — "
+                    "üretim başlatılamadı"
+                )
+                return self._result
+            task = asyncio.create_task(_no_hr())
+            task.add_done_callback(self._on_task_done)
+            return task
 
         logger.info(
             f"🚀 [Production Runtime Started] Üretim talebi kabul edildi — "
