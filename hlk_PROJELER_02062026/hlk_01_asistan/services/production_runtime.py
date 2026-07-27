@@ -2182,6 +2182,45 @@ class ProductionRuntime:
             "resolution": ud.get("resolution", ""),
         })
 
+        # ── Research Results Entegrasyonu (AR-002_13 / WF-002) ───────────
+        # Arka plan araştırması handlers/website.py'de başlatılmıştı.
+        # Bu aşamada sonuç beklenir ve Production Package'e kaydedilir.
+        research_task = ud.get("_research_task")
+        research_result = None
+        if research_task is not None:
+            try:
+                if not research_task.done():
+                    research_result = await research_task
+                else:
+                    research_result = research_task.result()
+            except Exception as _research_err:
+                logger.warning(f"⚠️ Research task sonucu alınamadı: {_research_err}")
+
+        if research_result and not research_result.get("error"):
+            results = research_result.get("results", {})
+            await package_runtime.update_section(pid, "research_results", results)
+            logger.info(f"📊 [WF-002] Research results kaydedildi: {list(results.keys())}")
+
+            # Referans Görselleri çıkar ve kaydet
+            refs = []
+            img_data = results.get("image") or results.get("A-PAGE-IMG") or {}
+            if img_data:
+                ref_gorsel = img_data.get("referans_gorsel", "")
+                ilgili = img_data.get("ilgili_gorseller", [])
+                if ref_gorsel:
+                    refs.append({"type": "reference", "url": ref_gorsel, "source": "product_page"})
+                for img in ilgili:
+                    refs.append({"type": "related", "url": img, "source": "product_page"})
+            # A-OG-IMG fallback
+            og_data = results.get("A-OG-IMG") or {}
+            if not refs and og_data.get("referans_gorsel"):
+                refs.append({"type": "reference", "url": og_data["referans_gorsel"], "source": "opengraph"})
+
+            await package_runtime.update_section(pid, "reference_images", refs)
+            logger.info(f"🖼️ [WF-002] Referans Görseller kaydedildi: {len(refs)} adet")
+        else:
+            logger.warning(f"⚠️ [WF-002] Research result yok veya hatalı — reference_images boş kalacak")
+
         # ── FAZ: HLK DECISION ENGINE (MASTER-004 / FEAT-002) ─────────────
         logger.info("🧠 [Decision Engine Started] HLK karar üretimi başlıyor")
         prod_context = ProductionContext(

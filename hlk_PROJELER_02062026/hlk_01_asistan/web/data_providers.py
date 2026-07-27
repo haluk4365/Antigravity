@@ -222,6 +222,9 @@ def get_pid_detail(pid: str) -> Optional[dict]:
         "providers": providers,
         "events": events,
         "runtime_connected": runtime_connected,
+        # AR-002_13 / WF-002: Research Results ve Referans Gorseller
+        "reference_images": pkg.get("reference_images", []) if pkg else [],
+        "research_results": pkg.get("research_results", {}) if pkg else {},
     }
 
 

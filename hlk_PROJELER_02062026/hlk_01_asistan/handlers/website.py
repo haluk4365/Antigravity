@@ -204,9 +204,10 @@ async def _process_link_background(
             text=t("link.validated", lang),
         )
 
-        # Arka plan araştırmasını başlat
+        # Arka plan araştırmasını başlat — sonucu Production Package'e aktarılmak üzere saklanır
         from services.research_orchestrator import run_research_task
-        asyncio.create_task(run_research_task(url=url, user_id=user_id))
+        research_task = asyncio.create_task(run_research_task(url=url, user_id=user_id))
+        user_data["_research_task"] = research_task
         logger.info(f"✅ Link doğrulandı, araştırma başlatıldı: {url[:60]}")
 
         # CEE + EEC denetimi
