@@ -133,20 +133,52 @@ async def _exec_images(page: dict) -> dict | None:
     svg_count = 0
     cat_count = 0
 
-    # Logo/menü/ikon filtreleme anahtar kelimeleri
+    # ── AR-002_24: Logo/menü/ikon filtreleme ──────────────────────────
     noise_keywords = [
+        # Site logolari / UI elemanlari
         "logo", "marka", "brand", "footer", "header", "banner", "sprite",
         "icon", "badge", "placeholder", "loading", "avatar", "profile",
         "default", "spinner", "preloader",
+        # Navigasyon / menus
         "house", "home", "shopping-bag", "cart", "heart", "wishlist",
         "favorite", "user", "account", "customer",
         "squares-four", "menu", "grid", "list",
         "search", "magnifying", "close", "x-mark",
         "hamburger", "chevron", "arrow",
+        # Sosyal medya / paylasim
         "facebook", "instagram", "twitter", "youtube",
         "pinterest", "whatsapp", "social", "share",
         "download", "upload",
+        # UI ses/medya kontrolleri (ikonlar)
+        "mic", "microphone", "speaker", "audio", "sound",
+        "play-", "pause", "stop-", "mute", "volume",
+        "video-player", "media-control",
+        # Rating / yildiz / rozet
+        "star-rating", "review-star", "trust-badge", "rating",
+        "trustpilot", "verified-", "guarantee",
+        # Dil / ulke bayraklari
+        "flag-", "language-", "translate", "currency",
+        # Renk / beden / varyant secim ikonlari
+        "swatch", "color-", "size-",
     ]
+
+    # ── AR-002_25: Ürün Referans bilgilerini cikar ──────────────────
+    soup = page.get("soup")
+    og_title = (_meta(soup, "og:title") or "").lower()
+    og_site = (_meta(soup, "og:site_name") or "").lower()
+    meta_desc = (_meta(soup, "description") or "").lower()
+    title_tag = (soup.find("title").get_text(strip=True).lower() if soup and soup.find("title") else "")
+    # Marka/urun isim parcaciklari (esleme dogrulamasi icin)
+    _product_terms = set()
+    for _src_text in [og_title, og_site, title_tag]:
+        for _word in _src_text.replace("-", " ").replace("|", " ").split():
+            _w = _word.strip().strip(".,;:!?()[]{}\"'").lower()
+            if len(_w) >= 3 and _w not in ("the", "and", "for", "buy", "shop", "size",
+                "color", "price", "sale", "new", "best", "all", "our", "your",
+                "with", "from", "that", "this", "have", "been", "also", "more",
+                "about", "product", "products", "collection", "collections",
+                "page", "online", "store", "shopify", "my"):
+                _product_terms.add(_w)
 
     for img in soup.find_all("img"):
         src = img.get("src", "") or img.get("data-src", "")
@@ -159,6 +191,7 @@ async def _exec_images(page: dict) -> dict | None:
         cls = " ".join(img.get("class", [])).lower() if img.get("class") else ""
         src_lower = src.lower()
 
+        # ADIM 1 — AR-002_24: Teknik gürültü filtresi
         combined = f"{alt} {cls} {src_lower}"
         if any(kw in combined for kw in noise_keywords):
             filtered_noise += 1
@@ -170,6 +203,23 @@ async def _exec_images(page: dict) -> dict | None:
             cat_count += 1
             continue
 
+        # ADIM 2 — AR-002_25: Ürün Referans Paketi ile esleme dogrulamasi
+        # Gorselin dosya adi veya alt metni, urunle ilgili en az bir terim icermeli.
+        _img_text = f"{alt} {src_lower}"
+        _has_product_match = False
+        if _product_terms:
+            for _term in _product_terms:
+                if _term in _img_text:
+                    _has_product_match = True
+                    break
+        # Eger hic urun terimi cikarilamadiysa (sayfada meta yoksa),
+        # yalnizca acikca UI olmayan dosya adlari gecsin.
+        # Ornek: "mic.gif", "star.png" → UI, urun gorseli degil.
+        if _product_terms and not _has_product_match:
+            # AR-002_25: AGENT_NOISE — urunle ilgisi yok
+            filtered_noise += 1
+            continue
+
         if not src.startswith("http"):
             src = "https:" + src if src.startswith("//") else src
 
@@ -178,6 +228,8 @@ async def _exec_images(page: dict) -> dict | None:
     if not images:
         return None
 
+    # ── AR-002_18: Bilgi değeri siralamasi ──────────────────────────
+    # og:image oncelikli referans; yoksa ilk urun gorseli
     og_image = _meta(page.get("soup"), "og:image") if page.get("soup") else ""
 
     referans = ""
@@ -185,9 +237,34 @@ async def _exec_images(page: dict) -> dict | None:
     if og_image and og_image in images:
         referans = og_image
         ilgili = [img for img in images if img != og_image]
-    else:
-        referans = images[0] if images else ""
-        ilgili = images[1:] if len(images) > 1 else []
+    elif images:
+        # og:image yoksa en anlamli goruntu adayini referans sec
+        # (urun adini iceren, .jpg/.png, vendor/cdn path'li)
+        _scored = []
+        for _i, _img in enumerate(images):
+            _score = 0
+            _il = _img.lower()
+            # Urun terimleriyle eslesme
+            for _term in _product_terms:
+                if _term in _il:
+                    _score += 2
+            # Dosya uzantisi urun fotografi mi?
+            if any(_il.endswith(_ext) for _ext in (".jpg", ".jpeg", ".png", ".webp")):
+                _score += 1
+            # CDN/products yolu tercihi
+            if any(_p in _il for _p in ("/products/", "/cdn/", "/files/", "/photos/")):
+                _score += 1
+            # UI/site geneli path'ler cezali
+            if any(_p in _il for _p in ("/assets/", "/theme/", "/layout/", "/svg/", "/icons/")):
+                _score -= 2
+            _scored.append((_score, _img))
+        _scored.sort(key=lambda x: x[0], reverse=True)
+        if _scored and _scored[0][0] > -1:
+            referans = _scored[0][1]
+            ilgili = [img for img in images if img != referans]
+        else:
+            referans = images[0]
+            ilgili = images[1:]
 
     return {
         "referans_gorsel": referans,
