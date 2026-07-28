@@ -50,7 +50,21 @@ class Settings:
         return self.TELEGRAM_ALLOWED_USERS == "*"
 
     def is_admin(self, user_id: str | int) -> bool:
-        """Kullanıcı yönetici mi? TELEGRAM_ADMIN_USER_ID tanımlı değilse herkes yönetici kabul edilmez."""
+        """Kullanıcı yönetici mi? TELEGRAM_ADMIN_USER_ID tanımlı değilse hiç kimse yönetici kabul edilmez.
+
+        Güvenlik prensibi (AR-002_84): fail-closed — env var eksikse herkes reddedilir.
+        Sebep loglanır; sessiz başarısızlık üretilmez.
+        """
         if not self.TELEGRAM_ADMIN_USER_ID:
+            import logging
+            _log = logging.getLogger("hlk.auth")
+            _log.warning(
+                "⚠️ [AUTH] TELEGRAM_ADMIN_USER_ID tanımlı değil — "
+                "hiç kimse yönetici kabul edilmez. "
+                "Yönetici işlemleri (fiyat onayı, ödeme onayı, /yeniden) "
+                "bu değişken tanımlanana kadar çalışmayacaktır. "
+                "Railway'de veya .env dosyasında TELEGRAM_ADMIN_USER_ID=<admin_id> "
+                "olarak tanımlanmalıdır."
+            )
             return False
         return str(user_id) == str(self.TELEGRAM_ADMIN_USER_ID)

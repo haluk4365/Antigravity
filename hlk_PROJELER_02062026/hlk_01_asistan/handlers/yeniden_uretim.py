@@ -62,9 +62,18 @@ def _is_admin(user_id: int) -> bool:
     AR-002_84: Prosedür yalnızca Yönetici tarafından başlatılabilir.
     Settings.is_admin ile aynı kural uygulanır (sınıf özniteliği üzerinden;
     TELEGRAM_ADMIN_USER_ID tanımlı değilse hiç kimse Yönetici kabul edilmez).
+
+    Güvenlik prensibi: fail-closed. Env var eksikse sebep loglanır,
+    sessiz başarısızlık üretilmez.
     """
     admin_id = Settings.TELEGRAM_ADMIN_USER_ID
     if not admin_id:
+        import logging
+        _log = logging.getLogger("hlk.auth")
+        _log.warning(
+            "⚠️ [AUTH] /yeniden: TELEGRAM_ADMIN_USER_ID tanımlı değil — "
+            "hiç kimse yönetici kabul edilmez."
+        )
         return False
     return str(user_id) == str(admin_id)
 
