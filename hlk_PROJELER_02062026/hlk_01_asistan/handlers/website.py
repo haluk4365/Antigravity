@@ -2078,6 +2078,7 @@ async def handle_scenario_approve(update: Update, context: ContextTypes.DEFAULT_
 
     se = StateEngine(context.user_data)
     se.fire(UserEvent.SCENARIO_APPROVED)
+    context.user_data["scenario_approved"] = True  # AR-002_70 Adım 3 doğrulaması için
     context.user_data["_pricing_user_id"] = user.id
     context.user_data["_pricing_chat_id"] = chat_id
 
@@ -2678,6 +2679,7 @@ async def handle_admin_payment_approve(update: Update, context: ContextTypes.DEF
 
     se = StateEngine(context.user_data)
     se.fire(UserEvent.PAYMENT_APPROVED)
+    context.user_data["payment_approved"] = True  # AR-002_70 Adım 4 doğrulaması için
 
     try:
         await query.message.delete()
