@@ -1684,18 +1684,25 @@ async def _run_sahne13_flow(
     video_duration = SAHNE13_SURE_LANG.get(language.upper(), SAHNE13_SURE)
 
     sahne13_msg = None
+    _video_sent = False
     if video_path and video_path.exists():
         try:
             with open(video_path, "rb") as vf:
-                sahne13_msg = await bot.send_video(
-                    chat_id=chat_id, video=vf,
-                    width=720, height=1280,
-                    duration=video_duration,
-                    write_timeout=180,
-                    read_timeout=90,
-                    connect_timeout=30,
+                sahne13_msg = await asyncio.wait_for(
+                    bot.send_video(
+                        chat_id=chat_id, video=vf,
+                        width=720, height=1280,
+                        duration=video_duration,
+                        write_timeout=15,
+                        read_timeout=10,
+                        connect_timeout=5,
+                    ),
+                    timeout=20.0,
                 )
+            _video_sent = True
             logger.info(f"🎬 SAHNE-13 video gönderildi: {language} msg={sahne13_msg.message_id}")
+        except asyncio.TimeoutError:
+            logger.warning(f"⚠️ SAHNE-13 video zaman aşımı (20sn) — atlanıyor: dil={language}")
         except Exception as e:
             logger.error(f"❌ SAHNE-13 video gönderilemedi: {e}")
     else:
@@ -1717,8 +1724,11 @@ async def _run_sahne13_flow(
             pass
     asyncio.create_task(_remove_sahne13_hint())
 
-    # Video süresince bekle
-    await asyncio.sleep(video_duration + SAHNE2_EXTRA_WAIT)
+    # Video süresince bekle (video gönderildiyse tam süre, gönderilemediyse kısa bekleme)
+    if _video_sent:
+        await asyncio.sleep(video_duration + SAHNE2_EXTRA_WAIT)
+    else:
+        await asyncio.sleep(2.0)
 
     # Videoyu sil
     if sahne13_msg:
