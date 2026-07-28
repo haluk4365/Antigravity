@@ -1761,6 +1761,7 @@ async def _run_sahne13_flow(
     # PNG render kullanılmaz; Telegram resmi bileşenleriyle uygulanır
     # ════════════════════════════════════════════════════════════════
     data = _build_scenario_data(user_data)
+    user_data["scenario"] = data  # AR-002_90: Production Gate WF-005/006 doğrulaması için
 
     html = _build_senaryo_html(data)
 
